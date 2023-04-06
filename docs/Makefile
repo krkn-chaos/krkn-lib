@@ -41,6 +41,9 @@ clean:
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
+markdown:
+	$(SPHINXBUILD) -b markdown $(ALLSPHINXOPTS) $(BUILDDIR)/markdown
+
 epub:
 	$(SPHINXBUILD) -b epub2 $(ALLSPHINXOPTS) $(BUILDDIR)/epub
 

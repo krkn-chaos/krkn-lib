@@ -128,9 +128,7 @@ class KrknLibKubernetes:
         :return: kubernetes server URL
         """
 
-        return (
-            self.cli.api_client.configuration.Configuration.get_default_copy().host  # NOQA
-        )
+        return self.cli.api_client.configuration.get_default_copy().host
 
     def get_clusterversion_string(self) -> str:
         """
