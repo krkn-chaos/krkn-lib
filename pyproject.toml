@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "krkn-lib-kubernetes-draft"
+version = "0.0.0"
+description = "Kubernetes library for Kraken"
+authors = ["Red Hat Chaos Engineering Team"]
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/redhat-chaos/krkn"
+packages = [{include= "src/krkn_lib_kubernetes"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+kubernetes ="^26.0.0"
+arcaflow-lib-kubernetes="^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
