@@ -35,7 +35,7 @@ def initialize_clients(kubeconfig_path: str = None):
         f = open(kubeconfig_path)
         with f:
             kubeconfig_str = f.read()
-            initialize_clients_from_kconfig_string(str(kubeconfig_str))
+            initialize_clients_from_kconfig_string(kubeconfig_str)
 
     except OSError:
         raise Exception(
