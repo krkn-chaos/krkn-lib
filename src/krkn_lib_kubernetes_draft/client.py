@@ -6,7 +6,7 @@ from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
-import re
+
 
 from .resources import (
     PVC,
