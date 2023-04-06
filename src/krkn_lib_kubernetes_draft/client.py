@@ -3,6 +3,7 @@ import re
 import time
 import arcaflow_lib_kubernetes
 import kubernetes
+import os
 from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
@@ -74,6 +75,8 @@ class KrknLibKubernetes:
         """
         if kubeconfig_path is None:
             kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
+        if "~/" in kubeconfig_path:
+            kubeconfig_path = os.path.expanduser(kubeconfig_path)
 
         try:
             f = open(kubeconfig_path)
