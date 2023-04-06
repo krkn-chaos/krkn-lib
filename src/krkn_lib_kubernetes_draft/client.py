@@ -32,7 +32,7 @@ def initialize_clients(kubeconfig_path: str = None):
         kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
 
     try:
-        f = open(kubeconfig_path, "rb")
+        f = open(kubeconfig_path)
         with f:
             kubeconfig_str = f.read()
             initialize_clients_from_kconfig_string(str(kubeconfig_str))
