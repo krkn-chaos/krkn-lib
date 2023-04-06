@@ -51,9 +51,17 @@ code_example_dir = "code-example"
 code_add_python_path = ["../py"]
 
 
+def skip(app, what, name, obj, would_skip, options):
+    if name == "__init__":
+        return False
+    return would_skip
+
+
 def setup(app):
     from sphinx.util.texescape import tex_replacements
 
+    app.add_css_file("krkn-style.css")
+    app.connect("autodoc-skip-member", skip)
     tex_replacements += [
         ("♮", "$\\natural$"),
         ("ē", "\=e"),  # NOQA

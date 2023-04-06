@@ -49,7 +49,7 @@ jobs:
       - name: Generate documentation
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-          poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Kubernetes library for Arcaflow"
+          poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Kubernetes library for Kraken"
           poetry run make -C docs html
       - name: Build
         run: poetry build
