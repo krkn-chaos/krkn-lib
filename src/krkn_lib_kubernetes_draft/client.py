@@ -4,6 +4,7 @@ import time
 import arcaflow_lib_kubernetes
 import kubernetes
 import os
+import random
 from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
@@ -86,8 +87,8 @@ class KrknLibKubernetes:
 
         except OSError:
             raise Exception(
-                f"Invalid kube-config file: {kubeconfig_path}. "
-                "No configuration found."
+                "Invalid kube-config file: {0}. "
+                "No configuration found.".format(kubeconfig_path)
             )
 
     def __initialize_clients_from_kconfig_string(
@@ -116,10 +117,12 @@ class KrknLibKubernetes:
             )
             self.dyn_client = DynamicClient(self.api_client)
         except ApiException as e:
-            logging.error(f"Failed to initialize kubernetes client: {e}\n")
+            logging.error(
+                "Failed to initialize kubernetes client: %s\n", str(e)
+            )
             raise e
         except Exception as e:
-            logging.error(f"failed to validate kubeconfig: {e}\n")
+            logging.error("failed to validate kubeconfig: %s\n", str(e))
             raise e
 
     def get_host(self) -> str:
@@ -175,7 +178,8 @@ class KrknLibKubernetes:
                 ret = self.cli.list_namespace(pretty=True)
         except ApiException as e:
             logging.error(
-                f"Exception when calling CoreV1Api->list_namespaced_pod: {e}\n"
+                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
+                str(e),
             )
             raise e
         for namespace in ret.items:
@@ -195,8 +199,9 @@ class KrknLibKubernetes:
             ret = self.cli.read_namespace_status(namespace_name)
         except ApiException as e:
             logging.error(
-                f"Exception when calling "
-                f"CoreV1Api->read_namespace_status: {e}\n"
+                "Exception when calling "
+                "CoreV1Api->read_namespace_status: %s\n",
+                str(e),
             )
         return ret.status.phase
 
@@ -212,13 +217,14 @@ class KrknLibKubernetes:
         try:
             api_response = self.cli.delete_namespace(namespace)
             logging.debug(
-                f"Namespace deleted. status='{str(api_response.status)}'"
+                "Namespace deleted. status='%s'", str(api_response.status)
             )
             return api_response
 
         except Exception as e:
             logging.error(
-                "Exception when calling CoreV1Api->delete_namespace: {e}\n"
+                "Exception when calling CoreV1Api->delete_namespace: %s\n",
+                str(e),
             )
             raise e
 
@@ -249,12 +255,13 @@ class KrknLibKubernetes:
             invalid_namespaces = regex_namespaces - valid_regex
             if invalid_namespaces:
                 raise Exception(
-                    f"There exists no namespaces"
-                    f" matching: {invalid_namespaces}"
+                    "There exists no namespaces matching: {0}".format(
+                        invalid_namespaces
+                    )
                 )
             return list(final_namespaces)
         except Exception as e:
-            logging.error(f"{e}")
+            logging.error("%s", str(e))
             raise e
 
     #
@@ -276,7 +283,7 @@ class KrknLibKubernetes:
                 ret = self.cli.list_node(pretty=True)
         except ApiException as e:
             logging.error(
-                f"Exception when calling CoreV1Api->list_node: {e}\n"
+                "Exception when calling CoreV1Api->list_node: %s\n", str(e)
             )
             raise e
         for node in ret.items:
@@ -303,7 +310,7 @@ class KrknLibKubernetes:
                 ret = self.cli.list_node(pretty=True)
         except ApiException as e:
             logging.error(
-                f"Exception when calling CoreV1Api->list_node: {e}\n"
+                "Exception when calling CoreV1Api->list_node: %s\n", str(e)
             )
             raise e
         for node in ret.items:
@@ -336,8 +343,9 @@ class KrknLibKubernetes:
             )
         except ApiException as e:
             logging.error(
-                f"Exception when calling "
-                f"CustomObjectsApi->list_cluster_custom_object: {e}\n"
+                "Exception when calling "
+                "CustomObjectsApi->list_cluster_custom_object: %s\n",
+                str(e),
             )
             raise e
         for managedcluster in ret["items"]:
@@ -375,7 +383,8 @@ class KrknLibKubernetes:
                 ret = self.cli.list_namespaced_pod(namespace, pretty=True)
         except ApiException as e:
             logging.error(
-                f"Exception when calling CoreV1Api->list_namespaced_pod: {e}\n"
+                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
+                str(e),
             )
             raise e
         for pod in ret.items:
@@ -448,7 +457,7 @@ class KrknLibKubernetes:
                     tty=False,
                 )
         except Exception as e:
-            logging.error(f"failed to exec command on pod {e}")
+            logging.error("failed to exec command on pod %s", str(e))
             raise e
         return ret
 
@@ -467,7 +476,7 @@ class KrknLibKubernetes:
             if e.status == 404:
                 logging.info("Pod already deleted")
             else:
-                logging.error(f"Failed to delete pod {e}")
+                logging.error("Failed to delete pod %s", str(e))
                 raise e
 
     def create_pod(self, body: any, namespace: str, timeout: int = 120):
@@ -494,7 +503,7 @@ class KrknLibKubernetes:
                     raise Exception("Starting pod failed")
                 time.sleep(1)
         except Exception as e:
-            logging.error(f"Pod creation failed {e}")
+            logging.error("Pod creation failed %s", str(e))
             if pod_stat:
                 logging.error(pod_stat.status.container_statuses)
             self.delete_pod(body["metadata"]["name"], namespace)
@@ -560,20 +569,20 @@ class KrknLibKubernetes:
                     propagation_policy="Foreground", grace_period_seconds=0
                 ),
             )
-            logging.debug(
-                "Job deleted. status='%s'" % str(api_response.status)
-            )
+            logging.debug("Job deleted. status='%s'", str(api_response.status))
             return api_response
         except ApiException as api:
             logging.warning(
-                f"Exception when calling "
-                f"BatchV1Api->create_namespaced_job: {api}"
+                "Exception when calling "
+                "BatchV1Api->create_namespaced_job: %s",
+                api,
             )
             logging.warning("Job already deleted\n")
         except Exception as e:
             logging.error(
-                f"Exception when calling "
-                f"BatchV1Api->delete_namespaced_job: {e}\n"
+                "Exception when calling "
+                "BatchV1Api->delete_namespaced_job: %s\n",
+                str(e),
             )
             raise e
 
@@ -593,14 +602,15 @@ class KrknLibKubernetes:
             return api_response
         except ApiException as api:
             logging.warning(
-                f"Exception when calling BatchV1Api->create_job: {api}"
+                "Exception when calling BatchV1Api->create_job: %s", api
             )
             if api.status == 409:
                 logging.warning("Job already present")
         except Exception as e:
             logging.error(
-                f"Exception when calling "
-                f"BatchV1Api->create_namespaced_job: {e}"
+                "Exception when calling "
+                "BatchV1Api->create_namespaced_job: %s",
+                str(e),
             )
             raise e
 
@@ -631,8 +641,9 @@ class KrknLibKubernetes:
             return api_response
         except ApiException as e:
             print(
-                f"Exception when calling "
-                f"CustomObjectsApi->create_namespaced_custom_object: {e}\n"
+                "Exception when calling "
+                "CustomObjectsApi->create_namespaced_custom_object: %s\n",
+                str(e),
             )
 
     def delete_manifestwork(self, namespace: str):
@@ -656,8 +667,9 @@ class KrknLibKubernetes:
             return api_response
         except ApiException as e:
             print(
-                f"Exception when calling "
-                f"CustomObjectsApi->delete_namespaced_custom_object: {e}\n"
+                "Exception when calling "
+                "CustomObjectsApi->delete_namespaced_custom_object: %s\n",
+                str(e),
             )
 
     def get_job_status(
@@ -676,8 +688,9 @@ class KrknLibKubernetes:
             )
         except Exception as e:
             logging.error(
-                f"Exception when calling "
-                f"BatchV1Api->read_namespaced_job_status: {e}\n"
+                "Exception when calling "
+                "BatchV1Api->read_namespaced_job_status: %s\n",
+                str(e),
             )
             raise
 
@@ -698,8 +711,9 @@ class KrknLibKubernetes:
                 node_info = self.cli.read_node_status(node, pretty=True)
             except ApiException as e:
                 logging.error(
-                    f"Exception when calling "
-                    f"CoreV1Api->read_node_status: {e}\n"
+                    "Exception when calling "
+                    "CoreV1Api->read_node_status: %s\n",
+                    str(e),
                 )
                 raise e
             for condition in node_info.status.conditions:
@@ -737,8 +751,9 @@ class KrknLibKubernetes:
                 )
             except ApiException as e:
                 logging.error(
-                    f"Exception when calling "
-                    f"CoreV1Api->read_namespaced_pod_status: {e}\n"
+                    "Exception when calling "
+                    "CoreV1Api->read_namespaced_pod_status: %s\n",
+                    str(e),
                 )
                 raise e
             pod_status = pod_info.status.phase
@@ -769,8 +784,10 @@ class KrknLibKubernetes:
             component_namespace
         )
         logging.info(
-            f"Iteration {iteration}: "
-            f"{component_namespace}: {watch_component_status}"
+            "Iteration %s: %s: %s",
+            iteration,
+            component_namespace,
+            watch_component_status,
         )
         return watch_component_status, failed_component_pods
 
@@ -849,8 +866,7 @@ class KrknLibKubernetes:
             return pod_info
         else:
             logging.error(
-                f"Pod '{str(name)}' doesn't "
-                f"exist in namespace '{str(namespace)}'"
+                "Pod '%s' doesn't exist in namespace '%s'", name, namespace
             )
             return None
 
@@ -954,7 +970,7 @@ class KrknLibKubernetes:
             if name in pod_list:
                 return True
         else:
-            logging.error(f"Namespace '{str(namespace)}' doesn't exist")
+            logging.error("Namespace '%s' doesn't exist", str(namespace))
         return False
 
     def check_if_pvc_exists(
@@ -977,7 +993,7 @@ class KrknLibKubernetes:
             if name in pvc_list:
                 return True
         else:
-            logging.error(f"Namespace '{str(namespace)}' doesn't exist")
+            logging.error("Namespace '%s' doesn't exist", str(namespace))
         return False
 
     def get_pvc_info(self, name: str, namespace: str) -> PVC:
@@ -1027,8 +1043,9 @@ class KrknLibKubernetes:
             return pvc_info
         else:
             logging.error(
-                f"PVC '{str(name)}' doesn't exist "
-                f"in namespace '{str(namespace)}'"
+                "PVC '%s' doesn't exist in namespace '%s'",
+                str(name),
+                str(namespace),
             )
             return None
 
@@ -1058,7 +1075,7 @@ class KrknLibKubernetes:
                     kraken_pod_name, kraken_project
                 ).nodeName
             except Exception as e:
-                logging.info(f"{e}")
+                logging.info("%s", str(e))
                 raise e
         return node_name
 
@@ -1091,7 +1108,9 @@ class KrknLibKubernetes:
             else:
                 count -= 1
                 logging.info(
-                    f"Status of node {node}: {str(conditions[0].status)}"
+                    "Status of node %s: %s",
+                    node,
+                    str(conditions[0].status),
                 )
             if not count:
                 self.watch_resource.stop()
@@ -1127,23 +1146,24 @@ class KrknLibKubernetes:
             if status == "True":
                 if available and available[0]["status"] == "True":
                     logging.info(
-                        f"Status of managedcluster "
-                        f"{managedcluster}: Available"
+                        "Status of managedcluster %s: Available",
+                        managedcluster,
                     )
                     return True
             else:
                 if not available:
                     logging.info(
-                        f"Status of managedcluster "
-                        f"{managedcluster}: Unavailable"
+                        "Status of managedcluster %s: Unavailable",
+                        managedcluster,
                     )
                     return True
             time.sleep(2)
             elapsed_time += 2
             if elapsed_time >= timeout:
                 logging.info(
-                    f"Timeout waiting for managedcluster "
-                    f"{managedcluster}  to become: {status}"
+                    "Timeout waiting for managedcluster %s to become: %s",
+                    managedcluster,
+                    status,
                 )
                 return False
 
@@ -1154,3 +1174,71 @@ class KrknLibKubernetes:
         :return: resource version
         """
         return self.cli.read_node(name=node).metadata.resource_version
+
+    def list_ready_nodes(self, label_selector: str = None) -> list[str]:
+        """
+        Returns a list of ready nodes
+
+        :param label_selector: filter by label
+                               selector (optional default `None`)
+        :return: a list of node names
+        """
+
+        nodes = []
+        try:
+            if label_selector:
+                ret = self.cli.list_node(
+                    pretty=True, label_selector=label_selector
+                )
+            else:
+                ret = self.cli.list_node(pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->list_node: %s\n", str(e)
+            )
+            raise e
+        for node in ret.items:
+            for cond in node.status.conditions:
+                if str(cond.type) == "Ready" and str(cond.status) == "True":
+                    nodes.append(node.metadata.name)
+
+        return nodes
+
+    # TODO: is the signature correct? the method
+    #  returns a list of nodes and the signature name is `get_node`
+    def get_node(
+        self, node_name: str, label_selector: str, instance_kill_count: int
+    ) -> list[str]:
+        """
+        Returns active node(s)
+
+        :param node_name: node name
+        :param label_selector: filter by label
+        :param instance_kill_count:
+        :return:
+        """
+        if node_name in self.list_ready_nodes():
+            return [node_name]
+        elif node_name:
+            logging.info(
+                "Node with provided node_name "
+                "does not exist or the node might "
+                "be in NotReady state."
+            )
+        nodes = self.list_ready_nodes(label_selector)
+        if not nodes:
+            raise Exception(
+                "Ready nodes with the provided label selector do not exist"
+            )
+        logging.info(
+            "Ready nodes with the label selector %s: %s", label_selector, nodes
+        )
+        number_of_nodes = len(nodes)
+        if instance_kill_count == number_of_nodes:
+            return nodes
+        nodes_to_return = []
+        for i in range(instance_kill_count):
+            node_to_add = nodes[random.randint(0, len(nodes) - 1)]
+            nodes_to_return.append(node_to_add)
+            nodes.remove(node_to_add)
+        return nodes_to_return
