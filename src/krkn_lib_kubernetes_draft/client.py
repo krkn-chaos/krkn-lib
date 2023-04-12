@@ -61,12 +61,12 @@ class KrknLibKubernetes:
             )
 
         if kubeconfig_string is not None:
-            self.initialize_clients_from_kconfig_string(kubeconfig_string)
+            self.__initialize_clients_from_kconfig_string(kubeconfig_string)
         else:
-            self.initialize_clients(self.initialize_clients(kubeconfig_path))
+            self.__initialize_clients(kubeconfig_path)
 
     # Load kubeconfig and initialize kubernetes python client
-    def initialize_clients(self, kubeconfig_path: str = None):
+    def __initialize_clients(self, kubeconfig_path: str = None):
         """
         Initialize all clients from kubeconfig path
 
@@ -90,7 +90,7 @@ class KrknLibKubernetes:
                 "No configuration found."
             )
 
-    def initialize_clients_from_kconfig_string(
+    def __initialize_clients_from_kconfig_string(
         self,
         kubeconfig_str: str,
     ):
