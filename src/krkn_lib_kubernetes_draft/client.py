@@ -55,7 +55,7 @@ class KrknLibKubernetes:
         >>> KrknLibKubernetes(kubeconfig_string=kubeconfig_string)
         """
 
-        if kubeconfig_string is not None and kubeconfig_path is None:
+        if kubeconfig_string is not None and kubeconfig_path is not None:
             raise Exception(
                 "please use either a kubeconfig path "
                 "or a valid kubeconfig string"
