@@ -83,7 +83,7 @@ class KrknLibKubernetes:
             f = open(kubeconfig_path)
             with f:
                 kubeconfig_str = f.read()
-                self.initialize_clients_from_kconfig_string(kubeconfig_str)
+                self.__initialize_clients_from_kconfig_string(kubeconfig_str)
 
         except OSError:
             raise Exception(
@@ -416,7 +416,7 @@ class KrknLibKubernetes:
         pod_name: str,
         namespace: str,
         container: str = None,
-        base_command: str = "bash",
+        base_command: str = None,
     ) -> str:
         """
         Execute a base command and its parameters
@@ -428,10 +428,17 @@ class KrknLibKubernetes:
         :param container: container where the command
                must be executed (optional default `None`)
         :param base_command: base command that must be executed
-               along the parameters (optional, default `bash`)
+               along the parameters (optional, default `bash -c`)
         :return: the command stdout
         """
-        exec_command = [base_command, "-c", command]
+        exec_command = []
+        if base_command is None:
+            exec_command = ["bash", "-c"]
+            exec_command.extend(command)
+        else:
+            exec_command.append(base_command)
+            exec_command.extend(command)
+
         try:
             if container:
                 ret = stream(
