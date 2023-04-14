@@ -422,7 +422,10 @@ class KrknLibKubernetes:
         Execute a base command and its parameters
         in a pod or a container
 
-        :param command: command parameters
+        :param command: command parameters list or full command string
+                        if the command must be piped to `bash -c`
+                        (in that case `base_command` parameter
+                        must is omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command

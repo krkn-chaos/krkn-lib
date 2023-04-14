@@ -27,7 +27,8 @@ class KrknLibKubernetesTests(unittest.TestCase):
             logging.error(
                 "Unable to connect to Kubernetes API %s.\n"
                 "To run the tests please setup a running kubernetes cluster.\n"
-                "To have a local working kubernetes cluster visit https://minikube.sigs.k8s.io/docs/\n",
+                "To have a local working kubernetes cluster "
+                "visit https://minikube.sigs.k8s.io/docs/\n",
                 host,
             )
             sys.exit(1)
