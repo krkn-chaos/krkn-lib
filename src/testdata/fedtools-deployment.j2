@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ name }}
+  namespace: {{ namespace }}
+  labels:
+    {% if random_label %}
+    random: {{random_label}}
+    {% endif %}
+spec:
+  containers:
+  - image: docker.io/fedora/tools
+    command:
+      - /bin/sh
+      - "-c"
+      - "dmesg && sleep 60m"
+    securityContext:
+       privileged: true
+    imagePullPolicy: IfNotPresent
+    name: {{ name }}
+  restartPolicy: Always

@@ -89,3 +89,7 @@ class ChaosResult(LitmusChaosObject):
 
     verdict: str
     failStep: str
+
+
+class ApiRequestException(Exception):
+    pass

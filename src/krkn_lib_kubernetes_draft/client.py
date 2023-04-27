@@ -9,7 +9,7 @@ from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
-
+from urllib3 import HTTPResponse
 
 from .resources import (
     PVC,
@@ -20,6 +20,7 @@ from .resources import (
     Pod,
     Volume,
     VolumeMount,
+    ApiRequestException,
 )
 
 
@@ -65,6 +66,10 @@ class KrknLibKubernetes:
             self.__initialize_clients_from_kconfig_string(kubeconfig_string)
         else:
             self.__initialize_clients(kubeconfig_path)
+
+    def __del__(self):
+        self.api_client.rest_client.pool_manager.clear()
+        self.api_client.close()
 
     # Load kubeconfig and initialize kubernetes python client
     def __initialize_clients(self, kubeconfig_path: str = None):
@@ -156,7 +161,7 @@ class KrknLibKubernetes:
             if e.status == 404:
                 return ""
             else:
-                raise
+                raise e
 
     #
     def list_namespaces(self, label_selector: str = None) -> list[str]:
@@ -197,13 +202,14 @@ class KrknLibKubernetes:
         ret = ""
         try:
             ret = self.cli.read_namespace_status(namespace_name)
+            return ret.status.phase
         except ApiException as e:
             logging.error(
                 "Exception when calling "
                 "CoreV1Api->read_namespace_status: %s\n",
                 str(e),
             )
-        return ret.status.phase
+            raise ApiRequestException("%s" % str(e))
 
     def delete_namespace(self, namespace: str) -> client.V1Status:
         """
@@ -254,7 +260,7 @@ class KrknLibKubernetes:
                             break
             invalid_namespaces = regex_namespaces - valid_regex
             if invalid_namespaces:
-                raise Exception(
+                raise ApiRequestException(
                     "There exists no namespaces matching: {0}".format(
                         invalid_namespaces
                     )
@@ -285,15 +291,15 @@ class KrknLibKubernetes:
             logging.error(
                 "Exception when calling CoreV1Api->list_node: %s\n", str(e)
             )
-            raise e
+            raise ApiRequestException(str(e))
         for node in ret.items:
             nodes.append(node.metadata.name)
         return nodes
 
-    #
+    # TODO: refactoring to work both in kubernetes and OpenShift
     def list_killable_nodes(self, label_selector: str = None) -> list[str]:
         """
-        List nodes in the cluster that can be killed
+        List nodes in the cluster that can be killed (OpenShift only)
 
         :param label_selector: filter by label
                                selector (optional default `None`)
@@ -529,7 +535,9 @@ class KrknLibKubernetes:
         """
         return self.cli.read_namespaced_pod(name=name, namespace=namespace)
 
-    def get_pod_log(self, name: str, namespace: str = "default") -> str:
+    def get_pod_log(
+        self, name: str, namespace: str = "default"
+    ) -> HTTPResponse:
         """
         Read the logs from a pod
 
@@ -602,7 +610,9 @@ class KrknLibKubernetes:
         """
         Create a job in a namespace
         :param body: an object representation of a valid job yaml manifest
-        :param namespace: namespace (optional default `default`)
+        :param namespace: namespace (optional default `default`),
+                          `Note:` if namespace is specified in the body won't
+                          overridden
         :return: V1Job API object
         """
         try:

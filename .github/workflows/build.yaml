@@ -17,6 +17,8 @@ jobs:
         python-version: [ '3.9', '3.10', 'pypy3.9' ]
     runs-on: ubuntu-latest
     steps:
+      - name: Create multi-node KinD cluster
+        uses: redhat-chaos/actions/kind@main
       - name: Check out code
         uses: actions/checkout@v3
       - name: Update version number

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{name}}
+  {% if labels|length > 1 %}
+  labels:
+    {% for label in labels %}
+    {{label.name}}: {{label.label}}
+    {% endfor %}
+  {% endif %}
