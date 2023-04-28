@@ -8,6 +8,7 @@ import logging
 import string
 import random
 import re
+import pytest
 from typing import List, Dict
 from kubernetes import config
 from kubernetes.client import ApiException
@@ -70,7 +71,7 @@ class BaseTest(unittest.TestCase):
         random_label: str = None,
         name: str = "fedtools",
     ):
-        template = self.template_to_deployment(name, namespace, random_label)
+        template = self.template_to_pod(name, namespace, random_label)
         self.apply_template(template)
 
     def deploy_fake_kraken(
@@ -79,7 +80,7 @@ class BaseTest(unittest.TestCase):
         random_label: str = None,
         node_name: str = None,
     ):
-        template = self.template_to_deployment(
+        template = self.template_to_pod(
             "kraken-deployment", namespace, random_label, node_name
         )
         self.apply_template(template)
@@ -105,7 +106,7 @@ class BaseTest(unittest.TestCase):
         content = template.render(name=name, labels=labels)
         return content
 
-    def template_to_deployment(
+    def template_to_pod(
         self,
         name: str,
         namespace: str = "default",
@@ -149,6 +150,10 @@ class BaseTest(unittest.TestCase):
             return True
         except Exception:
             return False
+
+    @pytest.fixture(autouse=True)
+    def inject_fixtures(self, caplog):
+        self._caplog = caplog
 
 
 class KrknLibKubernetesTests(BaseTest):
@@ -276,17 +281,12 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(nodes) == 0)
 
     def test_list_killable_nodes(self):
-        if self.is_openshift():
-            nodes = self.lib_k8s.list_nodes()
-            self.assertTrue(len(nodes) > 0)
-            self.deploy_fake_kraken(nodes[0])
-            killable_nodes = self.lib_k8s.list_killable_nodes()
-            self.assertNotIn(nodes[0], killable_nodes)
-            self.delete_fake_kraken()
-        logging.warning(
-            "test_list_killable_nodes can be run only on openshift, skipping"
-        )
-        pass
+        nodes = self.lib_k8s.list_nodes()
+        self.assertTrue(len(nodes) > 0)
+        self.deploy_fake_kraken(node_name=nodes[0])
+        killable_nodes = self.lib_k8s.list_killable_nodes()
+        self.assertNotIn(nodes[0], killable_nodes)
+        self.delete_fake_kraken()
 
     def test_list_pods(self):
         namespace = "test-" + self.get_random_string(5)
@@ -328,9 +328,7 @@ class KrknLibKubernetesTests(BaseTest):
     def test_create_pod(self):
         namespace = "test-ns-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        template_str = self.template_to_deployment(
-            "fedtools", namespace=namespace
-        )
+        template_str = self.template_to_pod("fedtools", namespace=namespace)
         body = yaml.safe_load(template_str)
         self.lib_k8s.create_pod(body, namespace)
         try:
@@ -458,30 +456,118 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(status.metadata.name == name)
 
     def test_monitor_nodes(self):
-        pass
+        try:
+            nodeStatus = self.lib_k8s.monitor_nodes()
+            self.assertIsNotNone(nodeStatus)
+            self.assertTrue(len(nodeStatus) >= 1)
+            self.assertTrue(nodeStatus[0])
+            self.assertTrue(len(nodeStatus[1]) == 0)
+        except ApiException:
+            logging.error("failed to retrieve node status, failing.")
+            self.assertTrue(False)
 
     def test_monitor_namespace(self):
-        pass
+        good_namespace = "test-ns-" + self.get_random_string(5)
+        good_name = "test-name-" + self.get_random_string(5)
+        self.deploy_namespace(good_namespace, [])
+        self.deploy_fedtools(namespace=good_namespace, name=good_name)
+        self.wait_pod(good_name, namespace=good_namespace)
+        status = self.lib_k8s.monitor_namespace(namespace=good_namespace)
+        self.assertTrue(status[0])
+        self.assertTrue(len(status[1]) == 0)
+
+        bad_namespace = "test-ns-" + self.get_random_string(5)
+        self.deploy_namespace(bad_namespace, [])
+        self.deploy_fake_kraken(
+            bad_namespace, random_label=None, node_name="do_not_exist"
+        )
+        status = self.lib_k8s.monitor_namespace(namespace=bad_namespace)
+        # sleeping for a while just in case
+        time.sleep(5)
+        self.assertFalse(status[0])
+        self.assertTrue(len(status[1]) == 1)
+        self.assertTrue(status[1][0] == "kraken-deployment")
 
     def test_monitor_component(self):
-        pass
+        namespace = "test-ns-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        with self._caplog.at_level(logging.INFO):
+            self.lib_k8s.monitor_component(0, namespace)
+            message = self._caplog.records[0].message
+            self.assertEqual(
+                message, "Iteration 0: {0}: True".format(namespace)
+            )
 
     def test_apply_yaml(self):
-        pass
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            environment = Environment(loader=FileSystemLoader("src/testdata/"))
+            template = environment.get_template("namespace_template.j2")
+            content = template.render(name=namespace, labels=[])
+            with tempfile.NamedTemporaryFile(mode="w") as file:
+                file.write(content)
+                file.flush()
+                self.lib_k8s.apply_yaml(file.name, "")
+            status = self.lib_k8s.get_namespace_status(namespace)
+            self.assertEqual(status, "Active")
+        except Exception as e:
+            logging.error("exception in test {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_get_pod_info(self):
-        pass
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            name = "test-name-" + self.get_random_string(5)
+            self.deploy_namespace(namespace, [])
+            self.deploy_fedtools(namespace=namespace, name=name)
+            self.wait_pod(name, namespace)
+            info = self.lib_k8s.get_pod_info(name, namespace)
+            self.assertEqual(info.namespace, namespace)
+            self.assertEqual(info.name, name)
+            self.assertIsNotNone(info.podIP)
+            self.assertIsNotNone(info.nodeName)
+            self.assertIsNotNone(info.containers)
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_check_if_namespace_exists(self):
-        pass
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            self.deploy_namespace(namespace, [])
+            self.assertTrue(self.lib_k8s.check_if_namespace_exists(namespace))
+            self.assertFalse(
+                self.lib_k8s.check_if_namespace_exists(
+                    self.get_random_string(10)
+                )
+            )
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_check_if_pod_exists(self):
-        pass
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            name = "test-name-" + self.get_random_string(5)
+            self.deploy_namespace(namespace, [])
+            self.deploy_fedtools(namespace=namespace, name=name)
+            self.wait_pod(name, namespace)
+            self.assertTrue(self.lib_k8s.check_if_pod_exists(name, namespace))
+            self.assertFalse(
+                self.lib_k8s.check_if_pod_exists(
+                    "do_not_exist", "do_not_exist"
+                )
+            )
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_check_if_vpc_exists(self):
+        # TODO: write and test on openshift
         pass
 
     def test_get_pvc_info(self):
+        # TODO: write and test on openshift
         pass
 
     def test_find_kraken_node(self):

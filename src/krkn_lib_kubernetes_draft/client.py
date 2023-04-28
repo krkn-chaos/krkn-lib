@@ -968,7 +968,7 @@ class KrknLibKubernetes:
         """
 
         v1_projects = self.dyn_client.resources.get(
-            api_version="project.openshift.io/v1", kind="Project"
+            api_version="v1", kind="Namespace"
         )
         project_list = v1_projects.get()
         return True if name in str(project_list) else False

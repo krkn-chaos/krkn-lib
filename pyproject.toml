@@ -13,6 +13,7 @@ python = "^3.9"
 kubernetes ="^26.0.0"
 arcaflow-lib-kubernetes="^0.1.1"
 sphinxnotes-markdown-builder="^0.5.6"
+pytest = "^7.3.1"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"

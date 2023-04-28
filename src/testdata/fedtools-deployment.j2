@@ -18,4 +18,8 @@ spec:
        privileged: true
     imagePullPolicy: IfNotPresent
     name: {{ name }}
+  {% if has_node_selector %}
+  nodeSelector:
+    kubernetes.io/hostname : {{node_name}}
+  {% endif %}
   restartPolicy: Always
