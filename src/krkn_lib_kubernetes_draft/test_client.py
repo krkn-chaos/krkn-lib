@@ -8,7 +8,6 @@ import logging
 import string
 import random
 import re
-import pytest
 from typing import List, Dict
 from kubernetes import config
 from kubernetes.client import ApiException
@@ -27,6 +26,7 @@ class BaseTest(unittest.TestCase):
     def setUpClass(cls):
         cls.lib_k8s = KrknLibKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         host = cls.lib_k8s.api_client.configuration.host
+        logging.disable(logging.CRITICAL)
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:
@@ -89,6 +89,18 @@ class BaseTest(unittest.TestCase):
         template = self.template_to_job(name, namespace)
         self.apply_template(template)
 
+    def deploy_persistent_volume(
+        self, name: str, storage_class: str, namespace: str
+    ):
+        template = self.template_to_pv(name, storage_class, namespace)
+        self.apply_template(template)
+
+    def deploy_persistent_volume_claim(
+        self, name: str, storage_class: str, namespace: str
+    ):
+        template = self.template_to_pvc(name, storage_class, namespace)
+        self.apply_template(template)
+
     def delete_fake_kraken(self, namespace: str = "default"):
         self.lib_k8s.delete_pod("kraken-deployment", namespace)
 
@@ -132,6 +144,22 @@ class BaseTest(unittest.TestCase):
             )
         return content
 
+    def template_to_pv(self, name: str, storage_class: str, namespace: str):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template("pv.j2")
+        content = template.render(
+            name=name, namespace=namespace, storage_class=storage_class
+        )
+        return content
+
+    def template_to_pvc(self, name: str, storage_class: str, namespace: str):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template("pvc.j2")
+        content = template.render(
+            name=name, namespace=namespace, storage_class=storage_class
+        )
+        return content
+
     def apply_template(self, template: str):
         with tempfile.NamedTemporaryFile(mode="w") as file:
             file.write(template)
@@ -150,10 +178,6 @@ class BaseTest(unittest.TestCase):
             return True
         except Exception:
             return False
-
-    @pytest.fixture(autouse=True)
-    def inject_fixtures(self, caplog):
-        self._caplog = caplog
 
 
 class KrknLibKubernetesTests(BaseTest):
@@ -296,6 +320,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
         self.lib_k8s.delete_namespace(namespace)
+        self.delete_fake_kraken(namespace=namespace)
 
     def test_get_all_pods(self):
         namespace = "test-" + self.get_random_string(5)
@@ -315,6 +340,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertEqual(results[0][0], "kraken-deployment")
         self.assertEqual(results[0][1], namespace)
         self.lib_k8s.delete_namespace(namespace)
+        self.delete_fake_kraken(namespace=namespace)
 
     def test_delete_pod(self):
         namespace = "test-ns-" + self.get_random_string(5)
@@ -487,16 +513,34 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertFalse(status[0])
         self.assertTrue(len(status[1]) == 1)
         self.assertTrue(status[1][0] == "kraken-deployment")
+        self.delete_fake_kraken(namespace=bad_namespace)
 
     def test_monitor_component(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        self.deploy_namespace(namespace, [])
-        with self._caplog.at_level(logging.INFO):
-            self.lib_k8s.monitor_component(0, namespace)
-            message = self._caplog.records[0].message
-            self.assertEqual(
-                message, "Iteration 0: {0}: True".format(namespace)
-            )
+        good_namespace = "test-ns-" + self.get_random_string(5)
+        good_name = "test-name-" + self.get_random_string(5)
+        self.deploy_namespace(good_namespace, [])
+        self.deploy_fedtools(namespace=good_namespace, name=good_name)
+        self.wait_pod(good_name, namespace=good_namespace)
+        status = self.lib_k8s.monitor_component(
+            iteration=0, component_namespace=good_namespace
+        )
+        self.assertTrue(status[0])
+        self.assertTrue(len(status[1]) == 0)
+
+        bad_namespace = "test-ns-" + self.get_random_string(5)
+        self.deploy_namespace(bad_namespace, [])
+        self.deploy_fake_kraken(
+            bad_namespace, random_label=None, node_name="do_not_exist"
+        )
+        status = self.lib_k8s.monitor_component(
+            iteration=1, component_namespace=bad_namespace
+        )
+        # sleeping for a while just in case
+        time.sleep(5)
+        self.assertFalse(status[0])
+        self.assertTrue(len(status[1]) == 1)
+        self.assertTrue(status[1][0] == "kraken-deployment")
+        self.delete_fake_kraken(namespace=bad_namespace)
 
     def test_apply_yaml(self):
         try:
@@ -551,7 +595,7 @@ class KrknLibKubernetesTests(BaseTest):
             name = "test-name-" + self.get_random_string(5)
             self.deploy_namespace(namespace, [])
             self.deploy_fedtools(namespace=namespace, name=name)
-            self.wait_pod(name, namespace)
+            self.wait_pod(name, namespace, timeout=120)
             self.assertTrue(self.lib_k8s.check_if_pod_exists(name, namespace))
             self.assertFalse(
                 self.lib_k8s.check_if_pod_exists(
@@ -562,28 +606,90 @@ class KrknLibKubernetesTests(BaseTest):
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
 
-    def test_check_if_vpc_exists(self):
-        # TODO: write and test on openshift
-        pass
+    def test_check_if_pvc_exists(self):
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            storage_class = "sc-" + self.get_random_string(5)
+            pv_name = "pv-" + self.get_random_string(5)
+            pvc_name = "pvc-" + self.get_random_string(5)
+            self.deploy_namespace(namespace, [])
+            self.deploy_persistent_volume(pv_name, storage_class, namespace)
+            self.deploy_persistent_volume_claim(
+                pvc_name, storage_class, namespace
+            )
+            self.assertTrue(
+                self.lib_k8s.check_if_pvc_exists(pvc_name, namespace)
+            )
+            self.assertFalse(
+                self.lib_k8s.check_if_pvc_exists(
+                    "do_not_exist", "do_not_exist"
+                )
+            )
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_get_pvc_info(self):
-        # TODO: write and test on openshift
-        pass
+        try:
+            namespace = "test-ns-" + self.get_random_string(5)
+            storage_class = "sc-" + self.get_random_string(5)
+            pv_name = "pv-" + self.get_random_string(5)
+            pvc_name = "pvc-" + self.get_random_string(5)
+            self.deploy_namespace(namespace, [])
+            self.deploy_persistent_volume(pv_name, storage_class, namespace)
+            self.deploy_persistent_volume_claim(
+                pvc_name, storage_class, namespace
+            )
+            info = self.lib_k8s.get_pvc_info(pvc_name, namespace)
+            self.assertIsNotNone(info)
+            self.assertEqual(info.name, pvc_name)
+            self.assertEqual(info.namespace, namespace)
+            self.assertEqual(info.volumeName, pv_name)
+
+            info = self.lib_k8s.get_pvc_info("do_not_exist", "do_not_exist")
+            self.assertIsNone(info)
+
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_find_kraken_node(self):
-        pass
-
-    def test_watch_node_status(self):
-        pass
+        namespace = "test-ns-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        nodes = self.lib_k8s.list_nodes()
+        random_node_index = random.randint(0, len(nodes) - 1)
+        self.deploy_fake_kraken(
+            namespace=namespace, node_name=nodes[random_node_index]
+        )
+        result = self.lib_k8s.find_kraken_node()
+        self.assertEqual(nodes[random_node_index], result)
+        self.delete_fake_kraken(namespace)
 
     def test_get_node_resource_version(self):
-        pass
+        try:
+            nodes = self.lib_k8s.list_nodes()
+            random_node_index = random.randint(0, len(nodes) - 1)
+            node_resource_version = self.lib_k8s.get_node_resource_version(
+                nodes[random_node_index]
+            )
+            self.assertIsNotNone(node_resource_version)
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
     def test_list_ready_nodes(self):
-        pass
-
-    def test_get_node(self):
-        pass
+        try:
+            ready_nodes = self.lib_k8s.list_ready_nodes()
+            nodes = self.lib_k8s.list_nodes()
+            result = set(ready_nodes) - set(nodes)
+            self.assertEqual(len(result), 0)
+            result = self.lib_k8s.list_ready_nodes(
+                label_selector="do_not_exist"
+            )
+            self.assertEqual(len(result), 0)
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
 
 
 if __name__ == "__main__":
