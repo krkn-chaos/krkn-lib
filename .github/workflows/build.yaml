@@ -55,8 +55,11 @@ jobs:
           poetry run make -C docs html
           poetry run make -C docs markdown
           cp docs/build/markdown/krkn_lib_kubernetes_draft.client.md api.md
-          git config --global user.name "${{ env.CI_COMMIT_AUTHOR }}"
-          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+      - name: Push updated Markdown documentation
+        if: ${{ matrix.python-version == '3.9'}}
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
           git add api.md
           git commit -m "api documentation update"
           git push
