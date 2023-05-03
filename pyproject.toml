@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "krkn-lib-kubernetes-draft"
+name = "krkn-lib-kubernetes"
 version = "0.0.0"
 description = "Kubernetes library for Kraken"
-authors = ["Red Hat Chaos Engineering Team"]
+authors = ["Red Hat Chaos Team"]
 license = "Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/redhat-chaos/krkn"
-#packages = [{include= "src/krkn_lib_kubernetes_draft"}]
+#packages = [{include= "src/krkn_lib_kubernetes"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"

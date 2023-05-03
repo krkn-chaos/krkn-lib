@@ -23,8 +23,8 @@ add_function_parentheses = True
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
 
-project = "Kubernetes client library helper for Python"
-copyright = "Arcalot Contributors "
+project = "Kubernetes client library helper for Kraken"
+copyright = "Red Hat Chaos Team"
 
 version = ""
 release = ""
