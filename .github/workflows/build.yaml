@@ -9,6 +9,7 @@ on:
 permissions:
   # https://github.community/t/permissions-nesecary-to-comment-on-a-pr/179047/5
   pull-requests: write
+  contents: write
 jobs:
   build:
     name: Build
