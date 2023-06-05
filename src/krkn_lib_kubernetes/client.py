@@ -441,6 +441,13 @@ class KrknLibKubernetes:
         :return: the command stdout
         """
         exec_command = []
+        # this check makes no sense since the type has been declared in the
+        # method signature, but unfortunately python do not enforce on type
+        # checks at compile time so this check
+        # ensures that the command variable is actually a list.
+        if not isinstance(command, list):
+            command = [command]
+
         if base_command is None:
             exec_command = ["bash", "-c"]
             exec_command.extend(command)
