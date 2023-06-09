@@ -12,10 +12,8 @@ from typing import List, Dict
 from kubernetes import config
 from kubernetes.client import ApiException
 from requests import ConnectTimeout
-
 from krkn_lib_kubernetes import ApiRequestException
 from jinja2 import Environment, FileSystemLoader
-
 from .client import KrknLibKubernetes
 
 
