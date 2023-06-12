@@ -123,11 +123,6 @@ class ScenarioTelemetry:
                 try:
                     yaml_params = base64.b64decode(self.parametersBase64)
                     yaml_object = yaml.safe_load(yaml_params)
-                    # if is not a dictionary means that the base64
-                    # encoded string is not a structured object
-                    if isinstance(yaml_object, dict) is False:
-                        raise Exception("parameters are in the wrong format")
-
                     json_string = json.dumps(yaml_object, indent=2)
                     self.parameters = json.loads(json_string)
                     self.parametersBase64 = ""
