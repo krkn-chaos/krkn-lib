@@ -52,6 +52,8 @@ class KrknTelemetry:
 
             if request.status_code != 200:
                 logging.warning("failed to send telemetry with error: {0}")
+            else:
+                logging.info("successfully sent telemetry data")
 
     def set_parameters_base64(
         self, scenario_telemetry: ScenarioTelemetry, file_path: str
