@@ -1,5 +1,7 @@
 import base64
 import logging
+import sys
+
 import yaml
 import requests
 import os
@@ -85,6 +87,7 @@ class KrknTelemetry:
             raise Exception("telemetry: {0}".format(str(e)))
         scenario_telemetry.parametersBase64 = input_file_base64
 
+    # move it to utils package
     def deep_set_attribute(self, attribute: str, value: str, obj: any) -> any:
         if isinstance(obj, list):
             for element in obj:
@@ -99,3 +102,21 @@ class KrknTelemetry:
                 if key == attribute:
                     obj[key] = value
         return obj
+
+    def log_exception(self, scenario: str = None):
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        if scenario is None:
+            logging.error(
+                "exception: %s file: %s line: %s",
+                exc_type,
+                exc_tb.tb_frame.f_code.co_filename,
+                exc_tb.tb_lineno,
+            )
+        else:
+            logging.error(
+                "scenario: %s failed with exception: %s file: %s line: %s",
+                scenario,
+                exc_type,
+                exc_tb.tb_frame.f_code.co_filename,
+                exc_tb.tb_lineno,
+            )
