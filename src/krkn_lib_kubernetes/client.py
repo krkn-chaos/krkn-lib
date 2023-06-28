@@ -85,11 +85,14 @@ class KrknLibKubernetes:
             kubeconfig_path = os.path.expanduser(kubeconfig_path)
 
         try:
-            f = open(kubeconfig_path)
-            with f:
-                kubeconfig_str = f.read()
-                self.__initialize_clients_from_kconfig_string(kubeconfig_str)
-
+            config.load_kube_config(kubeconfig_path)
+            self.api_client = client.ApiClient()
+            self.k8s_client = config.new_client_from_config(config_file=kubeconfig_path)
+            self.cli = client.CoreV1Api(self.k8s_client)
+            self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.custom_object_client = client.CustomObjectsApi(self.k8s_client)
+            self.dyn_client = DynamicClient(self.k8s_client)
+            self.watch_resource = watch.Watch()
         except OSError:
             raise Exception(
                 "Invalid kube-config file: {0}. "
