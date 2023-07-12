@@ -689,6 +689,36 @@ class KrknLibKubernetesTests(BaseTest):
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
 
+    def test_get_all_kubernetes_object_count(self):
+        objs = self.lib_k8s.get_all_kubernetes_object_count(
+            ["Namespace", "Ingress", "ConfigMap", "Unknown"]
+        )
+        self.assertTrue("Namespace" in objs.keys())
+        self.assertTrue("Ingress" in objs.keys())
+        self.assertTrue("ConfigMap" in objs.keys())
+        self.assertFalse("Unknown" in objs.keys())
+
+    def test_get_kubernetes_core_objects_count(self):
+        objs = self.lib_k8s.get_kubernetes_core_objects_count(
+            "v1",
+            [
+                "Namespace",
+                "Ingress",
+                "ConfigMap",
+            ],
+        )
+        self.assertTrue("Namespace" in objs.keys())
+        self.assertTrue("ConfigMap" in objs.keys())
+        self.assertFalse("Ingress" in objs.keys())
+
+    def test_get_kubernetes_custom_objects_count(self):
+        objs = self.lib_k8s.get_kubernetes_custom_objects_count(
+            ["Namespace", "Ingress", "ConfigMap", "Unknown"]
+        )
+        self.assertFalse("Namespace" in objs.keys())
+        self.assertFalse("ConfigMap" in objs.keys())
+        self.assertTrue("Ingress" in objs.keys())
+
 
 if __name__ == "__main__":
     unittest.main()

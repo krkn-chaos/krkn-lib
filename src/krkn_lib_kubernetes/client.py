@@ -1,6 +1,9 @@
+import json
 import logging
 import re
 import time
+from typing import Dict, List
+import ast
 import arcaflow_lib_kubernetes
 import kubernetes
 import os
@@ -1287,3 +1290,135 @@ class KrknLibKubernetes:
             nodes_to_return.append(node_to_add)
             nodes.remove(node_to_add)
         return nodes_to_return
+
+    def get_all_kubernetes_object_count(
+        self, objects: list[str]
+    ) -> dict[str, int]:
+        objects_found = dict[str, int]()
+        objects_found.update(
+            self.get_kubernetes_core_objects_count("v1", objects)
+        )
+        objects_found.update(self.get_kubernetes_custom_objects_count(objects))
+        return objects_found
+
+    def get_kubernetes_core_objects_count(
+        self, api_version: str, objects: list[str]
+    ) -> dict[str, int]:
+        """
+        Counts all the occurrences of Kinds contained in the object parameter in the CoreV1 Api
+
+        :param api_version: api version
+        :param objects: list of the kinds that must be counted
+        :return: a list of tuples with Kind and number of objects counted
+        """
+        api_client = self.api_client
+        resources = self.get_api_resources_by_group("", "v1")
+        result = dict[str, int]()
+        for resource in resources.resources:
+            if resource.kind in objects:
+                if api_client:
+                    try:
+                        path_params: Dict[str, str] = {}
+                        query_params: List[str] = []
+                        header_params: Dict[str, str] = {}
+
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
+                        )
+
+                        path = f"/api/{api_version}/{resource.name}"
+                        self.cli.list_namespace()
+                        (data) = api_client.call_api(
+                            path,
+                            "GET",
+                            path_params,
+                            query_params,
+                            header_params,
+                            response_type="str",
+                        )
+
+                        json_obj = ast.literal_eval(data[0])
+                        count = len(json_obj["items"])
+                        result[resource.kind] = count
+                    except ApiException as e:
+                        logging.warning("ApiException -> %s", str(e))
+        return result
+
+    def get_kubernetes_custom_objects_count(
+        self, objects: list[str]
+    ) -> dict[str, int]:
+        """
+        Counts all the occurrences of Kinds contained in the object parameter in the CustomObject Api
+
+        :param objects: list of Kinds that must be counted
+        :return: a list of tuples with Kind and number of objects counted
+        """
+        custom_object_api = client.CustomObjectsApi(self.api_client)
+        groups = client.ApisApi(self.api_client).get_api_versions().groups
+        result = dict[str, int]()
+        for api in groups:
+            versions = []
+            for v in api.versions:
+                name = ""
+                if (
+                    v.version == api.preferred_version.version
+                    and len(api.versions) > 1
+                ):
+                    name += "*"
+                name += v.version
+                versions.append(name)
+            try:
+                data = self.get_api_resources_by_group(
+                    api.name, api.preferred_version.version
+                )
+                for resource in data.resources:
+                    if resource.kind in objects:
+                        custom_resource = (
+                            custom_object_api.list_cluster_custom_object(
+                                group=api.name,
+                                version=api.preferred_version.version,
+                                plural=resource.name,
+                            )
+                        )
+                        result[resource.kind] = len(custom_resource["items"])
+
+            except Exception as e:
+                logging.warning("CustomObjectsApi -> %s", str(e))
+        return result
+
+    def get_api_resources_by_group(self, group, version):
+        api_client = self.api_client
+
+        if api_client:
+            try:
+                # Sadly, the Kubernetes Python library supports a method equivalent to `kubectl api-versions`
+                # but nothing for `kubectl api-resources`.
+                # Here, we extracted (read copy/pasted) a sample call from ApisApi().get_api_versions()
+                # where we use the rest ApiClient to list api resources specific to a group.
+
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = f"/apis/{group}/{version}"
+                if group == "":
+                    path = f"/api/{version}"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="V1APIResourceList",
+                )
+                return data[0]
+            except Exception as e:
+                logging.warning("V1ApiException -> %s", str(e))
+
+        return None
