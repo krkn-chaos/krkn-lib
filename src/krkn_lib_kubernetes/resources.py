@@ -125,6 +125,8 @@ class ScenarioTelemetry:
                     yaml_object = yaml.safe_load(yaml_params)
                     json_string = json.dumps(yaml_object, indent=2)
                     self.parameters = json.loads(json_string)
+                    if not isinstance(self.parameters, dict):
+                        raise Exception()
                     self.parametersBase64 = ""
                 except Exception as e:
                     raise Exception(
