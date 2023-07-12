@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import time
@@ -1305,11 +1304,12 @@ class KrknLibKubernetes:
         self, api_version: str, objects: list[str]
     ) -> dict[str, int]:
         """
-        Counts all the occurrences of Kinds contained in the object parameter in the CoreV1 Api
+        Counts all the occurrences of Kinds contained in
+        the object parameter in the CoreV1 Api
 
         :param api_version: api version
         :param objects: list of the kinds that must be counted
-        :return: a list of tuples with Kind and number of objects counted
+        :return: a dictionary of Kinds and the number of objects counted
         """
         api_client = self.api_client
         resources = self.get_api_resources_by_group("", "v1")
@@ -1350,10 +1350,11 @@ class KrknLibKubernetes:
         self, objects: list[str]
     ) -> dict[str, int]:
         """
-        Counts all the occurrences of Kinds contained in the object parameter in the CustomObject Api
+        Counts all the occurrences of Kinds contained in
+        the object parameter in the CustomObject Api
 
         :param objects: list of Kinds that must be counted
-        :return: a list of tuples with Kind and number of objects counted
+        :return: a dictionary of Kinds and number of objects counted
         """
         custom_object_api = client.CustomObjectsApi(self.api_client)
         groups = client.ApisApi(self.api_client).get_api_versions().groups
@@ -1393,11 +1394,6 @@ class KrknLibKubernetes:
 
         if api_client:
             try:
-                # Sadly, the Kubernetes Python library supports a method equivalent to `kubectl api-versions`
-                # but nothing for `kubectl api-resources`.
-                # Here, we extracted (read copy/pasted) a sample call from ApisApi().get_api_versions()
-                # where we use the rest ApiClient to list api resources specific to a group.
-
                 path_params: Dict[str, str] = {}
                 query_params: List[str] = []
                 header_params: Dict[str, str] = {}

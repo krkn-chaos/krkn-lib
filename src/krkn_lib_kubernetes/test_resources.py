@@ -5,7 +5,6 @@ from krkn_lib_kubernetes import ScenarioTelemetry, ChaosRunTelemetry
 
 class ResourcesTests(unittest.TestCase):
     def test_scenario_telemetry(self):
-        test_yaml = "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
         test_valid_json = """
         {
             "startTimeStamp": 1686141432,
@@ -14,7 +13,7 @@ class ResourcesTests(unittest.TestCase):
             "exitStatus": 0,
             "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
         }
-        """
+        """  # NOQA
         # wrong base64 format
         test_invalid_json_wrong_base64 = """
         {
@@ -88,7 +87,7 @@ class ResourcesTests(unittest.TestCase):
                             "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }]
         }
-        """
+        """  # NOQA
 
         test_invalid_json_scenarios_format = """
         {
@@ -100,7 +99,7 @@ class ResourcesTests(unittest.TestCase):
                         "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }
         }
-        """
+        """  # NOQA
 
         test_invalid_json_scenarios_element = """
         {
@@ -121,7 +120,7 @@ class ResourcesTests(unittest.TestCase):
 
                        ]
         }
-        """
+        """  # NOQA
 
         json_obj = json.loads(test_valid_json)
         telemetry = ChaosRunTelemetry(json_obj)

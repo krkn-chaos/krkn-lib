@@ -27,7 +27,7 @@ class KrknTelemetryTests(unittest.TestCase):
                               property_4: test
                             - property_5:
                                 element: __MARKER__
-            """
+            """  # NOQA
 
         deep_obj = yaml.safe_load(deep_yaml)
         self.lib_telemetry.deep_set_attribute(
