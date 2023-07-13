@@ -24,6 +24,7 @@ from .resources import (
     Volume,
     VolumeMount,
     ApiRequestException,
+    NodeInfo,
 )
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -1391,7 +1392,6 @@ class KrknLibKubernetes:
 
     def get_api_resources_by_group(self, group, version):
         api_client = self.api_client
-
         if api_client:
             try:
                 path_params: Dict[str, str] = {}
@@ -1418,3 +1418,40 @@ class KrknLibKubernetes:
                 logging.warning("V1ApiException -> %s", str(e))
 
         return None
+
+    def get_nodes_infos(self) -> list[NodeInfo]:
+        """
+        Returns a list of NodeInfo objects
+        :return:
+        """
+        instance_type_label = "node.kubernetes.io/instance-type"
+        node_type_master_label = "node-role.kubernetes.io/master"
+        node_type_worker_label = "node-role.kubernetes.io/worker"
+        node_type_infra_label = "node-role.kubernetes.io/infra"
+        result = list[NodeInfo]()
+        resp = self.cli.list_node()
+        for node in resp.items:
+            node_info = NodeInfo()
+            if instance_type_label in node.metadata.labels.keys():
+                node_info.instance_type = node.metadata.labels[
+                    instance_type_label
+                ]
+            else:
+                node_info.instance_type = "unknown"
+
+            if node_type_infra_label in node.metadata.labels.keys():
+                node_info.node_type = "infra"
+            elif node_type_worker_label in node.metadata.labels.keys():
+                node_info.node_type = "worker"
+            elif node_type_master_label in node.metadata.labels.keys():
+                node_info.node_type = "master"
+            else:
+                node_info.node_type = "unknown"
+
+            node_info.architecture = node.status.node_info.architecture
+            node_info.kernel_version = node.status.node_info.kernel_version
+            node_info.kubelet_version = node.status.node_info.kubelet_version
+            node_info.os_version = node.status.node_info.os_image
+            result.append(node_info)
+
+        return result

@@ -159,3 +159,17 @@ class ChaosRunTelemetry:
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
+
+
+@dataclass(order=False)
+class NodeInfo:
+    """
+    Cluster node metadata
+    """
+
+    architecture: str = ""
+    instance_type: str = ""
+    node_type: str = ""
+    kernel_version: str = ""
+    kubelet_version: str = ""
+    os_version: str = ""

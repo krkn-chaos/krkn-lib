@@ -719,6 +719,16 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertFalse("ConfigMap" in objs.keys())
         self.assertTrue("Ingress" in objs.keys())
 
+    def test_get_nodes_infos(self):
+        nodes = self.lib_k8s.get_nodes_infos()
+        for node in nodes:
+            self.assertTrue(node.node_type)
+            self.assertTrue(node.architecture)
+            self.assertTrue(node.instance_type)
+            self.assertTrue(node.os_version)
+            self.assertTrue(node.kernel_version)
+            self.assertTrue(node.kubelet_version)
+
 
 if __name__ == "__main__":
     unittest.main()
