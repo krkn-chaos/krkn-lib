@@ -1315,6 +1315,7 @@ class KrknLibKubernetes:
         api_client = self.api_client
         resources = self.get_api_resources_by_group("", "v1")
         result = dict[str, int]()
+
         for resource in resources.resources:
             if resource.kind in objects:
                 if api_client:
@@ -1322,7 +1323,7 @@ class KrknLibKubernetes:
                         path_params: Dict[str, str] = {}
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
-
+                        auth_settings = ["BearerToken"]
                         header_params[
                             "Accept"
                         ] = api_client.select_header_accept(
@@ -1338,6 +1339,7 @@ class KrknLibKubernetes:
                             query_params,
                             header_params,
                             response_type="str",
+                            auth_settings=auth_settings,
                         )
 
                         json_obj = ast.literal_eval(data[0])
@@ -1397,7 +1399,7 @@ class KrknLibKubernetes:
                 path_params: Dict[str, str] = {}
                 query_params: List[str] = []
                 header_params: Dict[str, str] = {}
-
+                auth_settings = ["BearerToken"]
                 header_params["Accept"] = api_client.select_header_accept(
                     ["application/json"]
                 )
@@ -1412,6 +1414,7 @@ class KrknLibKubernetes:
                     query_params,
                     header_params,
                     response_type="V1APIResourceList",
+                    auth_settings=auth_settings,
                 )
                 return data[0]
             except Exception as e:
@@ -1455,3 +1458,37 @@ class KrknLibKubernetes:
             result.append(node_info)
 
         return result
+
+    def get_cluster_infrastructure(self):
+        """
+        Get the cluster Cloud infrastructure name when available
+        :return: the cluster infrastructure name or `Unknown` when unavailable
+        """
+        api_client = self.api_client
+        if api_client:
+            try:
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = "/apis/config.openshift.io/v1/infrastructures/cluster"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+                json_obj = ast.literal_eval(data[0])
+                return json_obj["status"]["platform"]
+            except Exception as e:
+                logging.warning("V1ApiException -> %s", str(e))
+                return "Unknown"
+
+        return None

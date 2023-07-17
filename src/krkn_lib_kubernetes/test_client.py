@@ -729,6 +729,11 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(node.kernel_version)
             self.assertTrue(node.kubelet_version)
 
+    def test_get_cluster_infrastructure(self):
+        resp = self.lib_k8s.get_cluster_infrastructure()
+        self.assertTrue(resp)
+        self.assertEqual(resp, "Unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
