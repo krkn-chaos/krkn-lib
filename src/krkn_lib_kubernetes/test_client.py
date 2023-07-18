@@ -734,6 +734,11 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(resp)
         self.assertEqual(resp, "Unknown")
 
+    def test_get_cluster_network_plugins(self):
+        resp = self.lib_k8s.get_cluster_network_plugins()
+        self.assertTrue(len(resp) > 0)
+        self.assertEqual(resp[0], "Unknown")
+
 
 if __name__ == "__main__":
     unittest.main()
