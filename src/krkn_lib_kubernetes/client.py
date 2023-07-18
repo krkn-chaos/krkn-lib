@@ -1430,6 +1430,8 @@ class KrknLibKubernetes:
         node_type_master_label = "node-role.kubernetes.io/master"
         node_type_worker_label = "node-role.kubernetes.io/worker"
         node_type_infra_label = "node-role.kubernetes.io/infra"
+        node_type_workload_label = "node-role.kubernetes.io/workload"
+        node_type_application_label = "node-role.kubernetes.io/app"
         result = list[NodeInfo]()
         resp = self.cli.list_node()
         for node in resp.items:
@@ -1447,6 +1449,10 @@ class KrknLibKubernetes:
                 node_info.node_type = "worker"
             elif node_type_master_label in node.metadata.labels.keys():
                 node_info.node_type = "master"
+            elif node_type_workload_label in node.metadata.labels.keys():
+                node_info.node_type = "workload"
+            elif node_type_application_label in node.metadata.labels.keys():
+                node_info.node_type = "application"
             else:
                 node_info.node_type = "unknown"
 
