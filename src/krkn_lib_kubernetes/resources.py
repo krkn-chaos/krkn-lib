@@ -176,5 +176,13 @@ class ChaosRunTelemetry:
                 scenario_telemetry = ScenarioTelemetry(scenario)
                 self.scenarios.append(scenario_telemetry)
 
+            self.node_infos = json_object.get("node_infos")
+            self.node_count = json_object.get("node_count")
+            self.cloud_infrastructure = json_object.get("cloud_infrastructure")
+            self.kubernetes_objects_count = json_object.get(
+                "kubernetes_objects_count"
+            )
+            self.network_plugins = json_object.get("network_plugins")
+
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

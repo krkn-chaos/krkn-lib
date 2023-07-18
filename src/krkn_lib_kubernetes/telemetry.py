@@ -5,7 +5,11 @@ import sys
 import yaml
 import requests
 import os
-from krkn_lib_kubernetes import ChaosRunTelemetry, ScenarioTelemetry
+from krkn_lib_kubernetes import (
+    ChaosRunTelemetry,
+    ScenarioTelemetry,
+    KrknLibKubernetes,
+)
 
 
 class KrknTelemetry:
@@ -13,6 +17,7 @@ class KrknTelemetry:
         self,
         telemetry_config: dict,
         chaos_telemetry: ChaosRunTelemetry,
+        kubecli: KrknLibKubernetes,
     ):
         """
 
@@ -23,6 +28,28 @@ class KrknTelemetry:
         """
         enabled = telemetry_config.get("enabled")
         if enabled:
+            logging.info("collecting telemetry data, please wait....")
+            chaos_telemetry.cloud_infrastructure = (
+                kubecli.get_cluster_infrastructure()
+            )
+            chaos_telemetry.network_plugins = (
+                kubecli.get_cluster_network_plugins()
+            )
+            chaos_telemetry.kubernetes_objects_count = (
+                kubecli.get_all_kubernetes_object_count(
+                    [
+                        "Deployment",
+                        "Pod",
+                        "Secret",
+                        "ConfigMap",
+                        "Build",
+                        "Route",
+                    ]
+                )
+            )
+            chaos_telemetry.node_infos = kubecli.get_nodes_infos()
+            chaos_telemetry.node_count = len(chaos_telemetry.node_infos)
+
             url = telemetry_config.get("api_url")
             username = telemetry_config.get("username")
             password = telemetry_config.get("password")
@@ -45,10 +72,11 @@ class KrknTelemetry:
                 "Content-type": "application/json",
                 "Accept": "text/plain",
             }
+            json_data = chaos_telemetry.to_json()
             request = requests.post(
                 url=url,
                 auth=(username, password),
-                data=chaos_telemetry.to_json(),
+                data=json_data,
                 headers=headers,
             )
 

@@ -15,7 +15,8 @@ jobs:
     name: Build
     strategy:
       matrix:
-        python-version: [ '3.9', '3.10', 'pypy3.9' ]
+        #python-version: [ '3.9', '3.10', 'pypy3.9' ]
+        python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
       - name: Create multi-node KinD cluster
