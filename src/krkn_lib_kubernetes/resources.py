@@ -144,8 +144,27 @@ class ScenarioTelemetry:
 
 
 @dataclass(order=False)
+class NodeInfo:
+    """
+    Cluster node metadata
+    """
+
+    architecture: str = ""
+    instance_type: str = ""
+    node_type: str = ""
+    kernel_version: str = ""
+    kubelet_version: str = ""
+    os_version: str = ""
+
+
+@dataclass(order=False)
 class ChaosRunTelemetry:
     scenarios: list[ScenarioTelemetry]
+    node_infos: list[NodeInfo] = list[NodeInfo]
+    node_count: int = 0
+    cloud_infrastructure: str = "Unknown"
+    kubernetes_objects_count: dict[str, int] = dict[str, int]
+    network_plugins: list[str] = list[str]
 
     def __init__(self, json_object: any = None):
         self.scenarios = []
@@ -159,17 +178,3 @@ class ChaosRunTelemetry:
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
-
-
-@dataclass(order=False)
-class NodeInfo:
-    """
-    Cluster node metadata
-    """
-
-    architecture: str = ""
-    instance_type: str = ""
-    node_type: str = ""
-    kernel_version: str = ""
-    kubelet_version: str = ""
-    os_version: str = ""
