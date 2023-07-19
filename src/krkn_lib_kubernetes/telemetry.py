@@ -16,6 +16,7 @@ class KrknTelemetry:
     def send_telemetry(
         self,
         telemetry_config: dict,
+        uuid: str,
         chaos_telemetry: ChaosRunTelemetry,
         kubecli: KrknLibKubernetes,
     ):
@@ -77,6 +78,7 @@ class KrknTelemetry:
                 url=url,
                 auth=(username, password),
                 data=json_data,
+                params={"request_id": uuid},
                 headers=headers,
             )
 
