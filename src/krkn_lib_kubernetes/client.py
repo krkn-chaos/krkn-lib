@@ -1,7 +1,8 @@
 import logging
 import re
 import time
-from typing import Dict, List
+from tempfile import NamedTemporaryFile
+from typing import Dict, List, Optional
 import ast
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -444,6 +445,7 @@ class KrknLibKubernetes:
         namespace: str,
         container: str = None,
         base_command: str = None,
+        std_err: bool = True,
     ) -> str:
         """
         Execute a base command and its parameters
@@ -484,7 +486,7 @@ class KrknLibKubernetes:
                     namespace,
                     container=container,
                     command=exec_command,
-                    stderr=True,
+                    stderr=std_err,
                     stdin=False,
                     stdout=True,
                     tty=False,
@@ -495,7 +497,7 @@ class KrknLibKubernetes:
                     pod_name,
                     namespace,
                     command=exec_command,
-                    stderr=True,
+                    stderr=std_err,
                     stdin=False,
                     stdout=True,
                     tty=False,
@@ -1532,4 +1534,115 @@ class KrknLibKubernetes:
                 logging.warning("V1ApiException -> %s", str(e))
                 network_plugins.append("Unknown")
 
-        return network_plugins
+    def get_ocp_prometheus_data(self) -> Optional[str]:
+        prometheus_pod_name = "prometheus-k8s-0"
+        prometheus_namespace = "openshift-monitoring"
+        prometheus_backup_name = "krkn_prometheus_backup.tar.gz"
+        prometheus_pod = self.get_pod_info(
+            prometheus_pod_name, prometheus_namespace
+        )
+        if not prometheus_pod:
+            return None
+        try:
+            # create backup folder
+            logging.info("creating backup folder")
+            create_directory_command = [
+                "-p",
+                "/prometheus/backup/prometheus",
+            ]
+
+            self.exec_cmd_in_pod(
+                create_directory_command,
+                prometheus_pod_name,
+                prometheus_namespace,
+                "prometheus",
+                "mkdir",
+            )
+
+            # copy all prometheus files in the backup directory using
+            # the find + cp trick
+            # can be removed and added the --ignore-failed-read to the tar
+            copy_all_files_command = [
+                "/prometheus/",
+                "-not",
+                "-path",
+                "/prometheus/",
+                "-not",
+                "-path",
+                "/prometheus/backup/*",
+                "-not",
+                "-path",
+                "/prometheus/backup",
+                "-exec",
+                "cp",
+                "-R",
+                "{}",
+                "/prometheus/backup{}",
+                ";",
+            ]
+            logging.info(
+                "copying prometheus files in backup folder, please wait...."
+            )
+            self.exec_cmd_in_pod(
+                copy_all_files_command,
+                prometheus_pod_name,
+                prometheus_namespace,
+                "prometheus",
+                "/usr/bin/find",
+            )
+
+            # create the prometheus archive
+            targz_backup_folder_command = [
+                "cfz",
+                f"/prometheus/{prometheus_backup_name}",
+                "-C",
+                "/prometheus/backup/prometheus/",
+                ".",
+            ]
+            logging.info("creating prometheus data archive, please wait....")
+            self.exec_cmd_in_pod(
+                targz_backup_folder_command,
+                prometheus_pod_name,
+                prometheus_namespace,
+                "prometheus",
+                "tar",
+            )
+
+            # stream the prometheus archive as base64 string
+            with NamedTemporaryFile(delete=False) as file_buffer:
+                logging.info(
+                    f"downloading backup from prometheus pod in {file_buffer.name}, please wait...."
+                )
+                cat_command = [
+                    "base64",
+                    f"/prometheus/{prometheus_backup_name}",
+                ]
+                resp = stream(
+                    self.cli.connect_get_namespaced_pod_exec,
+                    prometheus_pod_name,
+                    prometheus_namespace,
+                    container="prometheus",
+                    command=cat_command,
+                    stderr=False,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                    _preload_content=False,
+                )
+
+                print(file_buffer.name)
+                while resp.is_open():
+                    resp.update(timeout=1)
+                    if resp.peek_stdout():
+                        out = resp.read_stdout()
+                        # print("STDOUT: %s" % len(out))
+                        file_buffer.write(out.encode("utf-8"))
+                resp.close()
+
+                file_buffer.flush()
+                file_buffer.seek(0)
+                return file_buffer.name
+        except Exception as e:
+            print(str(e))
+
+        # finally delete

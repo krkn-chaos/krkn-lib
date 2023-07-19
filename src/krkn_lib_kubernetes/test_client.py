@@ -739,6 +739,10 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(resp) > 0)
         self.assertEqual(resp[0], "Unknown")
 
+    def test_get_prometheus(self):
+        resp = self.lib_k8s.get_ocp_prometheus_data()
+        pass
+
 
 if __name__ == "__main__":
     unittest.main()
