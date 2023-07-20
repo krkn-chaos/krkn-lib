@@ -6,6 +6,7 @@ import kubernetes
 import os
 import random
 from kubernetes import client, config, utils, watch
+from kubeconfig import KubeConfig
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
@@ -23,7 +24,8 @@ from .resources import (
     ApiRequestException,
 )
 
-
+SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+SERVICE_CERT_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 class KrknLibKubernetes:
     """ """
 
@@ -83,6 +85,19 @@ class KrknLibKubernetes:
             kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
         if "~/" in kubeconfig_path:
             kubeconfig_path = os.path.expanduser(kubeconfig_path)
+        if not os.path.isfile(kubeconfig_path):
+            if os.path.isfile(SERVICE_TOKEN_FILENAME):
+                with open(SERVICE_TOKEN_FILENAME) as f:
+                    content = f.read().splitlines()
+                    if not content:
+                        raise Exception("Token file exists but empty.")
+                kube_addr = os.environ.get('KUBERNETES_PORT_443_TCP_ADDR')
+                kube_port = os.environ.get('KUBERNETES_PORT_443_TCP_PORT')
+                conf = KubeConfig()
+                conf.set_cluster(name='krkn-cluster', server=f'https://{kube_addr}:{kube_port}', certificate_authority=SERVICE_CERT_FILENAME,)
+                conf.set_credentials(name='user', token=content[0])
+                conf.set_context(name='krkn-context', cluster='krkn-cluster', user='user')
+                conf.use_context('krkn-context')            
 
         try:
             config.load_kube_config(kubeconfig_path)
