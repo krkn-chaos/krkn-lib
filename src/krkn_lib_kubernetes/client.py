@@ -1,13 +1,17 @@
 import logging
 import re
 import time
+import uuid
 from tempfile import NamedTemporaryFile
-from typing import Dict, List, Optional
+from typing import Dict, List
 import ast
 import arcaflow_lib_kubernetes
 import kubernetes
 import os
 import random
+
+
+from base64io import Base64IO
 from kubernetes import client, config, utils, watch
 from kubeconfig import KubeConfig
 from kubernetes.client.rest import ApiException
@@ -1533,96 +1537,93 @@ class KrknLibKubernetes:
             except Exception as e:
                 logging.warning("V1ApiException -> %s", str(e))
                 network_plugins.append("Unknown")
+        return network_plugins
 
-    def get_ocp_prometheus_data(self) -> Optional[str]:
-        prometheus_pod_name = "prometheus-k8s-0"
-        prometheus_namespace = "openshift-monitoring"
-        prometheus_backup_name = "krkn_prometheus_backup.tar.gz"
-        prometheus_pod = self.get_pod_info(
-            prometheus_pod_name, prometheus_namespace
-        )
-        if not prometheus_pod:
-            return None
+    def decode_base64_file(
+        self, source_filename: str, destination_filename: str
+    ):
+        """
+        Decodes a base64 file while it's read (no memory allocation).
+        Suitable for big file conversion.
+        :param source_filename: source base64 encoded file
+        :param destination_filename: destination decoded file
+        :return:
+        """
+        with open(source_filename, "rb") as encoded_source, open(
+            destination_filename, "wb"
+        ) as target:
+            with Base64IO(encoded_source) as source:
+                for line in source:
+                    target.write(line)
+
+    def download_folder_from_pod_as_archive(
+        self,
+        pod_name: str,
+        container_name: str,
+        namespace: str,
+        remote_archive_path: str,
+        target_path: str,
+        download_path: str = "/tmp",
+    ) -> str:
+        """
+        Download folder content from container in a base64,
+        gzip compressed tarball
+        :param pod_name: pod name from which the folder
+        must be downloaded
+        :param container_name: container name from which the
+        folder must be downloaded
+        :param namespace: namespace of the pod
+        :param remote_archive_path: path in the container
+        where the temporary archive
+        will be stored (will be deleted once the download
+        terminates, must be writable
+        and must have enough space to temporarly store the archive)
+        :param download_path: the local path
+        where the archive will be saved
+        :param target_path: the path that will be archived
+        and downloaded from the container
+        :return: the base64
+        """
+        remote_archive_name = f"{str(uuid.uuid1())}.tar.gz"
         try:
-            # create backup folder
-            logging.info("creating backup folder")
-            create_directory_command = [
-                "-p",
-                "/prometheus/backup/prometheus",
-            ]
-
-            self.exec_cmd_in_pod(
-                create_directory_command,
-                prometheus_pod_name,
-                prometheus_namespace,
-                "prometheus",
-                "mkdir",
-            )
-
-            # copy all prometheus files in the backup directory using
-            # the find + cp trick
-            # can be removed and added the --ignore-failed-read to the tar
-            copy_all_files_command = [
-                "/prometheus/",
-                "-not",
-                "-path",
-                "/prometheus/",
-                "-not",
-                "-path",
-                "/prometheus/backup/*",
-                "-not",
-                "-path",
-                "/prometheus/backup",
-                "-exec",
-                "cp",
-                "-R",
-                "{}",
-                "/prometheus/backup{}",
-                ";",
-            ]
-            logging.info(
-                "copying prometheus files in backup folder, please wait...."
-            )
-            self.exec_cmd_in_pod(
-                copy_all_files_command,
-                prometheus_pod_name,
-                prometheus_namespace,
-                "prometheus",
-                "/usr/bin/find",
-            )
-
             # create the prometheus archive
             targz_backup_folder_command = [
-                "cfz",
-                f"/prometheus/{prometheus_backup_name}",
+                "--ignore-failed-read",
+                "--exclude",
+                f"{remote_archive_name}",
+                "-zcf",
+                f"{remote_archive_path}/{remote_archive_name}",
                 "-C",
-                "/prometheus/backup/prometheus/",
+                target_path,
                 ".",
             ]
-            logging.info("creating prometheus data archive, please wait....")
-            self.exec_cmd_in_pod(
+            logging.info("creating data archive, please wait....")
+            resp = self.exec_cmd_in_pod(
                 targz_backup_folder_command,
-                prometheus_pod_name,
-                prometheus_namespace,
-                "prometheus",
+                pod_name,
+                namespace,
+                container_name,
                 "tar",
             )
 
             # stream the prometheus archive as base64 string
-            with NamedTemporaryFile(delete=False) as file_buffer:
+            with NamedTemporaryFile(
+                delete=False, dir=download_path
+            ) as file_buffer:
                 logging.info(
-                    f"downloading backup from prometheus pod in {file_buffer.name}, please wait...."
+                    f"downloading backup from pod: {pod_name}, container: "
+                    f"{container_name} in {file_buffer.name}, please wait...."
                 )
-                cat_command = [
+                base64_dump = [
                     "base64",
-                    f"/prometheus/{prometheus_backup_name}",
+                    f"{remote_archive_path}/{remote_archive_name}",
                 ]
                 resp = stream(
                     self.cli.connect_get_namespaced_pod_exec,
-                    prometheus_pod_name,
-                    prometheus_namespace,
-                    container="prometheus",
-                    command=cat_command,
+                    pod_name,
+                    namespace,
+                    container=container_name,
+                    command=base64_dump,
                     stderr=False,
                     stdin=False,
                     stdout=True,
@@ -1630,19 +1631,30 @@ class KrknLibKubernetes:
                     _preload_content=False,
                 )
 
-                print(file_buffer.name)
                 while resp.is_open():
                     resp.update(timeout=1)
                     if resp.peek_stdout():
                         out = resp.read_stdout()
-                        # print("STDOUT: %s" % len(out))
                         file_buffer.write(out.encode("utf-8"))
                 resp.close()
-
                 file_buffer.flush()
                 file_buffer.seek(0)
                 return file_buffer.name
         except Exception as e:
-            print(str(e))
-
-        # finally delete
+            raise ApiException(str(e))
+        finally:
+            try:
+                # delete the backup file
+                rm_command = [
+                    "-f",
+                    f"{remote_archive_path}/{remote_archive_name}",
+                ]
+                self.exec_cmd_in_pod(
+                    rm_command,
+                    pod_name,
+                    namespace,
+                    container_name,
+                    "rm",
+                )
+            except Exception as e:
+                logging.error("failed to remove remote backup: ", str(e))

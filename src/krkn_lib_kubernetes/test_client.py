@@ -1,3 +1,5 @@
+import base64
+import os.path
 import sys
 import tempfile
 import time
@@ -8,6 +10,7 @@ import logging
 import string
 import random
 import re
+import gzip
 from typing import List, Dict
 from kubernetes import config
 from kubernetes.client import ApiException
@@ -739,9 +742,46 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(resp) > 0)
         self.assertEqual(resp[0], "Unknown")
 
-    def test_get_prometheus(self):
-        resp = self.lib_k8s.get_ocp_prometheus_data()
-        pass
+    def test_download_folder_from_pod_as_archive(self):
+        namespace = "test-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace)
+
+        # loops while all the pods in the namespace are ready
+        ready_pod = False
+        while not ready_pod:
+            result = self.lib_k8s.monitor_namespace(namespace)
+            ready_pod = result[0]
+            continue
+
+        archive = self.lib_k8s.download_folder_from_pod_as_archive(
+            "fedtools", "fedtools", namespace, "/", "/root"
+        )
+        decoded_archive_name = f"{self.get_random_string(5)}.tar.gz"
+        self.lib_k8s.decode_base64_file(
+            archive, f"/tmp/{decoded_archive_name}"
+        )
+        self.assertTrue(os.path.isfile(f"/tmp/{decoded_archive_name}"))
+        # checks if it is a valid gzip archive
+        with gzip.open(f"/tmp/{decoded_archive_name}", "r") as fh:
+            try:
+                fh.read(1)
+                self.assertTrue(True)
+            except OSError:
+                self.fail("not a gzip valid archive")
+
+    def test_decode_base64_file(self):
+        test_string = "Tester McTesty!"
+        with tempfile.NamedTemporaryFile() as src, tempfile.NamedTemporaryFile() as dst:  # NOQA
+            with open(src.name, "w+") as source, open(dst.name, "w+") as dest:
+                encoded_test_byte = base64.b64encode(
+                    test_string.encode("utf-8")
+                )
+                source.write(encoded_test_byte.decode("utf-8"))
+                source.flush()
+                self.lib_k8s.decode_base64_file(source.name, dest.name)
+                test_read = dest.read()
+                self.assertEqual(test_string, test_read)
 
 
 if __name__ == "__main__":

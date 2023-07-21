@@ -114,6 +114,17 @@ files = [
 ]
 
 [[package]]
+name = "base64io"
+version = "1.0.3"
+description = ""
+optional = false
+python-versions = "*"
+files = [
+    {file = "base64io-1.0.3-py2.py3-none-any.whl", hash = "sha256:e9a6c9f470e34f8debaad26134bcf3f0bcbf677dac73e32295cfb2915d30815b"},
+    {file = "base64io-1.0.3.tar.gz", hash = "sha256:24f2d0fe765c35339e1b2d33aa95f9137b1b765b594164fad1016c15827a7073"},
+]
+
+[[package]]
 name = "cachetools"
 version = "5.3.1"
 description = "Extensible memoizing collections and decorators"

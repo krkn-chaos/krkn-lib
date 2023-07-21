@@ -1,6 +1,7 @@
 import base64
 import logging
 import sys
+from typing import Optional
 
 import yaml
 import requests
@@ -21,10 +22,10 @@ class KrknTelemetry:
         kubecli: KrknLibKubernetes,
     ):
         """
-
-        :param chaos_telemetry: already populated Chaos
         :param telemetry_config: krkn telemetry conf section
-        :param scenario_input_file: path to the scenario input yaml
+        :param uuid: uuid used as folder in S3 bucket
+        :param chaos_telemetry: already populated ChaosRunTelemetry object
+        :param kubecli: KrknLibKubernetes client object
         :return:
         """
         enabled = telemetry_config.get("enabled")
@@ -86,6 +87,47 @@ class KrknTelemetry:
                 logging.warning("failed to send telemetry with error: {0}")
             else:
                 logging.info("successfully sent telemetry data")
+
+    def get_ocp_prometheus_data(
+        self,
+        kubecli: KrknLibKubernetes,
+        telemetry_config: dict,
+        local_archive_path: str = "/tmp",
+    ) -> Optional[str]:
+        """
+        Downloads the OCP prometheus metrics folder
+        :param kubecli: KrknLibKubernetes client object
+        :param telemetry_config: krkn telemetry conf section
+        :param local_archive_path: local path where the archive
+        will be stored
+        :return:
+        """
+        prometheus_pod_name = "prometheus-k8s-0"
+        prometheus_container_name = "prometheus"
+        prometheus_namespace = "openshift-monitoring"
+        remote_archive_path = "/prometheus"
+        prometheus_pod = kubecli.get_pod_info(
+            prometheus_pod_name, prometheus_namespace
+        )
+        if not prometheus_pod:
+            return None
+        try:
+            archive_name = kubecli.download_folder_from_pod_as_archive(
+                prometheus_pod_name,
+                prometheus_container_name,
+                prometheus_namespace,
+                remote_archive_path,
+                remote_archive_path,
+            )
+            return archive_name
+        except Exception as e:
+            logging.error(
+                f"failed to download prometheus backup"
+                f" on pod: {prometheus_pod_name},"
+                f" container: {prometheus_container_name},"
+                f" namespace: {prometheus_namespace}:"
+                f" {str(e)}"
+            )
 
     def set_parameters_base64(
         self, scenario_telemetry: ScenarioTelemetry, file_path: str

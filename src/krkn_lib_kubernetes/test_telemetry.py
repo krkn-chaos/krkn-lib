@@ -69,7 +69,7 @@ class KrknTelemetryTests(unittest.TestCase):
                     input_file_yaml_processed["input_list"][0][key],
                 )
             else:
-                self.assertNotEquals(
+                self.assertNotEqual(
                     input_file_yaml_orig["input_list"][0][key],
                     input_file_yaml_processed["input_list"][0][key],
                 )
