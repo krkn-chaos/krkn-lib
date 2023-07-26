@@ -1,17 +1,15 @@
 import logging
 import re
+import threading
 import time
 import uuid
-from tempfile import NamedTemporaryFile
+from queue import Queue
 from typing import Dict, List
 import ast
 import arcaflow_lib_kubernetes
 import kubernetes
 import os
 import random
-
-
-from base64io import Base64IO
 from kubernetes import client, config, utils, watch
 from kubeconfig import KubeConfig
 from kubernetes.client.rest import ApiException
@@ -1539,24 +1537,183 @@ class KrknLibKubernetes:
                 network_plugins.append("Unknown")
         return network_plugins
 
-    def decode_base64_file(
-        self, source_filename: str, destination_filename: str
+    def delete_file_from_pod(
+        self, pod_name: str, container_name: str, namespace: str, filename: str
     ):
         """
-        Decodes a base64 file while it's read (no memory allocation).
-        Suitable for big file conversion.
-        :param source_filename: source base64 encoded file
-        :param destination_filename: destination decoded file
+        Deletes a file from a pod
+        :param pod_name: pod name
+        :param container_name: container name
+        :param namespace: namespace of the pod
+        :param filename: full-path of the file that
+        will be removed from the pod
         :return:
         """
-        with open(source_filename, "rb") as encoded_source, open(
-            destination_filename, "wb"
-        ) as target:
-            with Base64IO(encoded_source) as source:
-                for line in source:
-                    target.write(line)
+        try:
+            # delete the backup file
+            rm_command = [
+                "-f",
+                filename,
+            ]
+            self.exec_cmd_in_pod(
+                rm_command,
+                pod_name,
+                namespace,
+                container_name,
+                "rm",
+            )
+        except Exception as e:
+            raise ApiException(str(e))
 
-    def download_folder_from_pod_as_archive(
+    def get_archive_volume_from_pod_worker(
+        self,
+        pod_name: str,
+        container_name: str,
+        namespace: str,
+        remote_archive_path: str,
+        remote_archive_prefix: str,
+        local_download_path: str,
+        local_file_prefix: str,
+        queue: Queue,
+        downloaded_file_list: list[(int, str)],
+        delete_remote_after_download: bool,
+        thread_number: int,
+    ):
+        """
+        Download worker for the `create_download_multipart_archive`
+        method. The method will dequeue from the thread-safe `queue`
+        parameter until the queue will be empty and will download
+        the i-th tar volume popped from the queue itself.
+        the file will be downloaded in base64 string format in order
+        to avoid archive corruptions caused by the Kubernetes WebSocket
+        API.
+
+        :param pod_name: pod name from which the tar volume
+        must be downloaded
+        :param container_name: container name from which the
+        tar volume be downloaded
+        :param namespace: namespace of the pod
+        :param remote_archive_path: remote path where the archive volume
+        is stored
+        :param remote_archive_prefix: prefix of the file used to
+        create the archive.to this prefix will be appended sequential
+        number of the archive assigned to
+        the worker in a two digit format and the tar exception
+        (ex for a prefix like `prefix-`the remote filename
+         will become prefix-00.tar)
+        :param local_download_path: local path where the tar volume
+         will be download
+        :param local_file_prefix: local prefix to apply to the
+        local file downloaded.To the prefix will be appended the
+        sequential number of the archive assigned to the worker
+        and the extension tar.b64
+        :param queue: the queue from which the sequential
+         number wil be popped
+        :param downloaded_file_list: the list of
+         archive number and local filename  downloaded
+        file will be appended once the download terminates
+        shared between the threads
+        :param delete_remote_after_download: if set True once
+         the download will terminate
+        the remote file will be deleted.
+        :param thread_number: the assigned thread number
+        :return:
+        """
+        while not queue.empty():
+            file_number = queue.get()
+            if not isinstance(file_number, int):
+                logging.error(
+                    f"[Thread #{thread_number}] wrong queue "
+                    f"element format, download failed"
+                )
+                return
+
+            local_file_name = (
+                f"{local_download_path}/{local_file_prefix}"
+                f"{file_number:02d}.tar.b64"
+            )
+            remote_file_name = (
+                f"{remote_archive_path}/{remote_archive_prefix}"
+                f"{file_number:02d}.tar"
+            )
+
+            try:
+                with open(local_file_name, "x") as file_buffer:
+                    logging.info(
+                        f"[Thread #{thread_number}]: started downloading "
+                        f"archive {remote_file_name}"
+                        f"from pod: {pod_name}, container: "
+                        f"{container_name} in {local_file_name}, "
+                    )
+                    base64_dump = [
+                        "base64",
+                        remote_file_name,
+                    ]
+                    resp = stream(
+                        self.cli.connect_get_namespaced_pod_exec,
+                        pod_name,
+                        namespace,
+                        container=container_name,
+                        command=base64_dump,
+                        stderr=False,
+                        stdin=False,
+                        stdout=True,
+                        tty=False,
+                        _preload_content=False,
+                    )
+
+                    while resp.is_open():
+                        resp.update(timeout=1)
+                        if resp.peek_stdout():
+                            out = resp.read_stdout()
+                            file_buffer.write(out)
+                    resp.close()
+                    file_buffer.flush()
+                    file_buffer.seek(0)
+                    downloaded_file_list.append((file_number, local_file_name))
+                    logging.info(
+                        f"[Thread #{thread_number}]: finished downloading "
+                        f"archive {remote_file_name}"
+                        f"from pod: {pod_name}, container: "
+                        f"{container_name} in {local_file_name}, "
+                    )
+                    queue.task_done()
+
+            except Exception as e:
+                logging.error(
+                    f"[Thread #{thread_number}]: failed "
+                    f"to download {remote_file_name}"
+                    f" from pod: {pod_name}, "
+                    f"container: {container_name}, "
+                    f"namespace: {namespace}"
+                    f" with exception: {str(e)}. Aborting download."
+                )
+                with queue.mutex:
+                    queue.queue.clear()
+                    queue.all_tasks_done.notify_all()
+                    queue.unfinished_tasks = 0
+            finally:
+                if delete_remote_after_download:
+                    try:
+                        # delete the backup file
+                        self.delete_file_from_pod(
+                            pod_name,
+                            container_name,
+                            namespace,
+                            remote_file_name,
+                        )
+                        logging.info(
+                            f"[Thread #{thread_number}]: removed "
+                            f"remote archive {remote_file_name}"
+                        )
+                    except Exception as e:
+                        logging.error(
+                            f"[Thread #{thread_number}]: failed to "
+                            f"remove remote archive "
+                            f"{remote_file_name}: {str(e)}"
+                        )
+
+    def archive_and_get_path_from_pod(
         self,
         pod_name: str,
         container_name: str,
@@ -1564,10 +1721,16 @@ class KrknLibKubernetes:
         remote_archive_path: str,
         target_path: str,
         download_path: str = "/tmp",
-    ) -> str:
+        archive_part_size: int = 30000,
+        max_threads: int = 5,
+    ) -> list[(int, str)]:
         """
-        Download folder content from container in a base64,
-        gzip compressed tarball
+        archives and downloads a folder content
+        from container in a base64 tarball.
+        The function is designed to leverage multi-threading
+        in order to maximize the download speed.
+        a `max_threads` number of `download_archive_part_from_pod`
+        calls will be made in parallel.
         :param pod_name: pod name from which the folder
         must be downloaded
         :param container_name: container name from which the
@@ -1582,79 +1745,87 @@ class KrknLibKubernetes:
         where the archive will be saved
         :param target_path: the path that will be archived
         and downloaded from the container
-        :return: the base64
+        :param archive_part_size: the archive will splitted in multiple
+        files of the specified `archive_part_size`
+        :param max_threads: maximum number of threads that will be launched
+        :return: the list of the archive number and filenames downloaded
         """
-        remote_archive_name = f"{str(uuid.uuid1())}.tar.gz"
+        remote_archive_prefix = f"{str(uuid.uuid1())}-"
+        local_file_prefix = remote_archive_prefix
+        queue = Queue()
+        downloaded_files = list[(int, str)]()
         try:
-            # create the prometheus archive
-            targz_backup_folder_command = [
-                "--ignore-failed-read",
-                "--exclude",
-                f"{remote_archive_name}",
-                "-zcf",
-                f"{remote_archive_path}/{remote_archive_name}",
-                "-C",
-                target_path,
-                ".",
-            ]
+            # create the folder archive splitting
+            # in tar files of size `chunk_size`
+            # due to pipes and scripts the command is executed in
+
+            if not os.path.isdir(download_path):
+                raise Exception(
+                    f"download path {download_path} does not exist"
+                )
+
+            tar_command = (
+                f"printf 'n {remote_archive_path}/"
+                f"{remote_archive_prefix}%02d.tar\n' "
+                f"{{1..100000}} | "
+                f"tar --exclude={remote_archive_prefix}* "
+                f"--tape-length={archive_part_size} "
+                f"-cf {remote_archive_path}/{remote_archive_prefix}00.tar "
+                f"-C {target_path} ."
+            )
+
             logging.info("creating data archive, please wait....")
-            resp = self.exec_cmd_in_pod(
-                targz_backup_folder_command,
+            self.exec_cmd_in_pod(
+                [tar_command],
                 pod_name,
                 namespace,
                 container_name,
-                "tar",
+            )
+            # count how many tar files has been created
+            count_files_command = (
+                f"ls {remote_archive_path}/{remote_archive_prefix}* | wc -l"
+            )
+            logging.info(
+                f"created {count_files_command} archive "
+                f"files on pod: {pod_name}, "
+                f"container: {container_name}, "
+                f"namespace: {namespace}, "
+                f"remote path: {remote_archive_path}"
+            )
+            archive_file_number = self.exec_cmd_in_pod(
+                [count_files_command],
+                pod_name,
+                namespace,
+                container_name,
             )
 
-            # stream the prometheus archive as base64 string
-            with NamedTemporaryFile(
-                delete=False, dir=download_path
-            ) as file_buffer:
-                logging.info(
-                    f"downloading backup from pod: {pod_name}, container: "
-                    f"{container_name} in {file_buffer.name}, please wait...."
-                )
-                base64_dump = [
-                    "base64",
-                    f"{remote_archive_path}/{remote_archive_name}",
-                ]
-                resp = stream(
-                    self.cli.connect_get_namespaced_pod_exec,
-                    pod_name,
-                    namespace,
-                    container=container_name,
-                    command=base64_dump,
-                    stderr=False,
-                    stdin=False,
-                    stdout=True,
-                    tty=False,
-                    _preload_content=False,
-                )
+            for i in range(int(archive_file_number)):
+                queue.put(i)
 
-                while resp.is_open():
-                    resp.update(timeout=1)
-                    if resp.peek_stdout():
-                        out = resp.read_stdout()
-                        file_buffer.write(out.encode("utf-8"))
-                resp.close()
-                file_buffer.flush()
-                file_buffer.seek(0)
-                return file_buffer.name
-        except Exception as e:
-            raise ApiException(str(e))
-        finally:
-            try:
-                # delete the backup file
-                rm_command = [
-                    "-f",
-                    f"{remote_archive_path}/{remote_archive_name}",
-                ]
-                self.exec_cmd_in_pod(
-                    rm_command,
-                    pod_name,
-                    namespace,
-                    container_name,
-                    "rm",
+            for i in range(max_threads):
+                worker = threading.Thread(
+                    target=self.get_archive_volume_from_pod_worker,
+                    args=(
+                        pod_name,
+                        container_name,
+                        namespace,
+                        remote_archive_path,
+                        remote_archive_prefix,
+                        download_path,
+                        local_file_prefix,
+                        queue,
+                        downloaded_files,
+                        True,
+                        i,
+                    ),
                 )
-            except Exception as e:
-                logging.error("failed to remove remote backup: ", str(e))
+                worker.start()
+            queue.join()
+        except Exception as e:
+            logging.error(
+                f"failed to create archive {target_path} on pod: {pod_name}, "
+                f"container: {container_name}, namespace:{namespace} "
+                f"with exception: {str(e)}"
+            )
+
+        return downloaded_files

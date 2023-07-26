@@ -10,7 +10,6 @@ import logging
 import string
 import random
 import re
-import gzip
 from typing import List, Dict
 from kubernetes import config
 from kubernetes.client import ApiException
@@ -754,34 +753,17 @@ class KrknLibKubernetesTests(BaseTest):
             ready_pod = result[0]
             continue
 
-        archive = self.lib_k8s.download_folder_from_pod_as_archive(
-            "fedtools", "fedtools", namespace, "/", "/root"
+        archive = self.lib_k8s.create_download_multipart_archive(
+            "fedtools",
+            "fedtools",
+            namespace,
+            "/tmpza",
+            "/etc",
+            archive_part_size=10000,
         )
-        decoded_archive_name = f"{self.get_random_string(5)}.tar.gz"
-        self.lib_k8s.decode_base64_file(
-            archive, f"/tmp/{decoded_archive_name}"
-        )
-        self.assertTrue(os.path.isfile(f"/tmp/{decoded_archive_name}"))
-        # checks if it is a valid gzip archive
-        with gzip.open(f"/tmp/{decoded_archive_name}", "r") as fh:
-            try:
-                fh.read(1)
-                self.assertTrue(True)
-            except OSError:
-                self.fail("not a gzip valid archive")
-
-    def test_decode_base64_file(self):
-        test_string = "Tester McTesty!"
-        with tempfile.NamedTemporaryFile() as src, tempfile.NamedTemporaryFile() as dst:  # NOQA
-            with open(src.name, "w+") as source, open(dst.name, "w+") as dest:
-                encoded_test_byte = base64.b64encode(
-                    test_string.encode("utf-8")
-                )
-                source.write(encoded_test_byte.decode("utf-8"))
-                source.flush()
-                self.lib_k8s.decode_base64_file(source.name, dest.name)
-                test_read = dest.read()
-                self.assertEqual(test_string, test_read)
+        for file in archive:
+            self.assertTrue(os.path.isfile(file))
+            self.assertTrue(os.stat(file).st_size > 0)
 
 
 if __name__ == "__main__":
