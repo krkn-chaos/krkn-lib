@@ -1,4 +1,3 @@
-import base64
 import os.path
 import sys
 import tempfile
@@ -753,11 +752,11 @@ class KrknLibKubernetesTests(BaseTest):
             ready_pod = result[0]
             continue
 
-        archive = self.lib_k8s.create_download_multipart_archive(
+        archive = self.lib_k8s.archive_and_get_path_from_pod(
             "fedtools",
             "fedtools",
             namespace,
-            "/tmpza",
+            "/tmp",
             "/etc",
             archive_part_size=10000,
         )

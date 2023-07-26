@@ -88,7 +88,9 @@ class KrknTelemetry:
             )
 
             if request.status_code != 200:
-                logging.warning("failed to send telemetry with error: {0}")
+                logging.warning(
+                    f"failed to send telemetry with error: {request.status_code}"
+                )
             else:
                 logging.info("successfully sent telemetry data")
 
@@ -232,6 +234,7 @@ class KrknTelemetry:
             return
 
         try:
+            total_size = 0
             for i, item in enumerate(archive_volumes):
                 decoded_filename = item[1].replace(".b64", "")
                 if item[1] == decoded_filename:
@@ -240,29 +243,118 @@ class KrknTelemetry:
                         "source and destination file are the same"
                     )
                 self.decode_base64_file(item[1], decoded_filename)
-                presigned_url = self.get_bucket_url_for_filename(
-                    f"{url}/presigned-url",
-                    request_id,
-                    f"prometheus-{i:02d}.tar",
-                    username,
-                    password,
-                )
-                queue.put((presigned_url, decoded_filename))
+                queue.put((i, decoded_filename))
+                total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
 
+            logging.info(
+                f"uploading {len(archive_volumes)} files, total size {total_size}MB "
+                f"number of threads {int(backup_threads)}"
+            )
             for i in range(int(backup_threads)):
                 worker = threading.Thread(
-                    target=self.put_file_to_s3_worker,
+                    target=self.generate_url_and_put_to_s3_worker,
                     args=(
                         queue,
-                        int(i),
+                        request_id,
+                        f"{url}/presigned-url",
+                        username,
+                        password,
+                        i,
                     ),
                 )
+                worker.daemon = True
                 worker.start()
             queue.join()
 
         except Exception as e:
             logging.error(str(e))
+
+    def generate_url_and_put_to_s3_worker(
+        self,
+        queue: Queue,
+        request_id: str,
+        api_url: str,
+        username: str,
+        password: str,
+        thread_number: int,
+    ):
+        """
+        Worker function that creates an s3 link to put files and upload
+        and uploads the file on the bucket.
+        :param queue: queue that will be consumed. The queue
+        elements must be tuples on which the first item must
+        be the file sequence number and the second a local filename full-path
+        that will be uploaded in the S3 bucket
+        :param request_id: uuid of the session that will represent the
+        S3 folder on which the prometheus files will be stored
+        :param api_url: API endpoint to generate the S3 temporary link
+        :param username: API username
+        :param password: API password
+        :param thread_number: Thread number
+        :return:
+        """
+        while not queue.empty():
+            try:
+                data_tuple = queue.get()
+                file_number = data_tuple[0]
+                local_filename = data_tuple[1]
+
+                s3_url = self.get_bucket_url_for_filename(
+                    api_url,
+                    request_id,
+                    f"prometheus-{file_number:02d}.tar",
+                    username,
+                    password,
+                )
+                logging.info(f"[Thread #{thread_number}]: s3 link generated")
+                logging.info(
+                    f"[Thread #{thread_number}]: started "
+                    f"{local_filename} upload"
+                )
+                self.put_file_to_url(s3_url, local_filename)
+                logging.info(
+                    f"[Thread #{thread_number}]: "
+                    f"{local_filename} upload finished, "
+                    f"{queue.unfinished_tasks} files left"
+                )
+            except Exception as e:
+                logging.error(
+                    f"[Thread #{thread_number}] failed to upload "
+                    f"file {local_filename} with exception: {str(e)}"
+                )
+            finally:
+                os.unlink(local_filename)
+                queue.task_done()
+
+        def put_file_to_url(self, url: str, local_filename: str):
+            """
+            Puts a local file on an url
+            :param url: url where the file will be put
+            :param local_filename: local file full-path
+            :return:
+            """
+            try:
+                with open(local_filename, "rb") as file:
+                    session = requests.Session()
+                    retry = Retry(connect=30, backoff_factor=0.2)
+                    adapter = HTTPAdapter(max_retries=retry)
+                    session.mount("http://", adapter)
+                    session.mount("https://", adapter)
+
+                    upload_to_s3_response = session.put(
+                        url,
+                        data=file,
+                    )
+                    if upload_to_s3_response.status_code != 200:
+                        raise Exception(
+                            f"failed to send archive to s3 with "
+                            f"status code: "
+                            f"{str(upload_to_s3_response.status_code)}"
+                        )
+
+            except Exception as e:
+                raise e
 
     def get_bucket_url_for_filename(
         self,
@@ -299,66 +391,6 @@ class KrknTelemetry:
                 f"api with code: {presigned_url_response.status_code}"
             )
         return presigned_url_response.content.decode("utf-8")
-
-    def put_file_to_s3_worker(self, queue: Queue, thread_number: int):
-        """
-        Queue driven thread, uploads a file on the S3 bucket
-        :param queue: queue that will be consumed. The queue
-        elements must be tuples on which the first item must
-        be a valid S3 link and the second a local filename full-path
-        that will be uploaded in the S3 bucket
-        :param thread_number: number of the thread
-        :return:
-        """
-        while not queue.empty():
-            data_tuple = queue.get()
-            if not isinstance(data_tuple, tuple):
-                logging.error(
-                    "failed to upload file in s3 invalid "
-                    "data format in queue must be (str, str)"
-                )
-            s3_url = data_tuple[0]
-            local_filename = data_tuple[1]
-            try:
-                with open(local_filename, "rb") as file:
-                    logging.info(
-                        f"[Thread #{thread_number}]: started "
-                        f"{local_filename} upload"
-                    )
-                    session = requests.Session()
-                    retry = Retry(connect=30, backoff_factor=0.2)
-                    adapter = HTTPAdapter(max_retries=retry)
-                    session.mount("http://", adapter)
-                    session.mount("https://", adapter)
-
-                    upload_to_s3_response = session.put(
-                        s3_url,
-                        data=file,
-                    )
-                    if upload_to_s3_response.status_code != 200:
-                        raise Exception(
-                            f"failed to send archive to s3 with "
-                            f"status code: "
-                            f"{str(upload_to_s3_response.status_code)}"
-                        )
-                logging.info(
-                    f"[Thread #{thread_number}]: "
-                    f"{local_filename} upload finished"
-                )
-                queue.task_done()
-
-            except Exception as e:
-                logging.error(
-                    f"[Thread #{thread_number}]: failed "
-                    f"to upload {local_filename}"
-                    f" with exception: {str(e)}. Aborting upload."
-                )
-                with queue.mutex:
-                    queue.queue.clear()
-                    queue.all_tasks_done.notify_all()
-                    queue.unfinished_tasks = 0
-            finally:
-                os.unlink(local_filename)
 
     def set_parameters_base64(
         self, scenario_telemetry: ScenarioTelemetry, file_path: str

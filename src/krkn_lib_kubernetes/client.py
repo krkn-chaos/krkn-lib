@@ -1676,8 +1676,8 @@ class KrknLibKubernetes:
                         f"archive {remote_file_name}"
                         f"from pod: {pod_name}, container: "
                         f"{container_name} in {local_file_name}, "
+                        f"{queue.unfinished_tasks} files left"
                     )
-                    queue.task_done()
 
             except Exception as e:
                 logging.error(
@@ -1688,11 +1688,8 @@ class KrknLibKubernetes:
                     f"namespace: {namespace}"
                     f" with exception: {str(e)}. Aborting download."
                 )
-                with queue.mutex:
-                    queue.queue.clear()
-                    queue.all_tasks_done.notify_all()
-                    queue.unfinished_tasks = 0
             finally:
+                queue.task_done()
                 if delete_remote_after_download:
                     try:
                         # delete the backup file
@@ -1785,18 +1782,20 @@ class KrknLibKubernetes:
             count_files_command = (
                 f"ls {remote_archive_path}/{remote_archive_prefix}* | wc -l"
             )
-            logging.info(
-                f"created {count_files_command} archive "
-                f"files on pod: {pod_name}, "
-                f"container: {container_name}, "
-                f"namespace: {namespace}, "
-                f"remote path: {remote_archive_path}"
-            )
+
             archive_file_number = self.exec_cmd_in_pod(
                 [count_files_command],
                 pod_name,
                 namespace,
                 container_name,
+            )
+
+            logging.info(
+                f"created {archive_file_number} archives "
+                f"files on pod: {pod_name}, "
+                f"container: {container_name}, "
+                f"namespace: {namespace}, "
+                f"remote path: {remote_archive_path}"
             )
 
             for i in range(int(archive_file_number)):
@@ -1819,6 +1818,7 @@ class KrknLibKubernetes:
                         i,
                     ),
                 )
+                worker.daemon = True
                 worker.start()
             queue.join()
         except Exception as e:
