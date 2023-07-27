@@ -89,7 +89,8 @@ class KrknTelemetry:
 
             if request.status_code != 200:
                 logging.warning(
-                    f"failed to send telemetry with error: {request.status_code}"
+                    f"failed to send telemetry "
+                    f"with error: {request.status_code}"
                 )
             else:
                 logging.info("successfully sent telemetry data")
@@ -248,7 +249,8 @@ class KrknTelemetry:
                 os.unlink(item[1])
 
             logging.info(
-                f"uploading {len(archive_volumes)} files, total size {total_size}MB "
+                f"uploading {len(archive_volumes)} files, "
+                f"total size {total_size}MB "
                 f"number of threads {int(backup_threads)}"
             )
             for i in range(int(backup_threads)):
@@ -323,38 +325,39 @@ class KrknTelemetry:
                     f"[Thread #{thread_number}] failed to upload "
                     f"file {local_filename} with exception: {str(e)}"
                 )
+                raise e
             finally:
                 os.unlink(local_filename)
                 queue.task_done()
 
-        def put_file_to_url(self, url: str, local_filename: str):
-            """
-            Puts a local file on an url
-            :param url: url where the file will be put
-            :param local_filename: local file full-path
-            :return:
-            """
-            try:
-                with open(local_filename, "rb") as file:
-                    session = requests.Session()
-                    retry = Retry(connect=30, backoff_factor=0.2)
-                    adapter = HTTPAdapter(max_retries=retry)
-                    session.mount("http://", adapter)
-                    session.mount("https://", adapter)
+    def put_file_to_url(self, url: str, local_filename: str):
+        """
+        Puts a local file on an url
+        :param url: url where the file will be put
+        :param local_filename: local file full-path
+        :return:
+        """
+        try:
+            with open(local_filename, "rb") as file:
+                session = requests.Session()
+                retry = Retry(connect=30, backoff_factor=0.2)
+                adapter = HTTPAdapter(max_retries=retry)
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
 
-                    upload_to_s3_response = session.put(
-                        url,
-                        data=file,
+                upload_to_s3_response = session.put(
+                    url,
+                    data=file,
+                )
+                if upload_to_s3_response.status_code != 200:
+                    raise Exception(
+                        f"failed to send archive to s3 with "
+                        f"status code: "
+                        f"{str(upload_to_s3_response.status_code)}"
                     )
-                    if upload_to_s3_response.status_code != 200:
-                        raise Exception(
-                            f"failed to send archive to s3 with "
-                            f"status code: "
-                            f"{str(upload_to_s3_response.status_code)}"
-                        )
 
-            except Exception as e:
-                raise e
+        except Exception as e:
+            raise e
 
     def get_bucket_url_for_filename(
         self,

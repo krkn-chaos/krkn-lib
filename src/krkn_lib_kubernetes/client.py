@@ -1305,6 +1305,17 @@ class KrknLibKubernetes:
         objects_found.update(self.get_kubernetes_custom_objects_count(objects))
         return objects_found
 
+    def path_exists_in_pod(
+        self, pod_name: str, container_name: str, namespace: str, path: str
+    ) -> bool:
+        exists = self.exec_cmd_in_pod(
+            [f'[ -d "{path}" ] && echo "True" || echo "False"'],
+            pod_name,
+            namespace,
+            container_name,
+        ).rstrip()
+        return exists == "True"
+
     def get_kubernetes_core_objects_count(
         self, api_version: str, objects: list[str]
     ) -> dict[str, int]:
@@ -1760,6 +1771,15 @@ class KrknLibKubernetes:
                 raise Exception(
                     f"download path {download_path} does not exist"
                 )
+            if not self.path_exists_in_pod(
+                pod_name, container_name, namespace, remote_archive_path
+            ):
+                raise Exception("remote archive path does not exist")
+
+            if not self.path_exists_in_pod(
+                pod_name, container_name, namespace, target_path
+            ):
+                raise Exception("remote target path does not exist")
 
             tar_command = (
                 f"printf 'n {remote_archive_path}/"
@@ -1827,5 +1847,6 @@ class KrknLibKubernetes:
                 f"container: {container_name}, namespace:{namespace} "
                 f"with exception: {str(e)}"
             )
+            raise e
 
         return downloaded_files
