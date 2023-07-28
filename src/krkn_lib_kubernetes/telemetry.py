@@ -99,12 +99,15 @@ class KrknTelemetry:
         self,
         kubecli: KrknLibKubernetes,
         telemetry_config: dict,
+        request_id: str,
     ) -> list[(int, str)]:
         """
         Downloads the OCP prometheus metrics folder
         :param kubecli: KrknLibKubernetes client object
         :param telemetry_config: krkn telemetry conf section
         will be stored
+        :param request_id: uuid of the session that will represent the
+        temporary archive files
         :return: the list of the archive number and filenames downloaded
         """
         file_list = list[(int, str)]()
@@ -174,6 +177,7 @@ class KrknTelemetry:
                 prometheus_namespace,
                 remote_archive_path,
                 target_path,
+                request_id,
                 archive_path,
                 max_threads=int(backup_threads),
                 archive_part_size=10000,

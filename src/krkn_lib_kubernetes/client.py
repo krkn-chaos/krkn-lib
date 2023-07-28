@@ -1728,6 +1728,7 @@ class KrknLibKubernetes:
         namespace: str,
         remote_archive_path: str,
         target_path: str,
+        archive_files_prefix: str,
         download_path: str = "/tmp",
         archive_part_size: int = 30000,
         max_threads: int = 5,
@@ -1749,16 +1750,18 @@ class KrknLibKubernetes:
         will be stored (will be deleted once the download
         terminates, must be writable
         and must have enough space to temporarly store the archive)
-        :param download_path: the local path
-        where the archive will be saved
         :param target_path: the path that will be archived
         and downloaded from the container
+        :param archive_files_prefix: prefix string that will be added
+        to the files
+        :param download_path: the local path
+        where the archive will be saved
         :param archive_part_size: the archive will splitted in multiple
         files of the specified `archive_part_size`
         :param max_threads: maximum number of threads that will be launched
         :return: the list of the archive number and filenames downloaded
         """
-        remote_archive_prefix = f"{str(uuid.uuid1())}-"
+        remote_archive_prefix = f"{archive_files_prefix}-"
         local_file_prefix = remote_archive_prefix
         queue = Queue()
         downloaded_files = list[(int, str)]()

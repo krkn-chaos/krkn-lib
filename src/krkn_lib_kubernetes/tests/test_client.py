@@ -2,6 +2,8 @@ import os.path
 import tempfile
 import time
 import unittest
+import uuid
+
 import yaml
 import logging
 import random
@@ -593,6 +595,7 @@ class KrknLibKubernetesTests(BaseTest):
             namespace,
             "/tmp",
             "/etc",
+            str(uuid.uuid1()),
             archive_part_size=10000,
             download_path=test_workdir,
         )

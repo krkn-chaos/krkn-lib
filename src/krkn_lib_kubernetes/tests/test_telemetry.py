@@ -3,6 +3,8 @@ import os
 import tempfile
 import time
 import unittest
+import uuid
+
 import boto3
 import yaml
 
@@ -121,6 +123,7 @@ class KrknTelemetryTests(BaseTest):
                 prometheus_namespace,
                 "/does_not_exist",
                 "/test",
+                str(uuid.uuid1()),
                 archive_part_size=100,
                 download_path=test_workdir,
             )
@@ -133,6 +136,7 @@ class KrknTelemetryTests(BaseTest):
                 prometheus_namespace,
                 "/tmp",
                 "/does_not_exist",
+                str(uuid.uuid1()),
                 archive_part_size=100,
                 download_path=test_workdir,
             )
@@ -145,6 +149,7 @@ class KrknTelemetryTests(BaseTest):
                 prometheus_namespace,
                 "/tmp",
                 "/does_not_exist",
+                str(uuid.uuid1()),
                 archive_part_size=100,
                 download_path=test_workdir,
             )
@@ -157,6 +162,7 @@ class KrknTelemetryTests(BaseTest):
                 prometheus_namespace,
                 "/tmp",
                 "/does_not_exist",
+                str(uuid.uuid1()),
                 archive_part_size=100,
                 download_path=test_workdir,
             )
@@ -169,6 +175,7 @@ class KrknTelemetryTests(BaseTest):
                 "does_not_exist",
                 "/tmp",
                 "/does_not_exist",
+                str(uuid.uuid1()),
                 archive_part_size=100,
                 download_path=test_workdir,
             )
@@ -205,6 +212,7 @@ class KrknTelemetryTests(BaseTest):
             prometheus_namespace,
             "/tmp",
             "/test",
+            str(uuid.uuid1()),
             archive_part_size=100,
             download_path=test_workdir,
         )
