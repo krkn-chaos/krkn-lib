@@ -1401,8 +1401,8 @@ class KrknLibKubernetes:
                         )
                         result[resource.kind] = len(custom_resource["items"])
 
-            except Exception as e:
-                logging.warning("CustomObjectsApi -> %s", str(e))
+            except Exception:
+                pass
         return result
 
     def get_api_resources_by_group(self, group, version):
@@ -1430,8 +1430,8 @@ class KrknLibKubernetes:
                     auth_settings=auth_settings,
                 )
                 return data[0]
-            except Exception as e:
-                logging.warning("V1ApiException -> %s", str(e))
+            except Exception:
+                pass
 
         return None
 
@@ -1585,6 +1585,7 @@ class KrknLibKubernetes:
         local_download_path: str,
         local_file_prefix: str,
         queue: Queue,
+        queue_size: int,
         downloaded_file_list: list[(int, str)],
         delete_remote_after_download: bool,
         thread_number: int,
@@ -1619,6 +1620,7 @@ class KrknLibKubernetes:
         and the extension tar.b64
         :param queue: the queue from which the sequential
          number wil be popped
+        :param queue_size: total size of the queue
         :param downloaded_file_list: the list of
          archive number and local filename  downloaded
         file will be appended once the download terminates
@@ -1676,9 +1678,10 @@ class KrknLibKubernetes:
                     file_buffer.seek(0)
                     downloaded_file_list.append((file_number, local_file_name))
                     logging.info(
-                        f"[Thread #{thread_number}]: downloaded "
-                        f"file {len(downloaded_file_list)}/"
-                        f"{queue.unfinished_tasks}"
+                        f"[Thread #{thread_number}] : "
+                        f"{queue.unfinished_tasks-1}/"
+                        f"{queue_size} "
+                        f"{local_file_name} downloaded "
                     )
 
             except Exception as e:
@@ -1700,10 +1703,6 @@ class KrknLibKubernetes:
                             container_name,
                             namespace,
                             remote_file_name,
-                        )
-                        logging.info(
-                            f"[Thread #{thread_number}]: removed "
-                            f"remote archive {remote_file_name}"
                         )
                     except Exception as e:
                         logging.error(
@@ -1806,7 +1805,7 @@ class KrknLibKubernetes:
 
             for i in range(int(archive_file_number)):
                 queue.put(i)
-
+            queue_size = queue.qsize()
             for i in range(max_threads):
                 worker = threading.Thread(
                     target=self.get_archive_volume_from_pod_worker,
@@ -1819,6 +1818,7 @@ class KrknLibKubernetes:
                         download_path,
                         local_file_prefix,
                         queue,
+                        queue_size,
                         downloaded_files,
                         True,
                         i,

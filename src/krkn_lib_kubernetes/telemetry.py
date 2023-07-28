@@ -252,11 +252,13 @@ class KrknTelemetry:
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
             uploaded_files = list[str]()
+            queue_size = queue.qsize()
             for i in range(int(backup_threads)):
                 worker = threading.Thread(
                     target=self.generate_url_and_put_to_s3_worker,
                     args=(
                         queue,
+                        queue_size,
                         request_id,
                         f"{url}/presigned-url",
                         username,
@@ -275,6 +277,7 @@ class KrknTelemetry:
     def generate_url_and_put_to_s3_worker(
         self,
         queue: Queue,
+        queue_size: int,
         request_id: str,
         api_url: str,
         username: str,
@@ -289,6 +292,7 @@ class KrknTelemetry:
         elements must be tuples on which the first item must
         be the file sequence number and the second a local filename full-path
         that will be uploaded in the S3 bucket
+        :param queue_size: total number of files
         :param request_id: uuid of the session that will represent the
         S3 folder on which the prometheus files will be stored
         :param api_url: API endpoint to generate the S3 temporary link
@@ -315,9 +319,10 @@ class KrknTelemetry:
                 uploaded_file_list.append(local_filename)
 
                 logging.info(
-                    f"[Thread #{thread_number}]: uploaded file "
-                    f"{len(uploaded_file_list)}/{queue.unfinished_tasks} "
-                    f"on {request_id}/"
+                    f"[Thread #{thread_number}] : "
+                    f"{queue.unfinished_tasks - 1}/"
+                    f"{queue_size} "
+                    f"{local_filename} uploaded "
                 )
             except Exception as e:
                 logging.error(
