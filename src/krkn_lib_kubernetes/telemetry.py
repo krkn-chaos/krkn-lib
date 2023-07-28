@@ -251,12 +251,7 @@ class KrknTelemetry:
                 queue.put((i, decoded_filename))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
-
-            logging.info(
-                f"uploading {len(archive_volumes)} files, "
-                f"total size {total_size}MB "
-                f"number of threads {int(backup_threads)}"
-            )
+            uploaded_files = list[str]()
             for i in range(int(backup_threads)):
                 worker = threading.Thread(
                     target=self.generate_url_and_put_to_s3_worker,
@@ -267,6 +262,7 @@ class KrknTelemetry:
                         username,
                         password,
                         i,
+                        uploaded_files,
                     ),
                 )
                 worker.daemon = True
@@ -284,6 +280,7 @@ class KrknTelemetry:
         username: str,
         password: str,
         thread_number: int,
+        uploaded_file_list: list[str],
     ):
         """
         Worker function that creates an s3 link to put files and upload
@@ -313,16 +310,14 @@ class KrknTelemetry:
                     username,
                     password,
                 )
-                logging.info(f"[Thread #{thread_number}]: s3 link generated")
-                logging.info(
-                    f"[Thread #{thread_number}]: started "
-                    f"{local_filename} upload"
-                )
+
                 self.put_file_to_url(s3_url, local_filename)
+                uploaded_file_list.append(local_filename)
+
                 logging.info(
-                    f"[Thread #{thread_number}]: "
-                    f"{local_filename} upload finished, "
-                    f"{queue.unfinished_tasks} files left"
+                    f"[Thread #{thread_number}]: uploaded file "
+                    f"{len(uploaded_file_list)}/{queue.unfinished_tasks} "
+                    f"on {request_id}/"
                 )
             except Exception as e:
                 logging.error(
@@ -359,6 +354,7 @@ class KrknTelemetry:
                         f"status code: "
                         f"{str(upload_to_s3_response.status_code)}"
                     )
+                session.close()
 
         except Exception as e:
             raise e

@@ -1650,12 +1650,6 @@ class KrknLibKubernetes:
 
             try:
                 with open(local_file_name, "x") as file_buffer:
-                    logging.info(
-                        f"[Thread #{thread_number}]: started downloading "
-                        f"archive {remote_file_name}"
-                        f"from pod: {pod_name}, container: "
-                        f"{container_name} in {local_file_name}, "
-                    )
                     base64_dump = [
                         "base64",
                         remote_file_name,
@@ -1683,11 +1677,8 @@ class KrknLibKubernetes:
                     file_buffer.seek(0)
                     downloaded_file_list.append((file_number, local_file_name))
                     logging.info(
-                        f"[Thread #{thread_number}]: finished downloading "
-                        f"archive {remote_file_name}"
-                        f"from pod: {pod_name}, container: "
-                        f"{container_name} in {local_file_name}, "
-                        f"{queue.unfinished_tasks} files left"
+                        f"[Thread #{thread_number}]: downloaded "
+                        f"file {len(downloaded_file_list)}/{queue.unfinished_tasks}"
                     )
 
             except Exception as e:
@@ -1811,14 +1802,6 @@ class KrknLibKubernetes:
                 pod_name,
                 namespace,
                 container_name,
-            )
-
-            logging.info(
-                f"created {archive_file_number} archives "
-                f"files on pod: {pod_name}, "
-                f"container: {container_name}, "
-                f"namespace: {namespace}, "
-                f"remote path: {remote_archive_path}"
             )
 
             for i in range(int(archive_file_number)):
