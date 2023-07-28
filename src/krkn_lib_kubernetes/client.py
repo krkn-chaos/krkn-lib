@@ -2,7 +2,6 @@ import logging
 import re
 import threading
 import time
-import uuid
 from queue import Queue
 from typing import Dict, List
 import ast
@@ -1359,8 +1358,8 @@ class KrknLibKubernetes:
                         json_obj = ast.literal_eval(data[0])
                         count = len(json_obj["items"])
                         result[resource.kind] = count
-                    except ApiException as e:
-                        logging.warning("ApiException -> %s", str(e))
+                    except ApiException:
+                        pass
         return result
 
     def get_kubernetes_custom_objects_count(
@@ -1678,7 +1677,8 @@ class KrknLibKubernetes:
                     downloaded_file_list.append((file_number, local_file_name))
                     logging.info(
                         f"[Thread #{thread_number}]: downloaded "
-                        f"file {len(downloaded_file_list)}/{queue.unfinished_tasks}"
+                        f"file {len(downloaded_file_list)}/"
+                        f"{queue.unfinished_tasks}"
                     )
 
             except Exception as e:
