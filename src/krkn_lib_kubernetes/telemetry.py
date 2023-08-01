@@ -92,7 +92,7 @@ class KrknTelemetry:
             if request.status_code != 200:
                 logging.warning(
                     f"failed to send telemetry "
-                    f"with error: {request.status_code}"
+                    f"with error: {request.status_code} - {request.content}"
                 )
             else:
                 logging.info("successfully sent telemetry data")
