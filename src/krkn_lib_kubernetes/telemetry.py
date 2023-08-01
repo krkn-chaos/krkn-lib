@@ -331,7 +331,7 @@ class KrknTelemetry:
                 )
                 raise e
             finally:
-                os.unlink(local_filename)
+                # os.unlink(local_filename)
                 queue.task_done()
 
     def put_file_to_url(self, url: str, local_filename: str):
