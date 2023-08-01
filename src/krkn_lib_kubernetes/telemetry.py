@@ -2,6 +2,8 @@ import base64
 import logging
 import sys
 import threading
+import time
+
 import yaml
 import requests
 import os
@@ -215,6 +217,7 @@ class KrknTelemetry:
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         backup_threads = telemetry_config.get("backup_threads")
+        max_retries = telemetry_config.get("max_retries")
         exceptions = []
         is_exception = False
         if prometheus_backup is None:
@@ -231,6 +234,9 @@ class KrknTelemetry:
             is_exception = True
         if password is None:
             exceptions.append("telemetry -> password is missing")
+            is_exception = True
+        if max_retries is None:
+            exceptions.append("telemetry -> max_retries is missing")
             is_exception = True
         if is_exception:
             raise Exception(", ".join(exceptions))
@@ -249,7 +255,7 @@ class KrknTelemetry:
                         "source and destination file are the same"
                     )
                 self.decode_base64_file(item[1], decoded_filename)
-                queue.put((volume_number, decoded_filename))
+                queue.put((volume_number, decoded_filename, 0))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
             uploaded_files = list[str]()
@@ -266,6 +272,7 @@ class KrknTelemetry:
                         password,
                         i,
                         uploaded_files,
+                        max_retries,
                     ),
                 )
                 worker.daemon = True
@@ -285,14 +292,17 @@ class KrknTelemetry:
         password: str,
         thread_number: int,
         uploaded_file_list: list[str],
+        max_retries: int,
     ):
         """
         Worker function that creates an s3 link to put files and upload
         and uploads the file on the bucket.
         :param queue: queue that will be consumed. The queue
         elements must be tuples on which the first item must
-        be the file sequence number and the second a local filename full-path
-        that will be uploaded in the S3 bucket
+        be the file sequence number, the second a local filename full-path
+        that will be uploaded in the S3 bucket and the third will be a retry
+        counter updated by the thread on upload exception and compared with
+        max_retries.
         :param queue_size: total number of files
         :param request_id: uuid of the session that will represent the
         S3 folder on which the prometheus files will be stored
@@ -300,14 +310,18 @@ class KrknTelemetry:
         :param username: API username
         :param password: API password
         :param thread_number: Thread number
+        :param uploaded_file_list: uploaded file list shared between threads
+        :param max_retries: maximum number of retries from config.yaml.
+        If 0 will retry indefinitely.
         :return:
         """
+        THREAD_SLEEP = 5
         while not queue.empty():
+            data_tuple = queue.get()
+            file_number = data_tuple[0]
+            local_filename = data_tuple[1]
+            retry = data_tuple[2]
             try:
-                data_tuple = queue.get()
-                file_number = data_tuple[0]
-                local_filename = data_tuple[1]
-
                 s3_url = self.get_bucket_url_for_filename(
                     api_url,
                     request_id,
@@ -325,14 +339,24 @@ class KrknTelemetry:
                     f"{queue_size} "
                     f"{local_filename} uploaded "
                 )
+                os.unlink(local_filename)
             except Exception as e:
-                logging.error(
-                    f"[Thread #{thread_number}] failed to upload "
-                    f"file {local_filename} with exception: {str(e)}"
-                )
-                raise e
+                if max_retries == 0 or retry < max_retries:
+                    logging.warning(
+                        f"[Thread #{thread_number}] {local_filename} retry number {retry}"
+                    )
+                    time.sleep(THREAD_SLEEP)
+                    # if there's an exception on the file upload
+                    # the file will be re-enqueued to be retried in 5 seconds
+                    queue.put((file_number, local_filename, retry + 1))
+                else:
+                    logging.error(
+                        f"[Thread #{thread_number}] max retry number exceeded, "
+                        f"failed to upload file {local_filename} "
+                        f"with exception: {str(e)}"
+                    )
+                    raise e
             finally:
-                # os.unlink(local_filename)
                 queue.task_done()
 
     def put_file_to_url(self, url: str, local_filename: str):
@@ -344,24 +368,13 @@ class KrknTelemetry:
         """
         try:
             with open(local_filename, "rb") as file:
-                session = requests.Session()
-                retry = Retry(connect=30, backoff_factor=0.2)
-                adapter = HTTPAdapter(max_retries=retry)
-                session.mount("http://", adapter)
-                session.mount("https://", adapter)
-
-                upload_to_s3_response = session.put(
-                    url,
-                    data=file,
-                )
+                upload_to_s3_response = requests.put(url, data=file, timeout=5)
                 if upload_to_s3_response.status_code != 200:
                     raise Exception(
                         f"failed to send archive to s3 with "
                         f"status code: "
                         f"{str(upload_to_s3_response.status_code)}"
                     )
-                session.close()
-
         except Exception as e:
             raise e
 
