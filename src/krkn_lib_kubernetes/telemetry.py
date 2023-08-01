@@ -240,15 +240,16 @@ class KrknTelemetry:
 
         try:
             total_size = 0
-            for i, item in enumerate(archive_volumes):
+            for item in archive_volumes:
                 decoded_filename = item[1].replace(".b64", "")
+                volume_number = item[0]
                 if item[1] == decoded_filename:
                     raise Exception(
                         "impossible to convert base64 file, "
                         "source and destination file are the same"
                     )
                 self.decode_base64_file(item[1], decoded_filename)
-                queue.put((i, decoded_filename))
+                queue.put((volume_number, decoded_filename))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
             uploaded_files = list[str]()
