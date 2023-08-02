@@ -16,35 +16,43 @@ from krkn_lib_kubernetes import (
     ChaosRunTelemetry,
     ScenarioTelemetry,
     KrknLibKubernetes,
+    SafeLogger,
 )
 
 
 class KrknTelemetry:
+    kubecli: KrknLibKubernetes = None
+    safe_logger: SafeLogger = None
+
+    def __init__(
+        self, safe_logger: SafeLogger, lib_kubernetes: KrknLibKubernetes
+    ):
+        self.kubecli = lib_kubernetes
+        self.safe_logger = safe_logger
+
     def send_telemetry(
         self,
         telemetry_config: dict,
         uuid: str,
         chaos_telemetry: ChaosRunTelemetry,
-        kubecli: KrknLibKubernetes,
     ):
         """
         :param telemetry_config: krkn telemetry conf section
         :param uuid: uuid used as folder in S3 bucket
         :param chaos_telemetry: already populated ChaosRunTelemetry object
-        :param kubecli: KrknLibKubernetes client object
         :return:
         """
         enabled = telemetry_config.get("enabled")
         if enabled:
-            logging.info("collecting telemetry data, please wait....")
+            self.safe_logger.info("collecting telemetry data, please wait....")
             chaos_telemetry.cloud_infrastructure = (
-                kubecli.get_cluster_infrastructure()
+                self.kubecli.get_cluster_infrastructure()
             )
             chaos_telemetry.network_plugins = (
-                kubecli.get_cluster_network_plugins()
+                self.kubecli.get_cluster_network_plugins()
             )
             chaos_telemetry.kubernetes_objects_count = (
-                kubecli.get_all_kubernetes_object_count(
+                self.kubecli.get_all_kubernetes_object_count(
                     [
                         "Deployment",
                         "Pod",
@@ -55,7 +63,7 @@ class KrknTelemetry:
                     ]
                 )
             )
-            chaos_telemetry.node_infos = kubecli.get_nodes_infos()
+            chaos_telemetry.node_infos = self.kubecli.get_nodes_infos()
             chaos_telemetry.node_count = len(chaos_telemetry.node_infos)
 
             url = telemetry_config.get("api_url")
@@ -90,22 +98,20 @@ class KrknTelemetry:
             )
 
             if request.status_code != 200:
-                logging.warning(
+                self.safe_logger.warning(
                     f"failed to send telemetry "
                     f"with error: {request.status_code} - {request.content}"
                 )
             else:
-                logging.info("successfully sent telemetry data")
+                self.safe_logger.info("successfully sent telemetry data")
 
     def get_ocp_prometheus_data(
         self,
-        kubecli: KrknLibKubernetes,
         telemetry_config: dict,
         request_id: str,
     ) -> list[(int, str)]:
         """
         Downloads the OCP prometheus metrics folder
-        :param kubecli: KrknLibKubernetes client object
         :param telemetry_config: krkn telemetry conf section
         will be stored
         :param request_id: uuid of the session that will represent the
@@ -156,7 +162,7 @@ class KrknTelemetry:
         prometheus_container_name = "prometheus"
         prometheus_namespace = "openshift-monitoring"
         remote_archive_path = "/prometheus"
-        prometheus_pod = kubecli.get_pod_info(
+        prometheus_pod = self.kubecli.get_pod_info(
             prometheus_pod_name, prometheus_namespace
         )
         if not prometheus_pod:
@@ -173,7 +179,7 @@ class KrknTelemetry:
             target_path = "/prometheus/wal"
 
         try:
-            file_list = kubecli.archive_and_get_path_from_pod(
+            file_list = self.kubecli.archive_and_get_path_from_pod(
                 prometheus_pod_name,
                 prometheus_container_name,
                 prometheus_namespace,
@@ -183,6 +189,7 @@ class KrknTelemetry:
                 archive_path,
                 max_threads=int(backup_threads),
                 archive_part_size=10000,
+                safe_logger=self.safe_logger,
             )
             return file_list
         except Exception as e:
@@ -193,7 +200,7 @@ class KrknTelemetry:
                 f" namespace: {prometheus_namespace}:"
                 f" {str(e)}"
             )
-            logging.error(exception_string)
+            self.safe_logger.error(exception_string)
             raise Exception(exception_string)
 
     def put_ocp_prometheus_data(
@@ -280,7 +287,7 @@ class KrknTelemetry:
             queue.join()
 
         except Exception as e:
-            logging.error(str(e))
+            self.safe_logger.error(str(e))
 
     def generate_url_and_put_to_s3_worker(
         self,
@@ -315,7 +322,7 @@ class KrknTelemetry:
         If 0 will retry indefinitely.
         :return:
         """
-        THREAD_SLEEP = 5
+        THREAD_SLEEP = 5  # NOQA
         while not queue.empty():
             data_tuple = queue.get()
             file_number = data_tuple[0]
@@ -333,7 +340,7 @@ class KrknTelemetry:
                 self.put_file_to_url(s3_url, local_filename)
                 uploaded_file_list.append(local_filename)
 
-                logging.info(
+                self.safe_logger.info(
                     f"[Thread #{thread_number}] : "
                     f"{queue.unfinished_tasks - 1}/"
                     f"{queue_size} "
@@ -342,7 +349,7 @@ class KrknTelemetry:
                 os.unlink(local_filename)
             except Exception as e:
                 if max_retries == 0 or retry < max_retries:
-                    logging.warning(
+                    self.safe_logger.warning(
                         f"[Thread #{thread_number}] {local_filename} retry number {retry}"
                     )
                     time.sleep(THREAD_SLEEP)
@@ -350,7 +357,7 @@ class KrknTelemetry:
                     # the file will be re-enqueued to be retried in 5 seconds
                     queue.put((file_number, local_filename, retry + 1))
                 else:
-                    logging.error(
+                    self.safe_logger.error(
                         f"[Thread #{thread_number}] max retry number exceeded, "
                         f"failed to upload file {local_filename} "
                         f"with exception: {str(e)}"

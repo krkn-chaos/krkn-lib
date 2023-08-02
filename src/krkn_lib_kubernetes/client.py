@@ -27,6 +27,7 @@ from .resources import (
     VolumeMount,
     ApiRequestException,
     NodeInfo,
+    SafeLogger,
 )
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -42,25 +43,27 @@ class KrknLibKubernetes:
     dyn_client: kubernetes.dynamic.client.DynamicClient = None
 
     def __init__(
-        self, kubeconfig_path: str = None, *, kubeconfig_string: str = None
+        self,
+        kubeconfig_path: str = None,
+        *,
+        kubeconfig_string: str = None,
     ):
         """
         KrknLibKubernetes Constructor. Can be invoked with kubeconfig_path
         or, optionally, with a kubeconfig in string
         format using the keyword argument
-
         :param kubeconfig_path: kubeconfig path
         :param kubeconfig_string: (keyword argument)
                kubeconfig in string format
 
         Initialization with kubeconfig path:
 
-        >>> KrknLibKubernetes("/home/test/.kube/config")
+        >>> KrknLibKubernetes(log_writer, "/home/test/.kube/config")
 
         Initialization with kubeconfig string:
 
         >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknLibKubernetes(kubeconfig_string=kubeconfig_string)
+        >>> KrknLibKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
@@ -1589,6 +1592,7 @@ class KrknLibKubernetes:
         downloaded_file_list: list[(int, str)],
         delete_remote_after_download: bool,
         thread_number: int,
+        safe_logger: SafeLogger,
     ):
         """
         Download worker for the `create_download_multipart_archive`
@@ -1629,12 +1633,14 @@ class KrknLibKubernetes:
          the download will terminate
         the remote file will be deleted.
         :param thread_number: the assigned thread number
+        :param safe_logger: SafeLogger class, will allow thread-safe
+        logging
         :return:
         """
         while not queue.empty():
             file_number = queue.get()
             if not isinstance(file_number, int):
-                logging.error(
+                safe_logger.error(
                     f"[Thread #{thread_number}] wrong queue "
                     f"element format, download failed"
                 )
@@ -1677,7 +1683,7 @@ class KrknLibKubernetes:
                     file_buffer.flush()
                     file_buffer.seek(0)
                     downloaded_file_list.append((file_number, local_file_name))
-                    logging.info(
+                    safe_logger.info(
                         f"[Thread #{thread_number}] : "
                         f"{queue.unfinished_tasks-1}/"
                         f"{queue_size} "
@@ -1685,7 +1691,7 @@ class KrknLibKubernetes:
                     )
 
             except Exception as e:
-                logging.error(
+                safe_logger.error(
                     f"[Thread #{thread_number}]: failed "
                     f"to download {remote_file_name}"
                     f" from pod: {pod_name}, "
@@ -1705,7 +1711,7 @@ class KrknLibKubernetes:
                             remote_file_name,
                         )
                     except Exception as e:
-                        logging.error(
+                        safe_logger.error(
                             f"[Thread #{thread_number}]: failed to "
                             f"remove remote archive "
                             f"{remote_file_name}: {str(e)}"
@@ -1722,6 +1728,7 @@ class KrknLibKubernetes:
         download_path: str = "/tmp",
         archive_part_size: int = 30000,
         max_threads: int = 5,
+        safe_logger: SafeLogger = None,
     ) -> list[(int, str)]:
         """
         archives and downloads a folder content
@@ -1749,8 +1756,14 @@ class KrknLibKubernetes:
         :param archive_part_size: the archive will splitted in multiple
         files of the specified `archive_part_size`
         :param max_threads: maximum number of threads that will be launched
+        :param safe_logger: SafeLogger, if omitted a default SafeLogger will
+        be instantiated that will simply use the logging package to print logs
+        to stdout.
         :return: the list of the archive number and filenames downloaded
         """
+        if safe_logger is None:
+            safe_logger = SafeLogger()
+
         remote_archive_prefix = f"{archive_files_prefix}-"
         local_file_prefix = remote_archive_prefix
         queue = Queue()
@@ -1784,7 +1797,7 @@ class KrknLibKubernetes:
                 f"-C {target_path} ."
             )
 
-            logging.info("creating data archive, please wait....")
+            safe_logger.info("creating data archive, please wait....")
             self.exec_cmd_in_pod(
                 [tar_command],
                 pod_name,
@@ -1822,13 +1835,14 @@ class KrknLibKubernetes:
                         downloaded_files,
                         True,
                         i,
+                        safe_logger,
                     ),
                 )
                 worker.daemon = True
                 worker.start()
             queue.join()
         except Exception as e:
-            logging.error(
+            safe_logger.error(
                 f"failed to create archive {target_path} on pod: {pod_name}, "
                 f"container: {container_name}, namespace:{namespace} "
                 f"with exception: {str(e)}"

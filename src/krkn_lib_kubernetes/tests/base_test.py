@@ -12,7 +12,7 @@ from jinja2 import FileSystemLoader, Environment
 from kubernetes import config
 from requests import ConnectTimeout
 
-from krkn_lib_kubernetes import KrknLibKubernetes, KrknTelemetry
+from krkn_lib_kubernetes import KrknLibKubernetes, KrknTelemetry, SafeLogger
 
 
 class BaseTest(unittest.TestCase):
@@ -22,7 +22,7 @@ class BaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.lib_k8s = KrknLibKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
-        cls.lib_telemetry = KrknTelemetry()
+        cls.lib_telemetry = KrknTelemetry(SafeLogger(), cls.lib_k8s)
         host = cls.lib_k8s.api_client.configuration.host
         logging.disable(logging.CRITICAL)
         try:
