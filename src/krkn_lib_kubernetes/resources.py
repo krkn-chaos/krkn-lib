@@ -3,6 +3,8 @@ import yaml
 import json
 from dataclasses import dataclass
 from typing import List
+from queue import Queue, Empty
+from threading import Thread
 
 
 @dataclass(frozen=True, order=False)
@@ -167,6 +169,7 @@ class ChaosRunTelemetry:
     cloud_infrastructure: str = "Unknown"
     kubernetes_objects_count: dict[str, int] = dict[str, int]
     network_plugins: list[str] = list[str]
+    run_uuid: str = ""
 
     def __init__(self, json_object: any = None):
         self.scenarios = []
@@ -185,6 +188,7 @@ class ChaosRunTelemetry:
                 "kubernetes_objects_count"
             )
             self.network_plugins = json_object.get("network_plugins")
+            self.run_uuid = json_object.get("run_uuid")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
