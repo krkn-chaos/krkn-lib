@@ -9,8 +9,6 @@ import requests
 import os
 from queue import Queue
 from base64io import Base64IO
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
 
 from krkn_lib_kubernetes import (
     ChaosRunTelemetry,
@@ -98,10 +96,12 @@ class KrknTelemetry:
             )
 
             if request.status_code != 200:
-                self.safe_logger.warning(
-                    f"failed to send telemetry "
-                    f"with error: {request.status_code} - {request.content}"
+                error_message = (
+                    f"failed to send telemetry to {url}/telemetry"
+                    f"with error: {request.status_code} - {str(request.content)}"
                 )
+                self.safe_logger.warning(error_message)
+                raise Exception(error_message)
             else:
                 self.safe_logger.info("successfully sent telemetry data")
 
