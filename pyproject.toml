@@ -11,14 +11,16 @@ homepage = "https://github.com/redhat-chaos/krkn"
 [tool.poetry.dependencies]
 python = "^3.9"
 kubernetes ="^26.0.0"
-arcaflow-lib-kubernetes="^0.1.1"
+arcaflow-lib-kubernetes="^0.1.2"
 sphinxnotes-markdown-builder="^0.5.6"
 requests="^2.29.0"
 kubeconfig = "^1.1.1"
 
+
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
-
+boto3 = "^1.28.12"
+base64io = "^1.0.3"
 [build-system]
 requires = ["poetry-core>=1.1.0"]
 build-backend = "poetry.core.masonry.api"

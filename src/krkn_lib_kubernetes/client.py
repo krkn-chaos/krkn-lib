@@ -1,6 +1,10 @@
 import logging
 import re
+import threading
 import time
+from queue import Queue
+from typing import Dict, List
+import ast
 import arcaflow_lib_kubernetes
 import kubernetes
 import os
@@ -22,10 +26,14 @@ from .resources import (
     Volume,
     VolumeMount,
     ApiRequestException,
+    NodeInfo,
+    SafeLogger,
 )
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+
 class KrknLibKubernetes:
     """ """
 
@@ -37,25 +45,27 @@ class KrknLibKubernetes:
     dyn_client: kubernetes.dynamic.client.DynamicClient = None
 
     def __init__(
-        self, kubeconfig_path: str = None, *, kubeconfig_string: str = None
+        self,
+        kubeconfig_path: str = None,
+        *,
+        kubeconfig_string: str = None,
     ):
         """
         KrknLibKubernetes Constructor. Can be invoked with kubeconfig_path
         or, optionally, with a kubeconfig in string
         format using the keyword argument
-
         :param kubeconfig_path: kubeconfig path
         :param kubeconfig_string: (keyword argument)
                kubeconfig in string format
 
         Initialization with kubeconfig path:
 
-        >>> KrknLibKubernetes("/home/test/.kube/config")
+        >>> KrknLibKubernetes(log_writer, "/home/test/.kube/config")
 
         Initialization with kubeconfig string:
 
         >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknLibKubernetes(kubeconfig_string=kubeconfig_string)
+        >>> KrknLibKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
@@ -91,21 +101,31 @@ class KrknLibKubernetes:
                     content = f.read().splitlines()
                     if not content:
                         raise Exception("Token file exists but empty.")
-                kube_addr = os.environ.get('KUBERNETES_PORT_443_TCP_ADDR')
-                kube_port = os.environ.get('KUBERNETES_PORT_443_TCP_PORT')
+                kube_addr = os.environ.get("KUBERNETES_PORT_443_TCP_ADDR")
+                kube_port = os.environ.get("KUBERNETES_PORT_443_TCP_PORT")
                 conf = KubeConfig()
-                conf.set_cluster(name='krkn-cluster', server=f'https://{kube_addr}:{kube_port}', certificate_authority=SERVICE_CERT_FILENAME,)
-                conf.set_credentials(name='user', token=content[0])
-                conf.set_context(name='krkn-context', cluster='krkn-cluster', user='user')
-                conf.use_context('krkn-context')            
+                conf.set_cluster(
+                    name="krkn-cluster",
+                    server=f"https://{kube_addr}:{kube_port}",
+                    certificate_authority=SERVICE_CERT_FILENAME,
+                )
+                conf.set_credentials(name="user", token=content[0])
+                conf.set_context(
+                    name="krkn-context", cluster="krkn-cluster", user="user"
+                )
+                conf.use_context("krkn-context")
 
         try:
             config.load_kube_config(kubeconfig_path)
             self.api_client = client.ApiClient()
-            self.k8s_client = config.new_client_from_config(config_file=kubeconfig_path)
+            self.k8s_client = config.new_client_from_config(
+                config_file=kubeconfig_path
+            )
             self.cli = client.CoreV1Api(self.k8s_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
-            self.custom_object_client = client.CustomObjectsApi(self.k8s_client)
+            self.custom_object_client = client.CustomObjectsApi(
+                self.k8s_client
+            )
             self.dyn_client = DynamicClient(self.k8s_client)
             self.watch_resource = watch.Watch()
         except OSError:
@@ -441,6 +461,7 @@ class KrknLibKubernetes:
         namespace: str,
         container: str = None,
         base_command: str = None,
+        std_err: bool = True,
     ) -> str:
         """
         Execute a base command and its parameters
@@ -481,7 +502,7 @@ class KrknLibKubernetes:
                     namespace,
                     container=container,
                     command=exec_command,
-                    stderr=True,
+                    stderr=std_err,
                     stdin=False,
                     stdout=True,
                     tty=False,
@@ -492,7 +513,7 @@ class KrknLibKubernetes:
                     pod_name,
                     namespace,
                     command=exec_command,
-                    stderr=True,
+                    stderr=std_err,
                     stdin=False,
                     stdout=True,
                     tty=False,
@@ -1287,3 +1308,557 @@ class KrknLibKubernetes:
             nodes_to_return.append(node_to_add)
             nodes.remove(node_to_add)
         return nodes_to_return
+
+    def get_all_kubernetes_object_count(
+        self, objects: list[str]
+    ) -> dict[str, int]:
+        objects_found = dict[str, int]()
+        objects_found.update(
+            self.get_kubernetes_core_objects_count("v1", objects)
+        )
+        objects_found.update(self.get_kubernetes_custom_objects_count(objects))
+        return objects_found
+
+    def path_exists_in_pod(
+        self, pod_name: str, container_name: str, namespace: str, path: str
+    ) -> bool:
+        exists = self.exec_cmd_in_pod(
+            [f'[ -d "{path}" ] && echo "True" || echo "False"'],
+            pod_name,
+            namespace,
+            container_name,
+        ).rstrip()
+        return exists == "True"
+
+    def get_kubernetes_core_objects_count(
+        self, api_version: str, objects: list[str]
+    ) -> dict[str, int]:
+        """
+        Counts all the occurrences of Kinds contained in
+        the object parameter in the CoreV1 Api
+
+        :param api_version: api version
+        :param objects: list of the kinds that must be counted
+        :return: a dictionary of Kinds and the number of objects counted
+        """
+        api_client = self.api_client
+        resources = self.get_api_resources_by_group("", "v1")
+        result = dict[str, int]()
+
+        for resource in resources.resources:
+            if resource.kind in objects:
+                if api_client:
+                    try:
+                        path_params: Dict[str, str] = {}
+                        query_params: List[str] = []
+                        header_params: Dict[str, str] = {}
+                        auth_settings = ["BearerToken"]
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
+                        )
+
+                        path = f"/api/{api_version}/{resource.name}"
+                        (data) = api_client.call_api(
+                            path,
+                            "GET",
+                            path_params,
+                            query_params,
+                            header_params,
+                            response_type="str",
+                            auth_settings=auth_settings,
+                        )
+
+                        json_obj = ast.literal_eval(data[0])
+                        count = len(json_obj["items"])
+                        result[resource.kind] = count
+                    except ApiException:
+                        pass
+        return result
+
+    def get_kubernetes_custom_objects_count(
+        self, objects: list[str]
+    ) -> dict[str, int]:
+        """
+        Counts all the occurrences of Kinds contained in
+        the object parameter in the CustomObject Api
+
+        :param objects: list of Kinds that must be counted
+        :return: a dictionary of Kinds and number of objects counted
+        """
+        custom_object_api = client.CustomObjectsApi(self.api_client)
+        groups = client.ApisApi(self.api_client).get_api_versions().groups
+        result = dict[str, int]()
+        for api in groups:
+            versions = []
+            for v in api.versions:
+                name = ""
+                if (
+                    v.version == api.preferred_version.version
+                    and len(api.versions) > 1
+                ):
+                    name += "*"
+                name += v.version
+                versions.append(name)
+            try:
+                data = self.get_api_resources_by_group(
+                    api.name, api.preferred_version.version
+                )
+                for resource in data.resources:
+                    if resource.kind in objects:
+                        custom_resource = (
+                            custom_object_api.list_cluster_custom_object(
+                                group=api.name,
+                                version=api.preferred_version.version,
+                                plural=resource.name,
+                            )
+                        )
+                        result[resource.kind] = len(custom_resource["items"])
+
+            except Exception:
+                pass
+        return result
+
+    def get_api_resources_by_group(self, group, version):
+        api_client = self.api_client
+        if api_client:
+            try:
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = f"/apis/{group}/{version}"
+                if group == "":
+                    path = f"/api/{version}"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="V1APIResourceList",
+                    auth_settings=auth_settings,
+                )
+                return data[0]
+            except Exception:
+                pass
+
+        return None
+
+    def get_nodes_infos(self) -> list[NodeInfo]:
+        """
+        Returns a list of NodeInfo objects
+        :return:
+        """
+        instance_type_label = "node.kubernetes.io/instance-type"
+        node_type_master_label = "node-role.kubernetes.io/master"
+        node_type_worker_label = "node-role.kubernetes.io/worker"
+        node_type_infra_label = "node-role.kubernetes.io/infra"
+        node_type_workload_label = "node-role.kubernetes.io/workload"
+        node_type_application_label = "node-role.kubernetes.io/app"
+        result = list[NodeInfo]()
+        resp = self.cli.list_node()
+        for node in resp.items:
+            node_info = NodeInfo()
+            if instance_type_label in node.metadata.labels.keys():
+                node_info.instance_type = node.metadata.labels[
+                    instance_type_label
+                ]
+            else:
+                node_info.instance_type = "unknown"
+
+            if node_type_infra_label in node.metadata.labels.keys():
+                node_info.node_type = "infra"
+            elif node_type_worker_label in node.metadata.labels.keys():
+                node_info.node_type = "worker"
+            elif node_type_master_label in node.metadata.labels.keys():
+                node_info.node_type = "master"
+            elif node_type_workload_label in node.metadata.labels.keys():
+                node_info.node_type = "workload"
+            elif node_type_application_label in node.metadata.labels.keys():
+                node_info.node_type = "application"
+            else:
+                node_info.node_type = "unknown"
+
+            node_info.architecture = node.status.node_info.architecture
+            node_info.kernel_version = node.status.node_info.kernel_version
+            node_info.kubelet_version = node.status.node_info.kubelet_version
+            node_info.os_version = node.status.node_info.os_image
+            result.append(node_info)
+
+        return result
+
+    def get_cluster_infrastructure(self) -> str:
+        """
+        Get the cluster Cloud infrastructure name when available
+        :return: the cluster infrastructure name or `Unknown` when unavailable
+        """
+        api_client = self.api_client
+        if api_client:
+            try:
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = "/apis/config.openshift.io/v1/infrastructures/cluster"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+                json_obj = ast.literal_eval(data[0])
+                return json_obj["status"]["platform"]
+            except Exception as e:
+                logging.warning("V1ApiException -> %s", str(e))
+                return "Unknown"
+
+        return None
+
+    def get_cluster_network_plugins(self) -> list[str]:
+        """
+        Get the cluster Cloud network plugins list
+        :return: the cluster infrastructure name or `Unknown` when unavailable
+        """
+        api_client = self.api_client
+        network_plugins = list[str]()
+        if api_client:
+            try:
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = "/apis/config.openshift.io/v1/networks"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+                json_obj = ast.literal_eval(data[0])
+                for plugin in json_obj["items"]:
+                    network_plugins.append(plugin["status"]["networkType"])
+            except Exception as e:
+                logging.warning("V1ApiException -> %s", str(e))
+                network_plugins.append("Unknown")
+        return network_plugins
+
+    def delete_file_from_pod(
+        self, pod_name: str, container_name: str, namespace: str, filename: str
+    ):
+        """
+        Deletes a file from a pod
+        :param pod_name: pod name
+        :param container_name: container name
+        :param namespace: namespace of the pod
+        :param filename: full-path of the file that
+        will be removed from the pod
+        :return:
+        """
+        try:
+            # delete the backup file
+            rm_command = [
+                "-f",
+                filename,
+            ]
+            self.exec_cmd_in_pod(
+                rm_command,
+                pod_name,
+                namespace,
+                container_name,
+                "rm",
+            )
+        except Exception as e:
+            raise ApiException(str(e))
+
+    def get_archive_volume_from_pod_worker(
+        self,
+        pod_name: str,
+        container_name: str,
+        namespace: str,
+        remote_archive_path: str,
+        remote_archive_prefix: str,
+        local_download_path: str,
+        local_file_prefix: str,
+        queue: Queue,
+        queue_size: int,
+        downloaded_file_list: list[(int, str)],
+        delete_remote_after_download: bool,
+        thread_number: int,
+        safe_logger: SafeLogger,
+    ):
+        """
+        Download worker for the `create_download_multipart_archive`
+        method. The method will dequeue from the thread-safe `queue`
+        parameter until the queue will be empty and will download
+        the i-th tar volume popped from the queue itself.
+        the file will be downloaded in base64 string format in order
+        to avoid archive corruptions caused by the Kubernetes WebSocket
+        API.
+
+        :param pod_name: pod name from which the tar volume
+        must be downloaded
+        :param container_name: container name from which the
+        tar volume be downloaded
+        :param namespace: namespace of the pod
+        :param remote_archive_path: remote path where the archive volume
+        is stored
+        :param remote_archive_prefix: prefix of the file used to
+        create the archive.to this prefix will be appended sequential
+        number of the archive assigned to
+        the worker in a two digit format and the tar exception
+        (ex for a prefix like `prefix-`the remote filename
+         will become prefix-00.tar)
+        :param local_download_path: local path where the tar volume
+         will be download
+        :param local_file_prefix: local prefix to apply to the
+        local file downloaded.To the prefix will be appended the
+        sequential number of the archive assigned to the worker
+        and the extension tar.b64
+        :param queue: the queue from which the sequential
+         number wil be popped
+        :param queue_size: total size of the queue
+        :param downloaded_file_list: the list of
+         archive number and local filename  downloaded
+        file will be appended once the download terminates
+        shared between the threads
+        :param delete_remote_after_download: if set True once
+         the download will terminate
+        the remote file will be deleted.
+        :param thread_number: the assigned thread number
+        :param safe_logger: SafeLogger class, will allow thread-safe
+        logging
+        :return:
+        """
+        while not queue.empty():
+            file_number = queue.get()
+            if not isinstance(file_number, int):
+                safe_logger.error(
+                    f"[Thread #{thread_number}] wrong queue "
+                    f"element format, download failed"
+                )
+                return
+
+            local_file_name = (
+                f"{local_download_path}/{local_file_prefix}"
+                f"{file_number:02d}.tar.b64"
+            )
+            remote_file_name = (
+                f"{remote_archive_path}/{remote_archive_prefix}"
+                f"{file_number:02d}.tar"
+            )
+
+            try:
+                with open(local_file_name, "x") as file_buffer:
+                    base64_dump = [
+                        "base64",
+                        remote_file_name,
+                    ]
+                    resp = stream(
+                        self.cli.connect_get_namespaced_pod_exec,
+                        pod_name,
+                        namespace,
+                        container=container_name,
+                        command=base64_dump,
+                        stderr=False,
+                        stdin=False,
+                        stdout=True,
+                        tty=False,
+                        _preload_content=False,
+                    )
+
+                    while resp.is_open():
+                        resp.update(timeout=1)
+                        if resp.peek_stdout():
+                            out = resp.read_stdout()
+                            file_buffer.write(out)
+                    resp.close()
+                    file_buffer.flush()
+                    file_buffer.seek(0)
+                    downloaded_file_list.append((file_number, local_file_name))
+                    safe_logger.info(
+                        f"[Thread #{thread_number}] : "
+                        f"{queue.unfinished_tasks-1}/"
+                        f"{queue_size} "
+                        f"{local_file_name} downloaded "
+                    )
+
+            except Exception as e:
+                safe_logger.error(
+                    f"[Thread #{thread_number}]: failed "
+                    f"to download {remote_file_name}"
+                    f" from pod: {pod_name}, "
+                    f"container: {container_name}, "
+                    f"namespace: {namespace}"
+                    f" with exception: {str(e)}. Aborting download."
+                )
+            finally:
+                queue.task_done()
+                if delete_remote_after_download:
+                    try:
+                        # delete the backup file
+                        self.delete_file_from_pod(
+                            pod_name,
+                            container_name,
+                            namespace,
+                            remote_file_name,
+                        )
+                    except Exception as e:
+                        safe_logger.error(
+                            f"[Thread #{thread_number}]: failed to "
+                            f"remove remote archive "
+                            f"{remote_file_name}: {str(e)}"
+                        )
+
+    def archive_and_get_path_from_pod(
+        self,
+        pod_name: str,
+        container_name: str,
+        namespace: str,
+        remote_archive_path: str,
+        target_path: str,
+        archive_files_prefix: str,
+        download_path: str = "/tmp",
+        archive_part_size: int = 30000,
+        max_threads: int = 5,
+        safe_logger: SafeLogger = None,
+    ) -> list[(int, str)]:
+        """
+        archives and downloads a folder content
+        from container in a base64 tarball.
+        The function is designed to leverage multi-threading
+        in order to maximize the download speed.
+        a `max_threads` number of `download_archive_part_from_pod`
+        calls will be made in parallel.
+        :param pod_name: pod name from which the folder
+        must be downloaded
+        :param container_name: container name from which the
+        folder must be downloaded
+        :param namespace: namespace of the pod
+        :param remote_archive_path: path in the container
+        where the temporary archive
+        will be stored (will be deleted once the download
+        terminates, must be writable
+        and must have enough space to temporarly store the archive)
+        :param target_path: the path that will be archived
+        and downloaded from the container
+        :param archive_files_prefix: prefix string that will be added
+        to the files
+        :param download_path: the local path
+        where the archive will be saved
+        :param archive_part_size: the archive will splitted in multiple
+        files of the specified `archive_part_size`
+        :param max_threads: maximum number of threads that will be launched
+        :param safe_logger: SafeLogger, if omitted a default SafeLogger will
+        be instantiated that will simply use the logging package to print logs
+        to stdout.
+        :return: the list of the archive number and filenames downloaded
+        """
+        if safe_logger is None:
+            safe_logger = SafeLogger()
+
+        remote_archive_prefix = f"{archive_files_prefix}-"
+        local_file_prefix = remote_archive_prefix
+        queue = Queue()
+        downloaded_files = list[(int, str)]()
+        try:
+            # create the folder archive splitting
+            # in tar files of size `chunk_size`
+            # due to pipes and scripts the command is executed in
+
+            if not os.path.isdir(download_path):
+                raise Exception(
+                    f"download path {download_path} does not exist"
+                )
+            if not self.path_exists_in_pod(
+                pod_name, container_name, namespace, remote_archive_path
+            ):
+                raise Exception("remote archive path does not exist")
+
+            if not self.path_exists_in_pod(
+                pod_name, container_name, namespace, target_path
+            ):
+                raise Exception("remote target path does not exist")
+
+            tar_command = (
+                f"printf 'n {remote_archive_path}/"
+                f"{remote_archive_prefix}%02d.tar\n' "
+                f"{{1..100000}} | "
+                f"tar --exclude={remote_archive_prefix}* "
+                f"--tape-length={archive_part_size} "
+                f"-cf {remote_archive_path}/{remote_archive_prefix}00.tar "
+                f"-C {target_path} ."
+            )
+
+            safe_logger.info("creating data archive, please wait....")
+            self.exec_cmd_in_pod(
+                [tar_command],
+                pod_name,
+                namespace,
+                container_name,
+            )
+            # count how many tar files has been created
+            count_files_command = (
+                f"ls {remote_archive_path}/{remote_archive_prefix}* | wc -l"
+            )
+
+            archive_file_number = self.exec_cmd_in_pod(
+                [count_files_command],
+                pod_name,
+                namespace,
+                container_name,
+            )
+
+            for i in range(int(archive_file_number)):
+                queue.put(i)
+            queue_size = queue.qsize()
+            for i in range(max_threads):
+                worker = threading.Thread(
+                    target=self.get_archive_volume_from_pod_worker,
+                    args=(
+                        pod_name,
+                        container_name,
+                        namespace,
+                        remote_archive_path,
+                        remote_archive_prefix,
+                        download_path,
+                        local_file_prefix,
+                        queue,
+                        queue_size,
+                        downloaded_files,
+                        True,
+                        i,
+                        safe_logger,
+                    ),
+                )
+                worker.daemon = True
+                worker.start()
+            queue.join()
+        except Exception as e:
+            safe_logger.error(
+                f"failed to create archive {target_path} on pod: {pod_name}, "
+                f"container: {container_name}, namespace:{namespace} "
+                f"with exception: {str(e)}"
+            )
+            raise e
+
+        return downloaded_files
