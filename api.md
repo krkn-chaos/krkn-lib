@@ -9,27 +9,22 @@ Bases: `object`
 KrknLibKubernetes Constructor. Can be invoked with kubeconfig_path
 or, optionally, with a kubeconfig in string
 format using the keyword argument
+:param kubeconfig_path: kubeconfig path
+:param kubeconfig_string: (keyword argument)
 
-
-* **Parameters**
-
-    
-    * **kubeconfig_path** – kubeconfig path
-    * **kubeconfig_string** – (keyword argument)
-    kubeconfig in string format
-
+> kubeconfig in string format
 
 Initialization with kubeconfig path:
 
 ```python
->>> KrknLibKubernetes("/home/test/.kube/config")
+>>> KrknLibKubernetes(log_writer, "/home/test/.kube/config")
 ```
 
 Initialization with kubeconfig string:
 
 ```python
 >>> kubeconfig_string="apiVersion: v1 ....."
->>> KrknLibKubernetes(kubeconfig_string=kubeconfig_string)
+>>> KrknLibKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
 ```
 
 
@@ -52,6 +47,38 @@ Apply yaml config to create Kubernetes resources
 
     the list of names of created objects
 
+
+
+#### archive_and_get_path_from_pod(pod_name: str, container_name: str, namespace: str, remote_archive_path: str, target_path: str, archive_files_prefix: str, download_path: str = '/tmp', archive_part_size: int = 30000, max_threads: int = 5, safe_logger: [SafeLogger](krkn_lib_kubernetes.resources.md#krkn_lib_kubernetes.resources.SafeLogger) | None = None) -> list[int, str]
+archives and downloads a folder content
+from container in a base64 tarball.
+The function is designed to leverage multi-threading
+in order to maximize the download speed.
+a max_threads number of download_archive_part_from_pod
+calls will be made in parallel.
+:param pod_name: pod name from which the folder
+must be downloaded
+:param container_name: container name from which the
+folder must be downloaded
+:param namespace: namespace of the pod
+:param remote_archive_path: path in the container
+where the temporary archive
+will be stored (will be deleted once the download
+terminates, must be writable
+and must have enough space to temporarly store the archive)
+:param target_path: the path that will be archived
+and downloaded from the container
+:param archive_files_prefix: prefix string that will be added
+to the files
+:param download_path: the local path
+where the archive will be saved
+:param archive_part_size: the archive will splitted in multiple
+files of the specified archive_part_size
+:param max_threads: maximum number of threads that will be launched
+:param safe_logger: SafeLogger, if omitted a default SafeLogger will
+be instantiated that will simply use the logging package to print logs
+to stdout.
+:return: the list of the archive number and filenames downloaded
 
 
 #### batch_cli_: BatchV1Ap_ _ = Non_ 
@@ -162,6 +189,16 @@ Create a pod in a namespace
 
 #### custom_object_client_: CustomObjectsAp_ _ = Non_ 
 
+#### delete_file_from_pod(pod_name: str, container_name: str, namespace: str, filename: str)
+Deletes a file from a pod
+:param pod_name: pod name
+:param container_name: container name
+:param namespace: namespace of the pod
+:param filename: full-path of the file that
+will be removed from the pod
+:return:
+
+
 #### delete_job(name: str, namespace: str = 'default') -> V1Status
 Delete a job from a namespace
 
@@ -227,7 +264,7 @@ Delete a pod in a namespace
 
 #### dyn_client_: DynamicClien_ _ = Non_ 
 
-#### exec_cmd_in_pod(command: list[str], pod_name: str, namespace: str, container: str | None = None, base_command: str | None = None) -> str
+#### exec_cmd_in_pod(command: list[str], pod_name: str, namespace: str, container: str | None = None, base_command: str | None = None, std_err: bool = True) -> str
 Execute a base command and its parameters
 in a pod or a container
 
@@ -265,6 +302,8 @@ Set global kraken node to not delete
 
 
 
+#### get_all_kubernetes_object_count(objects: list[str]) -> dict[str, int]
+
 #### get_all_pods(label_selector: str | None = None) -> list[[<class 'str'>, <class 'str'>]]
 Return a list of tuples containing pod name [0] and namespace [1]
 :param label_selector: filter by label_selector
@@ -276,6 +315,97 @@ Return a list of tuples containing pod name [0] and namespace [1]
 
     list of tuples pod,namespace
 
+
+
+#### get_api_resources_by_group(group, version)
+
+#### get_archive_volume_from_pod_worker(pod_name: str, container_name: str, namespace: str, remote_archive_path: str, remote_archive_prefix: str, local_download_path: str, local_file_prefix: str, queue: Queue, queue_size: int, downloaded_file_list: list[int, str], delete_remote_after_download: bool, thread_number: int, safe_logger: [SafeLogger](krkn_lib_kubernetes.resources.md#krkn_lib_kubernetes.resources.SafeLogger))
+Download worker for the create_download_multipart_archive
+method. The method will dequeue from the thread-safe queue
+parameter until the queue will be empty and will download
+the i-th tar volume popped from the queue itself.
+the file will be downloaded in base64 string format in order
+to avoid archive corruptions caused by the Kubernetes WebSocket
+API.
+
+
+* **Parameters**
+
+    **pod_name** – pod name from which the tar volume
+
+
+must be downloaded
+:param container_name: container name from which the
+tar volume be downloaded
+:param namespace: namespace of the pod
+:param remote_archive_path: remote path where the archive volume
+is stored
+:param remote_archive_prefix: prefix of the file used to
+create the archive.to this prefix will be appended sequential
+number of the archive assigned to
+the worker in a two digit format and the tar exception
+(ex for a prefix like 
+
+```
+`
+```
+
+prefix-
+
+```
+`
+```
+
+the remote filename
+
+> will become prefix-00.tar)
+
+
+* **Parameters**
+
+    
+    * **local_download_path** – local path where the tar volume
+    will be download
+    * **local_file_prefix** – local prefix to apply to the
+
+
+local file downloaded.To the prefix will be appended the
+sequential number of the archive assigned to the worker
+and the extension tar.b64
+:param queue: the queue from which the sequential
+
+> number wil be popped
+
+
+* **Parameters**
+
+    
+    * **queue_size** – total size of the queue
+    * **downloaded_file_list** – the list of
+    archive number and local filename  downloaded
+
+
+file will be appended once the download terminates
+shared between the threads
+:param delete_remote_after_download: if set True once
+
+> the download will terminate
+
+the remote file will be deleted.
+:param thread_number: the assigned thread number
+:param safe_logger: SafeLogger class, will allow thread-safe
+logging
+:return:
+
+
+#### get_cluster_infrastructure() -> str
+Get the cluster Cloud infrastructure name when available
+:return: the cluster infrastructure name or Unknown when unavailable
+
+
+#### get_cluster_network_plugins() -> list[str]
+Get the cluster Cloud network plugins list
+:return: the cluster infrastructure name or Unknown when unavailable
 
 
 #### get_clusterversion_string() -> str
@@ -327,6 +457,42 @@ Get a job status
 * **Returns**
 
     V1Job API object
+
+
+
+#### get_kubernetes_core_objects_count(api_version: str, objects: list[str]) -> dict[str, int]
+Counts all the occurrences of Kinds contained in
+the object parameter in the CoreV1 Api
+
+
+* **Parameters**
+
+    
+    * **api_version** – api version
+    * **objects** – list of the kinds that must be counted
+
+
+
+* **Returns**
+
+    a dictionary of Kinds and the number of objects counted
+
+
+
+#### get_kubernetes_custom_objects_count(objects: list[str]) -> dict[str, int]
+Counts all the occurrences of Kinds contained in
+the object parameter in the CustomObject Api
+
+
+* **Parameters**
+
+    **objects** – list of Kinds that must be counted
+
+
+
+* **Returns**
+
+    a dictionary of Kinds and number of objects counted
 
 
 
@@ -385,6 +551,11 @@ Returns active node(s)
 Get the resource version for the specified node
 :param node: node name
 :return: resource version
+
+
+#### get_nodes_infos() -> list[[krkn_lib_kubernetes.resources.NodeInfo](krkn_lib_kubernetes.resources.md#krkn_lib_kubernetes.resources.NodeInfo)]
+Returns a list of NodeInfo objects
+:return:
 
 
 #### get_pod_info(name: str, namespace: str = 'default') -> [Pod](krkn_lib_kubernetes.resources.md#krkn_lib_kubernetes.resources.Pod)
@@ -578,6 +749,8 @@ and set the status to true or false
     cluster status and a list of node names
 
 
+
+#### path_exists_in_pod(pod_name: str, container_name: str, namespace: str, path: str) -> bool
 
 #### read_pod(name: str, namespace: str = 'default') -> V1Pod
 Read a pod definition
