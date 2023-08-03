@@ -98,7 +98,8 @@ class KrknTelemetry:
             if request.status_code != 200:
                 error_message = (
                     f"failed to send telemetry to {url}/telemetry"
-                    f"with error: {request.status_code} - {str(request.content)}"
+                    f"with error: {request.status_code} - "
+                    f"{str(request.content)}"
                 )
                 self.safe_logger.warning(error_message)
                 raise Exception(error_message)
@@ -350,7 +351,9 @@ class KrknTelemetry:
             except Exception as e:
                 if max_retries == 0 or retry < max_retries:
                     self.safe_logger.warning(
-                        f"[Thread #{thread_number}] {local_filename} retry number {retry}"
+                        f"[Thread #{thread_number}] "
+                        f"{local_filename} "
+                        f"retry number {retry}"
                     )
                     time.sleep(THREAD_SLEEP)
                     # if there's an exception on the file upload
@@ -358,7 +361,8 @@ class KrknTelemetry:
                     queue.put((file_number, local_filename, retry + 1))
                 else:
                     self.safe_logger.error(
-                        f"[Thread #{thread_number}] max retry number exceeded, "
+                        f"[Thread #{thread_number}] "
+                        f"max retry number exceeded, "
                         f"failed to upload file {local_filename} "
                         f"with exception: {str(e)}"
                     )

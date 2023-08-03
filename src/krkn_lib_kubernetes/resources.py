@@ -233,7 +233,8 @@ class SafeLogger:
     def error(self, data: str):
         if self.filewriter and not self.finished:
             self._write(
-                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} [ERR] {data}'
+                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} '
+                f"[ERR] {data}"
             )
         else:
             logging.error(data)
@@ -241,7 +242,8 @@ class SafeLogger:
     def warning(self, data: str):
         if self.filewriter and not self.finished:
             self._write(
-                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} [WRN] {data}'
+                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} '
+                f"[WRN] {data}"
             )
         else:
             logging.warning(data)
@@ -249,7 +251,8 @@ class SafeLogger:
     def info(self, data: str):
         if self.filewriter and not self.finished:
             self._write(
-                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} [INF] {data}'
+                f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M")} '
+                f"[INF] {data}"
             )
         else:
             logging.info(data)

@@ -32,6 +32,8 @@ from .resources import (
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+
 class KrknLibKubernetes:
     """ """
 
@@ -99,21 +101,31 @@ class KrknLibKubernetes:
                     content = f.read().splitlines()
                     if not content:
                         raise Exception("Token file exists but empty.")
-                kube_addr = os.environ.get('KUBERNETES_PORT_443_TCP_ADDR')
-                kube_port = os.environ.get('KUBERNETES_PORT_443_TCP_PORT')
+                kube_addr = os.environ.get("KUBERNETES_PORT_443_TCP_ADDR")
+                kube_port = os.environ.get("KUBERNETES_PORT_443_TCP_PORT")
                 conf = KubeConfig()
-                conf.set_cluster(name='krkn-cluster', server=f'https://{kube_addr}:{kube_port}', certificate_authority=SERVICE_CERT_FILENAME,)
-                conf.set_credentials(name='user', token=content[0])
-                conf.set_context(name='krkn-context', cluster='krkn-cluster', user='user')
-                conf.use_context('krkn-context')            
+                conf.set_cluster(
+                    name="krkn-cluster",
+                    server=f"https://{kube_addr}:{kube_port}",
+                    certificate_authority=SERVICE_CERT_FILENAME,
+                )
+                conf.set_credentials(name="user", token=content[0])
+                conf.set_context(
+                    name="krkn-context", cluster="krkn-cluster", user="user"
+                )
+                conf.use_context("krkn-context")
 
         try:
             config.load_kube_config(kubeconfig_path)
             self.api_client = client.ApiClient()
-            self.k8s_client = config.new_client_from_config(config_file=kubeconfig_path)
+            self.k8s_client = config.new_client_from_config(
+                config_file=kubeconfig_path
+            )
             self.cli = client.CoreV1Api(self.k8s_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
-            self.custom_object_client = client.CustomObjectsApi(self.k8s_client)
+            self.custom_object_client = client.CustomObjectsApi(
+                self.k8s_client
+            )
             self.dyn_client = DynamicClient(self.k8s_client)
             self.watch_resource = watch.Watch()
         except OSError:

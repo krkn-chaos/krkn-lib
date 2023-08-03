@@ -8,7 +8,7 @@ import uuid
 import boto3
 import yaml
 
-from krkn_lib_kubernetes import KrknTelemetry, ScenarioTelemetry
+from krkn_lib_kubernetes import ScenarioTelemetry
 from krkn_lib_kubernetes.tests.base_test import BaseTest
 
 
@@ -43,8 +43,8 @@ class KrknTelemetryTests(BaseTest):
     def test_set_parameters_base_64(self):
         file_path = "src/testdata/input.yaml"
         scenario_telemetry = ScenarioTelemetry()
-        telemetry = KrknTelemetry()
-        telemetry.set_parameters_base64(scenario_telemetry, file_path)
+
+        self.lib_telemetry.set_parameters_base64(scenario_telemetry, file_path)
         with open(file_path, "rb") as file_stream:
             input_file_data_orig = file_stream.read().decode("utf-8")
             self.assertIsNotNone(input_file_data_orig)
