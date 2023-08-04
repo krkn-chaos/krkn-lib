@@ -128,6 +128,7 @@ class KrknTelemetry:
         password = telemetry_config.get("password")
         backup_threads = telemetry_config.get("backup_threads")
         archive_path = telemetry_config.get("archive_path")
+        archive_size = telemetry_config.get("archive_size")
         exceptions = []
         is_exception = False
         if prometheus_backup is None:
@@ -152,6 +153,9 @@ class KrknTelemetry:
             is_exception = True
         if archive_path is None:
             exceptions.append("telemetry -> archive_path is missing")
+            is_exception = True
+        if archive_size is None:
+            exceptions.append("telemetry -> archive_size is missing")
             is_exception = True
         if is_exception:
             raise Exception(", ".join(exceptions))
@@ -189,7 +193,7 @@ class KrknTelemetry:
                 request_id,
                 archive_path,
                 max_threads=int(backup_threads),
-                archive_part_size=10000,
+                archive_part_size=archive_size,
                 safe_logger=self.safe_logger,
             )
             return file_list
