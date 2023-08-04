@@ -9,10 +9,10 @@ import logging
 import random
 import re
 from kubernetes.client import ApiException
-from krkn_lib_kubernetes import ApiRequestException
 from jinja2 import Environment, FileSystemLoader
 
-from krkn_lib_kubernetes.tests.base_test import BaseTest
+from src.krkn_lib_kubernetes import ApiRequestException
+from src.krkn_lib_kubernetes.tests.base_test import BaseTest
 
 
 class KrknLibKubernetesTests(BaseTest):
@@ -605,7 +605,7 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(os.stat(file[1]).st_size > 0)
 
     # NEEDFIX
-    def _test_exists_path_in_pod(self):
+    def test_exists_path_in_pod(self):
         namespace = "test-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
