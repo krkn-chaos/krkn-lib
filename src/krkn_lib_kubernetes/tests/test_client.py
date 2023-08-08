@@ -1,9 +1,9 @@
-# import os.path
+import os.path
 import tempfile
 import time
 import unittest
 
-# import uuid
+import uuid
 
 import yaml
 import logging
@@ -577,59 +577,59 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(resp) > 0)
         self.assertEqual(resp[0], "Unknown")
 
-    # def test_download_folder_from_pod_as_archive(self):
-    #     test_workdir = os.getenv("TEST_WORKDIR")
-    #     namespace = "test-" + self.get_random_string(10)
-    #     self.deploy_namespace(namespace, [])
-    #     self.deploy_fedtools(namespace=namespace)
-    #     count = 0
-    #     MAX_RETRIES = 5
-    #     while not self.lib_k8s.is_pod_running("fedtools", namespace):
-    #         if count > MAX_RETRIES:
-    #             self.assertFalse(True, "container failed to become ready")
-    #         count += 1
-    #         time.sleep(3)
-    #         continue
-    #
-    #     archive = self.lib_k8s.archive_and_get_path_from_pod(
-    #         "fedtools",
-    #         "fedtools",
-    #         namespace,
-    #         "/tmp",
-    #         "/etc",
-    #         str(uuid.uuid1()),
-    #         archive_part_size=10000,
-    #         download_path=test_workdir,
-    #     )
-    #     for file in archive:
-    #         self.assertTrue(os.path.isfile(file[1]))
-    #         self.assertTrue(os.stat(file[1]).st_size > 0)
-    #
-    # # NEEDFIX
-    # def test_exists_path_in_pod(self):
-    #     namespace = "test-" + self.get_random_string(10)
-    #     self.deploy_namespace(namespace, [])
-    #     self.deploy_fedtools(namespace=namespace)
-    #     count = 0
-    #     MAX_RETRIES = 5
-    #     while not self.lib_k8s.is_pod_running("fedtools", namespace):
-    #         if count > MAX_RETRIES:
-    #             self.assertFalse(True, "container failed to become ready")
-    #         count += 1
-    #         time.sleep(3)
-    #         continue
-    #
-    #     self.assertTrue(
-    #         self.lib_k8s.path_exists_in_pod(
-    #             "fedtools", "fedtools", namespace, "/home"
-    #         )
-    #     )
-    #
-    #     self.assertFalse(
-    #         self.lib_k8s.path_exists_in_pod(
-    #             "fedtools", "fedtools", namespace, "/does_not_exist"
-    #         )
-    #     )
+    def test_download_folder_from_pod_as_archive(self):
+        test_workdir = os.getenv("TEST_WORKDIR")
+        namespace = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace)
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
+
+        archive = self.lib_k8s.archive_and_get_path_from_pod(
+            "fedtools",
+            "fedtools",
+            namespace,
+            "/tmp",
+            "/etc",
+            str(uuid.uuid1()),
+            archive_part_size=10000,
+            download_path=test_workdir,
+        )
+        for file in archive:
+            self.assertTrue(os.path.isfile(file[1]))
+            self.assertTrue(os.stat(file[1]).st_size > 0)
+
+    # NEEDFIX
+    def test_exists_path_in_pod(self):
+        namespace = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace)
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
+
+        self.assertTrue(
+            self.lib_k8s.path_exists_in_pod(
+                "fedtools", "fedtools", namespace, "/home"
+            )
+        )
+
+        self.assertFalse(
+            self.lib_k8s.path_exists_in_pod(
+                "fedtools", "fedtools", namespace, "/does_not_exist"
+            )
+        )
 
     def test_is_pod_running(self):
         namespace = "test-" + self.get_random_string(10)
