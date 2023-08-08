@@ -1,8 +1,9 @@
-import os.path
+# import os.path
 import tempfile
 import time
 import unittest
-import uuid
+
+# import uuid
 
 import yaml
 import logging
@@ -17,7 +18,7 @@ from krkn_lib_kubernetes.tests.base_test import BaseTest
 
 class KrknLibKubernetesTests(BaseTest):
     def test_exec_command(self):
-        namespace = "test-ns-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         self.wait_pod("fedtools", namespace=namespace)
@@ -72,7 +73,7 @@ class KrknLibKubernetesTests(BaseTest):
             self.lib_k8s.get_namespace_status("not-exists")
 
     def test_delete_namespace(self):
-        name = "test-ns-" + self.get_random_string(5)
+        name = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(name, [{"name": "name", "label": name}])
         result = self.lib_k8s.get_namespace_status(name)
         self.assertTrue(result == "Active")
@@ -88,11 +89,11 @@ class KrknLibKubernetesTests(BaseTest):
         i = 0
         namespaces = []
         labels = []
-        labels.append("check-namespace-" + self.get_random_string(5))
-        labels.append("check-namespace-" + self.get_random_string(5))
-        common_label = "check-namespace-" + self.get_random_string(5)
+        labels.append("check-namespace-" + self.get_random_string(10))
+        labels.append("check-namespace-" + self.get_random_string(10))
+        common_label = "check-namespace-" + self.get_random_string(10)
         while i < 5:
-            name = "test-ns-" + self.get_random_string(5)
+            name = "test-ns-" + self.get_random_string(10)
             self.deploy_namespace(
                 name,
                 [
@@ -148,7 +149,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.delete_fake_kraken()
 
     def test_list_pods(self):
-        namespace = "test-" + self.get_random_string(5)
+        namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fake_kraken(namespace=namespace)
         pods = self.lib_k8s.list_pods(namespace=namespace)
@@ -158,7 +159,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.delete_fake_kraken(namespace=namespace)
 
     def test_get_all_pods(self):
-        namespace = "test-" + self.get_random_string(5)
+        namespace = "test-" + self.get_random_string(10)
         random_label = self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fake_kraken(random_label=random_label, namespace=namespace)
@@ -178,7 +179,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.delete_fake_kraken(namespace=namespace)
 
     def test_delete_pod(self):
-        namespace = "test-ns-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         self.wait_pod("fedtools", namespace=namespace)
@@ -187,7 +188,7 @@ class KrknLibKubernetesTests(BaseTest):
             self.lib_k8s.read_pod("fedtools", namespace=namespace)
 
     def test_create_pod(self):
-        namespace = "test-ns-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         template_str = self.template_to_pod("fedtools", namespace=namespace)
         body = yaml.safe_load(template_str)
@@ -199,8 +200,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_read_pod(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
         try:
@@ -216,8 +217,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_get_pod_log(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
         self.wait_pod(name, namespace)
@@ -232,8 +233,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_get_containers_in_pod(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
         self.wait_pod(name, namespace)
@@ -250,8 +251,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_delete_job(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_job(name, namespace)
         self.lib_k8s.delete_job(name, namespace)
@@ -276,8 +277,8 @@ class KrknLibKubernetesTests(BaseTest):
                 break
 
     def test_create_job(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         template = self.template_to_job(name, namespace)
         body = yaml.safe_load(template)
@@ -293,8 +294,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_get_job_status(self):
-        namespace = "test-ns-" + self.get_random_string(5)
-        name = "test-name-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_job(name, namespace)
         max_retries = 30
@@ -328,8 +329,8 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_monitor_namespace(self):
-        good_namespace = "test-ns-" + self.get_random_string(5)
-        good_name = "test-name-" + self.get_random_string(5)
+        good_namespace = "test-ns-" + self.get_random_string(10)
+        good_name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(good_namespace, [])
         self.deploy_fedtools(namespace=good_namespace, name=good_name)
         self.wait_pod(good_name, namespace=good_namespace)
@@ -337,7 +338,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(status[0])
         self.assertTrue(len(status[1]) == 0)
 
-        bad_namespace = "test-ns-" + self.get_random_string(5)
+        bad_namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(bad_namespace, [])
         self.deploy_fake_kraken(
             bad_namespace, random_label=None, node_name="do_not_exist"
@@ -351,8 +352,8 @@ class KrknLibKubernetesTests(BaseTest):
         self.delete_fake_kraken(namespace=bad_namespace)
 
     def test_monitor_component(self):
-        good_namespace = "test-ns-" + self.get_random_string(5)
-        good_name = "test-name-" + self.get_random_string(5)
+        good_namespace = "test-ns-" + self.get_random_string(10)
+        good_name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(good_namespace, [])
         self.deploy_fedtools(namespace=good_namespace, name=good_name)
         self.wait_pod(good_name, namespace=good_namespace)
@@ -362,7 +363,7 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(status[0])
         self.assertTrue(len(status[1]) == 0)
 
-        bad_namespace = "test-ns-" + self.get_random_string(5)
+        bad_namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(bad_namespace, [])
         self.deploy_fake_kraken(
             bad_namespace, random_label=None, node_name="do_not_exist"
@@ -379,7 +380,7 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_apply_yaml(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
             environment = Environment(loader=FileSystemLoader("src/testdata/"))
             template = environment.get_template("namespace_template.j2")
             content = template.render(name=namespace, labels=[])
@@ -395,8 +396,8 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_get_pod_info(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
-            name = "test-name-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
+            name = "test-name-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.deploy_fedtools(namespace=namespace, name=name)
             self.wait_pod(name, namespace)
@@ -412,7 +413,7 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_check_if_namespace_exists(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.assertTrue(self.lib_k8s.check_if_namespace_exists(namespace))
             self.assertFalse(
@@ -426,8 +427,8 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_check_if_pod_exists(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
-            name = "test-name-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
+            name = "test-name-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.deploy_fedtools(namespace=namespace, name=name)
             self.wait_pod(name, namespace, timeout=120)
@@ -443,10 +444,10 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_check_if_pvc_exists(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
-            storage_class = "sc-" + self.get_random_string(5)
-            pv_name = "pv-" + self.get_random_string(5)
-            pvc_name = "pvc-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
+            storage_class = "sc-" + self.get_random_string(10)
+            pv_name = "pv-" + self.get_random_string(10)
+            pvc_name = "pvc-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.deploy_persistent_volume(pv_name, storage_class, namespace)
             self.deploy_persistent_volume_claim(
@@ -466,10 +467,10 @@ class KrknLibKubernetesTests(BaseTest):
 
     def test_get_pvc_info(self):
         try:
-            namespace = "test-ns-" + self.get_random_string(5)
-            storage_class = "sc-" + self.get_random_string(5)
-            pv_name = "pv-" + self.get_random_string(5)
-            pvc_name = "pvc-" + self.get_random_string(5)
+            namespace = "test-ns-" + self.get_random_string(10)
+            storage_class = "sc-" + self.get_random_string(10)
+            pv_name = "pv-" + self.get_random_string(10)
+            pvc_name = "pvc-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.deploy_persistent_volume(pv_name, storage_class, namespace)
             self.deploy_persistent_volume_claim(
@@ -489,7 +490,7 @@ class KrknLibKubernetesTests(BaseTest):
             self.assertTrue(False)
 
     def test_find_kraken_node(self):
-        namespace = "test-ns-" + self.get_random_string(5)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         nodes = self.lib_k8s.list_nodes()
         random_node_index = random.randint(0, len(nodes) - 1)
@@ -576,58 +577,74 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertTrue(len(resp) > 0)
         self.assertEqual(resp[0], "Unknown")
 
-    # NEEDFIX
-    def _test_download_folder_from_pod_as_archive(self):
-        test_workdir = os.getenv("TEST_WORKDIR")
-        namespace = "test-" + self.get_random_string(5)
+    # def test_download_folder_from_pod_as_archive(self):
+    #     test_workdir = os.getenv("TEST_WORKDIR")
+    #     namespace = "test-" + self.get_random_string(10)
+    #     self.deploy_namespace(namespace, [])
+    #     self.deploy_fedtools(namespace=namespace)
+    #     count = 0
+    #     MAX_RETRIES = 5
+    #     while not self.lib_k8s.is_pod_running("fedtools", namespace):
+    #         if count > MAX_RETRIES:
+    #             self.assertFalse(True, "container failed to become ready")
+    #         count += 1
+    #         time.sleep(3)
+    #         continue
+    #
+    #     archive = self.lib_k8s.archive_and_get_path_from_pod(
+    #         "fedtools",
+    #         "fedtools",
+    #         namespace,
+    #         "/tmp",
+    #         "/etc",
+    #         str(uuid.uuid1()),
+    #         archive_part_size=10000,
+    #         download_path=test_workdir,
+    #     )
+    #     for file in archive:
+    #         self.assertTrue(os.path.isfile(file[1]))
+    #         self.assertTrue(os.stat(file[1]).st_size > 0)
+    #
+    # # NEEDFIX
+    # def test_exists_path_in_pod(self):
+    #     namespace = "test-" + self.get_random_string(10)
+    #     self.deploy_namespace(namespace, [])
+    #     self.deploy_fedtools(namespace=namespace)
+    #     count = 0
+    #     MAX_RETRIES = 5
+    #     while not self.lib_k8s.is_pod_running("fedtools", namespace):
+    #         if count > MAX_RETRIES:
+    #             self.assertFalse(True, "container failed to become ready")
+    #         count += 1
+    #         time.sleep(3)
+    #         continue
+    #
+    #     self.assertTrue(
+    #         self.lib_k8s.path_exists_in_pod(
+    #             "fedtools", "fedtools", namespace, "/home"
+    #         )
+    #     )
+    #
+    #     self.assertFalse(
+    #         self.lib_k8s.path_exists_in_pod(
+    #             "fedtools", "fedtools", namespace, "/does_not_exist"
+    #         )
+    #     )
+
+    def test_is_pod_running(self):
+        namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
-
-        # loops while all the pods in the namespace are ready
-        ready_pod = False
-        while not ready_pod:
-            result = self.lib_k8s.monitor_namespace(namespace)
-            ready_pod = result[0]
+        count = 0
+        while self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > 20:
+                self.assertTrue(
+                    False, "container is not running after 20 retries"
+                )
+            count += 1
             continue
-
-        archive = self.lib_k8s.archive_and_get_path_from_pod(
-            "fedtools",
-            "fedtools",
-            namespace,
-            "/tmp",
-            "/etc",
-            str(uuid.uuid1()),
-            archive_part_size=10000,
-            download_path=test_workdir,
-        )
-        for file in archive:
-            self.assertTrue(os.path.isfile(file[1]))
-            self.assertTrue(os.stat(file[1]).st_size > 0)
-
-    # NEEDFIX
-    def _test_exists_path_in_pod(self):
-        namespace = "test-" + self.get_random_string(5)
-        self.deploy_namespace(namespace, [])
-        self.deploy_fedtools(namespace=namespace)
-
-        # loops while all the pods in the namespace are ready
-        ready_pod = False
-        while not ready_pod:
-            result = self.lib_k8s.monitor_namespace(namespace)
-            ready_pod = result[0]
-            continue
-
-        self.assertTrue(
-            self.lib_k8s.path_exists_in_pod(
-                "fedtools", "fedtools", namespace, "/home"
-            )
-        )
-
-        self.assertFalse(
-            self.lib_k8s.path_exists_in_pod(
-                "fedtools", "fedtools", namespace, "/does_not_exist"
-            )
-        )
+        result = self.lib_k8s.is_pod_running("do_not_exist", "do_not_exist")
+        self.assertFalse(result)
 
 
 if __name__ == "__main__":
