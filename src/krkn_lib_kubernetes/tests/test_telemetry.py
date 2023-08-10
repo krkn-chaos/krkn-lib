@@ -236,6 +236,7 @@ class KrknTelemetryTests(BaseTest):
 
         s3 = boto3.client("s3")
         bucket_name = os.getenv("BUCKET_NAME")
+        self.assertTrue(bucket_name)
         remote_files = s3.list_objects_v2(
             Bucket=bucket_name, Prefix=bucket_folder
         )
