@@ -19,11 +19,11 @@ jobs:
         python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
-      - name: Check If PR comes from a fork
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          echo "Action cannot be executed from forked repos PR"
-          exit 1
+#      - name: Check If PR comes from a fork
+#        if: github.event.pull_request.head.repo.full_name != github.repository
+#        run: |
+#          echo "Action cannot be executed from forked repos PR"
+#          exit 1
       - name: Create multi-node KinD cluster
         uses: redhat-chaos/actions/kind@main
       - name: Check out code
