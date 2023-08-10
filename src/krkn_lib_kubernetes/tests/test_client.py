@@ -578,7 +578,10 @@ class KrknLibKubernetesTests(BaseTest):
         self.assertEqual(resp[0], "Unknown")
 
     def test_download_folder_from_pod_as_archive(self):
-        test_workdir = os.getenv("TEST_WORKDIR")
+        workdir_basepath = os.getenv("TEST_WORKDIR")
+        workdir = self.get_random_string(10)
+        test_workdir = os.path.join(workdir_basepath, workdir)
+        os.mkdir(test_workdir)
         namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)

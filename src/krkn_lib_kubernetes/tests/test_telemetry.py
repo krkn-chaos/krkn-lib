@@ -1,9 +1,13 @@
 import base64
 import os
 import tempfile
+import time
 
 # import time
 import unittest
+import uuid
+
+import boto3
 
 # import uuid
 
@@ -83,7 +87,10 @@ class KrknTelemetryTests(BaseTest):
                 )
 
     def test_decode_base64_file(self):
-        test_workdir = os.getenv("TEST_WORKDIR")
+        workdir_basepath = os.getenv("TEST_WORKDIR")
+        workdir = self.get_random_string(10)
+        test_workdir = os.path.join(workdir_basepath, workdir)
+        os.mkdir(test_workdir)
         test_string = "Tester McTesty!"
         with tempfile.NamedTemporaryFile(
             dir=test_workdir
@@ -100,137 +107,139 @@ class KrknTelemetryTests(BaseTest):
                 test_read = dest.read()
                 self.assertEqual(test_string, test_read)
 
-    # def test_upload_download_prometheus(self):
-    #     namespace = "test-" + self.get_random_string(10)
-    #     self.deploy_namespace(namespace, [])
-    #     self.deploy_fedtools(namespace=namespace)
-    #     count = 0
-    #     MAX_RETRIES = 5
-    #     while not self.lib_k8s.is_pod_running("fedtools", namespace):
-    #         if count > MAX_RETRIES:
-    #             self.assertFalse(True, "container failed to become ready")
-    #         count += 1
-    #         time.sleep(3)
-    #         continue
-    #
-    #     prometheus_pod_name = "fedtools"
-    #     prometheus_container_name = "fedtools"
-    #     prometheus_namespace = namespace
-    #     bucket_folder = f"test_folder/{int(time.time())}"
-    #     test_workdir = os.getenv("TEST_WORKDIR")
-    #
-    #     # raises exception if archive path does not exist
-    #     with self.assertRaises(Exception):
-    #         self.lib_k8s.archive_and_get_path_from_pod(
-    #             prometheus_pod_name,
-    #             prometheus_container_name,
-    #             prometheus_namespace,
-    #             "/does_not_exist",
-    #             "/test",
-    #             str(uuid.uuid1()),
-    #             archive_part_size=100,
-    #             download_path=test_workdir,
-    #         )
-    #
-    #     # raises exception if target path does not exist
-    #     with self.assertRaises(Exception):
-    #         self.lib_k8s.archive_and_get_path_from_pod(
-    #             prometheus_pod_name,
-    #             prometheus_container_name,
-    #             prometheus_namespace,
-    #             "/tmp",
-    #             "/does_not_exist",
-    #             str(uuid.uuid1()),
-    #             archive_part_size=100,
-    #             download_path=test_workdir,
-    #         )
-    #
-    #     # raises exception if target pod does not exist
-    #     with self.assertRaises(Exception):
-    #         self.lib_k8s.archive_and_get_path_from_pod(
-    #             "does_not_exist",
-    #             prometheus_container_name,
-    #             prometheus_namespace,
-    #             "/tmp",
-    #             "/does_not_exist",
-    #             str(uuid.uuid1()),
-    #             archive_part_size=100,
-    #             download_path=test_workdir,
-    #         )
-    #
-    #     # raises exception if target container does not exist
-    #     with self.assertRaises(Exception):
-    #         self.lib_k8s.archive_and_get_path_from_pod(
-    #             prometheus_pod_name,
-    #             "does_not_exist",
-    #             prometheus_namespace,
-    #             "/tmp",
-    #             "/does_not_exist",
-    #             str(uuid.uuid1()),
-    #             archive_part_size=100,
-    #             download_path=test_workdir,
-    #         )
-    #
-    #     # raises exception if target namespace does not exist
-    #     with self.assertRaises(Exception):
-    #         self.lib_k8s.archive_and_get_path_from_pod(
-    #             prometheus_pod_name,
-    #             prometheus_container_name,
-    #             "does_not_exist",
-    #             "/tmp",
-    #             "/does_not_exist",
-    #             str(uuid.uuid1()),
-    #             archive_part_size=100,
-    #             download_path=test_workdir,
-    #         )
-    #
-    #     # happy path:
-    #     # - creates a dummy file in the pod
-    #     # - downloads it as multivolume tar
-    #     # - uploads on s3
-    #     # - check if all the files are updated in the bucket
-    #     # create folder
-    #     self.lib_k8s.exec_cmd_in_pod(
-    #         ["mkdir /test"], "fedtools", namespace, "fedtools"
-    #     )
-    #     # create test file
-    #     self.lib_k8s.exec_cmd_in_pod(
-    #         ["dd if=/dev/urandom of=/test/test.bin bs=1024 count=500"],
-    #         "fedtools",
-    #         namespace,
-    #         "fedtools",
-    #     )
-    #
-    #     telemetry_config = {
-    #         "username": os.getenv("API_USER"),
-    #         "password": os.getenv("API_PASSWORD"),
-    #         "max_retries": 5,
-    #         "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-    #         "backup_threads": "6",
-    #         "archive_path": "/tmp/prometheus",
-    #         "prometheus_backup": "True",
-    #     }
-    #
-    #     file_list = self.lib_k8s.archive_and_get_path_from_pod(
-    #         prometheus_pod_name,
-    #         prometheus_container_name,
-    #         prometheus_namespace,
-    #         "/tmp",
-    #         "/test",
-    #         str(uuid.uuid1()),
-    #         archive_part_size=100,
-    #         download_path=test_workdir,
-    #     )
-    #     self.lib_telemetry.put_ocp_prometheus_data(
-    #         telemetry_config, file_list, bucket_folder
-    #     )
-    #
-    #     s3 = boto3.client("s3")
-    #     bucket_name = os.getenv("BUCKET_NAME")
-    #     remote_files = s3.list_objects_v2(
-    #         Bucket=bucket_name, Prefix=bucket_folder
-    #     )
-    #     self.assertEqual(len(remote_files["Contents"]), len(file_list))
+    def test_upload_download_prometheus(self):
+        namespace = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace)
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
+
+        prometheus_pod_name = "fedtools"
+        prometheus_container_name = "fedtools"
+        prometheus_namespace = namespace
+        bucket_folder = f"test_folder/{int(time.time())}"
+        workdir_basepath = os.getenv("TEST_WORKDIR")
+        workdir = self.get_random_string(10)
+        test_workdir = os.path.join(workdir_basepath, workdir)
+        os.mkdir(test_workdir)
+        # raises exception if archive path does not exist
+        with self.assertRaises(Exception):
+            self.lib_k8s.archive_and_get_path_from_pod(
+                prometheus_pod_name,
+                prometheus_container_name,
+                prometheus_namespace,
+                "/does_not_exist",
+                "/test",
+                str(uuid.uuid1()),
+                archive_part_size=100,
+                download_path=test_workdir,
+            )
+
+        # raises exception if target path does not exist
+        with self.assertRaises(Exception):
+            self.lib_k8s.archive_and_get_path_from_pod(
+                prometheus_pod_name,
+                prometheus_container_name,
+                prometheus_namespace,
+                "/tmp",
+                "/does_not_exist",
+                str(uuid.uuid1()),
+                archive_part_size=100,
+                download_path=test_workdir,
+            )
+
+        # raises exception if target pod does not exist
+        with self.assertRaises(Exception):
+            self.lib_k8s.archive_and_get_path_from_pod(
+                "does_not_exist",
+                prometheus_container_name,
+                prometheus_namespace,
+                "/tmp",
+                "/does_not_exist",
+                str(uuid.uuid1()),
+                archive_part_size=100,
+                download_path=test_workdir,
+            )
+
+        # raises exception if target container does not exist
+        with self.assertRaises(Exception):
+            self.lib_k8s.archive_and_get_path_from_pod(
+                prometheus_pod_name,
+                "does_not_exist",
+                prometheus_namespace,
+                "/tmp",
+                "/does_not_exist",
+                str(uuid.uuid1()),
+                archive_part_size=100,
+                download_path=test_workdir,
+            )
+
+        # raises exception if target namespace does not exist
+        with self.assertRaises(Exception):
+            self.lib_k8s.archive_and_get_path_from_pod(
+                prometheus_pod_name,
+                prometheus_container_name,
+                "does_not_exist",
+                "/tmp",
+                "/does_not_exist",
+                str(uuid.uuid1()),
+                archive_part_size=100,
+                download_path=test_workdir,
+            )
+
+        # happy path:
+        # - creates a dummy file in the pod
+        # - downloads it as multivolume tar
+        # - uploads on s3
+        # - check if all the files are updated in the bucket
+        # create folder
+        self.lib_k8s.exec_cmd_in_pod(
+            ["mkdir /test"], "fedtools", namespace, "fedtools"
+        )
+        # create test file
+        self.lib_k8s.exec_cmd_in_pod(
+            ["dd if=/dev/urandom of=/test/test.bin bs=1024 count=500"],
+            "fedtools",
+            namespace,
+            "fedtools",
+        )
+
+        telemetry_config = {
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "backup_threads": "6",
+            "archive_path": test_workdir,
+            "prometheus_backup": "True",
+        }
+
+        file_list = self.lib_k8s.archive_and_get_path_from_pod(
+            prometheus_pod_name,
+            prometheus_container_name,
+            prometheus_namespace,
+            "/tmp",
+            "/test",
+            str(uuid.uuid1()),
+            archive_part_size=100,
+            download_path=test_workdir,
+        )
+        self.lib_telemetry.put_ocp_prometheus_data(
+            telemetry_config, file_list, bucket_folder
+        )
+
+        s3 = boto3.client("s3")
+        bucket_name = os.getenv("BUCKET_NAME")
+        remote_files = s3.list_objects_v2(
+            Bucket=bucket_name, Prefix=bucket_folder
+        )
+        self.assertEqual(len(remote_files["Contents"]), len(file_list))
 
 
 if __name__ == "__main__":
