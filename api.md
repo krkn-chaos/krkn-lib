@@ -608,6 +608,24 @@ given namespace
 
 
 
+#### is_pod_running(pod_name: str, namespace: str) -> bool
+Checks if a pod and all its containers are running
+
+
+* **Parameters**
+
+    
+    * **pod_name:str** – the name of the pod to check
+    * **namespace:str** – the namespace of the pod to check
+
+
+
+* **Returns**
+
+    True if is running or False if not
+
+
+
 #### list_killable_managedclusters(label_selector: str | None = None) -> list[str]
 List managed clusters attached to the hub that can be killed
 
