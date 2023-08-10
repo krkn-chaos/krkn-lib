@@ -19,6 +19,11 @@ jobs:
         python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
+#      - name: Check If PR comes from a fork
+#        if: github.event.pull_request.head.repo.full_name != github.repository
+#        run: |
+#          echo "Action cannot be executed from forked repos PR"
+#          exit 1
       - name: Create multi-node KinD cluster
         uses: redhat-chaos/actions/kind@main
       - name: Check out code
@@ -30,18 +35,15 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Configure AWS Creds
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
       - name: Check isort, black, and flake8
         run: |
           pip install black flake8 isort
           isort --profile black .
           black --line-length 79 .
           flake8 .
+          curl -sSL https://install.python-poetry.org | python3 -
+      - name: Check isort, black, and flake8
+        run: |
           curl -sSL https://install.python-poetry.org | python3 -
       - name: Install project dependencies
         run: poetry install --no-interaction

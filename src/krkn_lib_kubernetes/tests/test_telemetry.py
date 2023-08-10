@@ -2,13 +2,19 @@ import base64
 import os
 import tempfile
 import time
+
+# import time
 import unittest
 import uuid
 
 import boto3
+
+# import uuid
+
+# import boto3
 import yaml
 
-from krkn_lib_kubernetes import ScenarioTelemetry
+from krkn_lib_kubernetes import ScenarioTelemetry, ChaosRunTelemetry
 from krkn_lib_kubernetes.tests.base_test import BaseTest
 
 
@@ -24,7 +30,7 @@ class KrknTelemetryTests(BaseTest):
                     obj_1:
                         element: __MARKER__
                         property_1: test
-                        property_2: 
+                        property_2:
                             - property_3: test
                               property_4: test
                             - property_5:
@@ -81,7 +87,10 @@ class KrknTelemetryTests(BaseTest):
                 )
 
     def test_decode_base64_file(self):
-        test_workdir = os.getenv("TEST_WORKDIR")
+        workdir_basepath = os.getenv("TEST_WORKDIR")
+        workdir = self.get_random_string(10)
+        test_workdir = os.path.join(workdir_basepath, workdir)
+        os.mkdir(test_workdir)
         test_string = "Tester McTesty!"
         with tempfile.NamedTemporaryFile(
             dir=test_workdir
@@ -98,24 +107,27 @@ class KrknTelemetryTests(BaseTest):
                 test_read = dest.read()
                 self.assertEqual(test_string, test_read)
 
-    # NEEDFIX
-    def _test_upload_download_prometheus(self):
-        namespace = "test-" + self.get_random_string(5)
+    def test_upload_download_prometheus(self):
+        namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
-
-        # loops while all the pods in the namespace are ready
-        ready_pod = False
-        while not ready_pod:
-            result = self.lib_k8s.monitor_namespace(namespace)
-            ready_pod = result[0]
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
             continue
+
         prometheus_pod_name = "fedtools"
         prometheus_container_name = "fedtools"
         prometheus_namespace = namespace
         bucket_folder = f"test_folder/{int(time.time())}"
-        test_workdir = os.getenv("TEST_WORKDIR")
-
+        workdir_basepath = os.getenv("TEST_WORKDIR")
+        workdir = self.get_random_string(10)
+        test_workdir = os.path.join(workdir_basepath, workdir)
+        os.mkdir(test_workdir)
         # raises exception if archive path does not exist
         with self.assertRaises(Exception):
             self.lib_k8s.archive_and_get_path_from_pod(
@@ -201,9 +213,10 @@ class KrknTelemetryTests(BaseTest):
         telemetry_config = {
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
             "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
             "backup_threads": "6",
-            "archive_path": "/tmp/prometheus",
+            "archive_path": test_workdir,
             "prometheus_backup": "True",
         }
 
@@ -222,10 +235,83 @@ class KrknTelemetryTests(BaseTest):
         )
 
         s3 = boto3.client("s3")
+        bucket_name = os.getenv("BUCKET_NAME")
+        self.assertTrue(bucket_name)
         remote_files = s3.list_objects_v2(
-            Bucket=os.getenv("BUCKET_NAME"), Prefix=bucket_folder
+            Bucket=bucket_name, Prefix=bucket_folder
         )
         self.assertEqual(len(remote_files["Contents"]), len(file_list))
+
+    def test_send_telemetry(self):
+        request_id = f"test_folder/{int(time.time())}"
+        telemetry_config = {
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "backup_threads": "6",
+            "archive_path": request_id,
+            "prometheus_backup": "True",
+            "enabled": True,
+        }
+        chaos_telemetry = ChaosRunTelemetry()
+        try:
+            self.lib_telemetry.send_telemetry(
+                telemetry_config, request_id, chaos_telemetry
+            )
+        except Exception as e:
+            self.assertTrue(False, f"send_telemetry raised exception {str(e)}")
+        s3 = boto3.client("s3")
+
+        bucket_name = os.getenv("BUCKET_NAME")
+        remote_files = s3.list_objects_v2(
+            Bucket=bucket_name, Prefix=request_id
+        )
+        self.assertTrue("Contents" in remote_files.keys())
+        self.assertEqual(
+            remote_files["Contents"][0]["Key"],
+            f"{request_id}/telemetry.json",
+        )
+
+    def test_get_bucket_url_for_filename(self):
+        test_workdir = f"test_folder/{int(time.time())}"
+        telemetry_config = {
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "backup_threads": "6",
+            "archive_path": test_workdir,
+            "prometheus_backup": "True",
+            "enabled": True,
+        }
+        with tempfile.NamedTemporaryFile() as file:
+            file_content = self.get_random_string(100).encode("utf-8")
+            file.write(file_content)
+            file.flush()
+
+            try:
+                url = self.lib_telemetry.get_bucket_url_for_filename(
+                    f'{telemetry_config["api_url"]}/presigned-url',
+                    test_workdir,
+                    os.path.basename(file.name),
+                    telemetry_config["username"],
+                    telemetry_config["password"],
+                )
+                self.lib_telemetry.put_file_to_url(url, file.name)
+
+                bucket_name = os.getenv("BUCKET_NAME")
+                s3 = boto3.client("s3")
+                remote_files = s3.list_objects_v2(
+                    Bucket=bucket_name, Prefix=test_workdir
+                )
+                self.assertTrue("Contents" in remote_files.keys())
+                self.assertEqual(
+                    remote_files["Contents"][0]["Key"],
+                    f"{test_workdir}/{os.path.basename(file.name)}",
+                )
+            except Exception as e:
+                self.assertTrue(False, f"test failed with exception: {str(e)}")
 
 
 if __name__ == "__main__":

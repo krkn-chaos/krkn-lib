@@ -126,17 +126,17 @@ files = [
 
 [[package]]
 name = "boto3"
-version = "1.28.19"
+version = "1.28.21"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.28.19-py3-none-any.whl", hash = "sha256:1bae3e6222c7272af44ab4dc456fc4cb7d2d7044489b7a4a08f9cd0fbad6d213"},
-    {file = "boto3-1.28.19.tar.gz", hash = "sha256:8630c2c38c3130e31e1a4182943aee8bc7dd1a1ad9729092b46fdbc8ac045a77"},
+    {file = "boto3-1.28.21-py3-none-any.whl", hash = "sha256:28e1ea098e43e764d990b4466e377c322b5d57829e2eb1395eca52d4209a6c11"},
+    {file = "boto3-1.28.21.tar.gz", hash = "sha256:0ad6932b2469f4fa4e63f4baf8508ccc1b1bc215b9c835df73505aa85210fc27"},
 ]
 
 [package.dependencies]
-botocore = ">=1.31.19,<1.32.0"
+botocore = ">=1.31.21,<1.32.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.6.0,<0.7.0"
 
@@ -145,13 +145,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.31.19"
+version = "1.31.21"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.31.19-py3-none-any.whl", hash = "sha256:15f269945f319b0263cde9a61a25f2c9a83f6074b62cddae71edafec4a61e637"},
-    {file = "botocore-1.31.19.tar.gz", hash = "sha256:724f9a1a91f88291f5adc6347705a31e52312c88cddd56e38709215b161e025a"},
+    {file = "botocore-1.31.21-py3-none-any.whl", hash = "sha256:c20a5c46eaf49b18b76fdfaec5583320e18abd551b1bc3cd7b1e718372675e21"},
+    {file = "botocore-1.31.21.tar.gz", hash = "sha256:9a13736b16aea3f16829b00edfb2c656fee72ecbfe5eb396cc2f8632e31fd524"},
 ]
 
 [package.dependencies]
@@ -838,13 +838,13 @@ dev = ["Sphinx", "black", "build", "coverage", "docformatter", "flake8", "flake8
 
 [[package]]
 name = "pygments"
-version = "2.15.1"
+version = "2.16.1"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "Pygments-2.15.1-py3-none-any.whl", hash = "sha256:db2db3deb4b4179f399a09054b023b6a586b76499d36965813c71aa8ed7b5fd1"},
-    {file = "Pygments-2.15.1.tar.gz", hash = "sha256:8ace4d3c1dd481894b2005f560ead0f9f19ee64fe983366be1a21e171d12775c"},
+    {file = "Pygments-2.16.1-py3-none-any.whl", hash = "sha256:13fc09fa63bc8d8671a6d247e1eb303c4b343eaee81d861f3404db2935653692"},
+    {file = "Pygments-2.16.1.tar.gz", hash = "sha256:1daff0494820c69bc8941e407aa20f577374ee88364ee10a98fdbe0aece96e29"},
 ]
 
 [package.extras]
@@ -1523,4 +1523,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "0f1eab8934bde2bf03a0a0aa220f3a03529dea047f6a557f5152fa4448d5cc7d"
+content-hash = "eef750c60f3527e317b6555fc22ffd36e4e14370c0b98cbb8e3c47f83f258d01"
