@@ -1862,3 +1862,27 @@ class KrknLibKubernetes:
             raise e
 
         return downloaded_files
+
+    def is_pod_running(self, pod_name: str, namespace: str) -> bool:
+        """
+        Checks if a pod and all its containers are running
+
+        :param pod_name:str: the name of the pod to check
+
+        :param namespace:str: the namespace of the pod to check
+
+        :return: True if is running or False if not
+        """
+        try:
+            response = self.cli.read_namespaced_pod(
+                name=pod_name, namespace=namespace, pretty="true"
+            )
+
+            is_ready = True
+
+            for status in response.status.container_statuses:
+                if not status.ready:
+                    is_ready = False
+            return is_ready
+        except Exception:
+            return False
