@@ -9,13 +9,14 @@ import logging
 import random
 import re
 from kubernetes.client import ApiException
-from krkn_lib_kubernetes import ApiRequestException
+
 from jinja2 import Environment, FileSystemLoader
 
-from krkn_lib_kubernetes.tests.base_test import BaseTest
+from krkn_lib.kubernetes import ApiRequestException
+from base_test import BaseTest
 
 
-class KrknLibKubernetesTests(BaseTest):
+class KrknKubernetesTests(BaseTest):
     def test_exec_command(self):
         namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])

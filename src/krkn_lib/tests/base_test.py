@@ -12,16 +12,18 @@ from jinja2 import FileSystemLoader, Environment
 from kubernetes import config
 from requests import ConnectTimeout
 
-from krkn_lib_kubernetes import KrknLibKubernetes, KrknTelemetry, SafeLogger
+from krkn_lib.kubernetes import KrknKubernetes
+from krkn_lib.telemetry import KrknTelemetry
+from krkn_lib.utils import SafeLogger
 
 
 class BaseTest(unittest.TestCase):
-    lib_k8s: KrknLibKubernetes
+    lib_k8s: KrknKubernetes
     lib_telemetry: KrknTelemetry
 
     @classmethod
     def setUpClass(cls):
-        cls.lib_k8s = KrknLibKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
+        cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry = KrknTelemetry(SafeLogger(), cls.lib_k8s)
         host = cls.lib_k8s.api_client.configuration.host
         logging.disable(logging.CRITICAL)

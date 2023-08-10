@@ -1,9 +1,10 @@
 import json
 import unittest
-from krkn_lib_kubernetes import ScenarioTelemetry, ChaosRunTelemetry
+
+from krkn_lib.telemetry import ScenarioTelemetry, ChaosRunTelemetry
 
 
-class ResourcesTests(unittest.TestCase):
+class KrknTelemetryModelsTests(unittest.TestCase):
     def test_scenario_telemetry(self):
         test_valid_json = """
         {

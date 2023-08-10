@@ -8,22 +8,19 @@ import yaml
 import requests
 import os
 from queue import Queue
-from base64io import Base64IO
+from krkn_lib.kubernetes import KrknKubernetes
+from .models import ChaosRunTelemetry, ScenarioTelemetry
+from krkn_lib.utils.functions import decode_base64_file
 
-from krkn_lib_kubernetes import (
-    ChaosRunTelemetry,
-    ScenarioTelemetry,
-    KrknLibKubernetes,
-    SafeLogger,
-)
+from krkn_lib.utils.safe_logger import SafeLogger
 
 
 class KrknTelemetry:
-    kubecli: KrknLibKubernetes = None
+    kubecli: KrknKubernetes = None
     safe_logger: SafeLogger = None
 
     def __init__(
-        self, safe_logger: SafeLogger, lib_kubernetes: KrknLibKubernetes
+        self, safe_logger: SafeLogger, lib_kubernetes: KrknKubernetes
     ):
         self.kubecli = lib_kubernetes
         self.safe_logger = safe_logger
@@ -266,7 +263,7 @@ class KrknTelemetry:
                         "impossible to convert base64 file, "
                         "source and destination file are the same"
                     )
-                self.decode_base64_file(item[1], decoded_filename)
+                decode_base64_file(item[1], decoded_filename)
                 queue.put((volume_number, decoded_filename, 0))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
@@ -458,52 +455,3 @@ class KrknTelemetry:
         scenario_telemetry.parametersBase64 = input_file_base64
 
     # move it to utils package
-    def deep_set_attribute(self, attribute: str, value: str, obj: any) -> any:
-        if isinstance(obj, list):
-            for element in obj:
-                self.deep_set_attribute(attribute, value, element)
-        if isinstance(obj, dict):
-            for key in obj.keys():
-                if isinstance(obj[key], dict):
-                    self.deep_set_attribute(attribute, value, obj[key])
-                elif isinstance(obj[key], list):
-                    for element in obj[key]:
-                        self.deep_set_attribute(attribute, value, element)
-                if key == attribute:
-                    obj[key] = value
-        return obj
-
-    def log_exception(self, scenario: str = None):
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        if scenario is None:
-            logging.error(
-                "exception: %s file: %s line: %s",
-                exc_type,
-                exc_tb.tb_frame.f_code.co_filename,
-                exc_tb.tb_lineno,
-            )
-        else:
-            logging.error(
-                "scenario: %s failed with exception: %s file: %s line: %s",
-                scenario,
-                exc_type,
-                exc_tb.tb_frame.f_code.co_filename,
-                exc_tb.tb_lineno,
-            )
-
-    def decode_base64_file(
-        self, source_filename: str, destination_filename: str
-    ):
-        """
-        Decodes a base64 file while it's read (no memory allocation).
-        Suitable for big file conversion.
-        :param source_filename: source base64 encoded file
-        :param destination_filename: destination decoded file
-        :return:
-        """
-        with open(source_filename, "rb") as encoded_source, open(
-            destination_filename, "wb"
-        ) as target:
-            with Base64IO(encoded_source) as source:
-                for line in source:
-                    target.write(line)

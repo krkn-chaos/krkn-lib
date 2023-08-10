@@ -16,25 +16,25 @@ from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
 
-from .resources import (
+from .models import (
+    Pod,
     PVC,
+    ApiRequestException,
+    VolumeMount,
+    Container,
+    Volume,
+    LitmusChaosObject,
     ChaosEngine,
     ChaosResult,
-    Container,
-    LitmusChaosObject,
-    Pod,
-    Volume,
-    VolumeMount,
-    ApiRequestException,
-    NodeInfo,
-    SafeLogger,
 )
+from krkn_lib.telemetry import NodeInfo
+from krkn_lib.utils.safe_logger import SafeLogger
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 
-class KrknLibKubernetes:
+class KrknKubernetes:
     """ """
 
     api_client: client.ApiClient = None
@@ -51,7 +51,7 @@ class KrknLibKubernetes:
         kubeconfig_string: str = None,
     ):
         """
-        KrknLibKubernetes Constructor. Can be invoked with kubeconfig_path
+        KrknKubernetes Constructor. Can be invoked with kubeconfig_path
         or, optionally, with a kubeconfig in string
         format using the keyword argument
         :param kubeconfig_path: kubeconfig path
@@ -60,12 +60,12 @@ class KrknLibKubernetes:
 
         Initialization with kubeconfig path:
 
-        >>> KrknLibKubernetes(log_writer, "/home/test/.kube/config")
+        >>> KrknKubernetes(log_writer, "/home/test/.kube/config")
 
         Initialization with kubeconfig string:
 
         >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknLibKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
+        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
