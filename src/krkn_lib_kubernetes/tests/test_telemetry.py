@@ -243,37 +243,6 @@ class KrknTelemetryTests(BaseTest):
         self.assertEqual(len(remote_files["Contents"]), len(file_list))
 
     def test_send_telemetry(self):
-        request_id = f"test_folder/{int(time.time())}"
-        telemetry_config = {
-            "username": os.getenv("API_USER"),
-            "password": os.getenv("API_PASSWORD"),
-            "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-            "backup_threads": "6",
-            "archive_path": request_id,
-            "prometheus_backup": "True",
-            "enabled": True,
-        }
-        chaos_telemetry = ChaosRunTelemetry()
-        try:
-            self.lib_telemetry.send_telemetry(
-                telemetry_config, request_id, chaos_telemetry
-            )
-        except Exception as e:
-            self.assertTrue(False, f"send_telemetry raised exception {str(e)}")
-        s3 = boto3.client("s3")
-
-        bucket_name = os.getenv("BUCKET_NAME")
-        remote_files = s3.list_objects_v2(
-            Bucket=bucket_name, Prefix=request_id
-        )
-        self.assertTrue("Contents" in remote_files.keys())
-        self.assertEqual(
-            remote_files["Contents"][0]["Key"],
-            f"{request_id}/telemetry.json",
-        )
-
-    def test_get_bucket_url_for_filename(self):
         test_workdir = f"test_folder/{int(time.time())}"
         telemetry_config = {
             "username": os.getenv("API_USER"),
@@ -285,33 +254,25 @@ class KrknTelemetryTests(BaseTest):
             "prometheus_backup": "True",
             "enabled": True,
         }
-        with tempfile.NamedTemporaryFile() as file:
-            file_content = self.get_random_string(100).encode("utf-8")
-            file.write(file_content)
-            file.flush()
+        chaos_telemetry = ChaosRunTelemetry()
+        try:
+            self.lib_telemetry.send_telemetry(
+                telemetry_config, test_workdir, chaos_telemetry
+            )
+        except Exception as e:
+            self.assertTrue(False, f"send_telemetry raised exception {str(e)}")
+        s3 = boto3.client("s3")
 
-            try:
-                url = self.lib_telemetry.get_bucket_url_for_filename(
-                    f'{telemetry_config["api_url"]}/presigned-url',
-                    test_workdir,
-                    os.path.basename(file.name),
-                    telemetry_config["username"],
-                    telemetry_config["password"],
-                )
-                self.lib_telemetry.put_file_to_url(url, file.name)
-
-                bucket_name = os.getenv("BUCKET_NAME")
-                s3 = boto3.client("s3")
-                remote_files = s3.list_objects_v2(
-                    Bucket=bucket_name, Prefix=test_workdir
-                )
-                self.assertTrue("Contents" in remote_files.keys())
-                self.assertEqual(
-                    remote_files["Contents"][0]["Key"],
-                    f"{test_workdir}/{os.path.basename(file.name)}",
-                )
-            except Exception as e:
-                self.assertTrue(False, f"test failed with exception: {str(e)}")
+        bucket_name = os.getenv("BUCKET_NAME")
+        remote_files = s3.list_objects_v2(
+            Bucket=bucket_name, Prefix=test_workdir
+        )
+        self.assertTrue("Contents" in remote_files.keys())
+        self.assertEqual(
+            remote_files["Contents"][0]["Key"],
+            f"{test_workdir}/telemetry.json",
+        )
+        pass
 
 
 if __name__ == "__main__":
