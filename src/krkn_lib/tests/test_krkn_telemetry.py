@@ -6,8 +6,8 @@ import unittest
 import uuid
 import boto3
 import yaml
-
-from krkn_lib.telemetry import ChaosRunTelemetry, ScenarioTelemetry
+import krkn_lib.utils
+from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from base_test import BaseTest
 
 

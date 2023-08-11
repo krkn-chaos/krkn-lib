@@ -1,16 +1,14 @@
 import base64
-import logging
-import sys
 import threading
 import time
 
 import yaml
 import requests
 import os
+import krkn_lib.utils as utils
 from queue import Queue
 from krkn_lib.kubernetes import KrknKubernetes
-from .models import ChaosRunTelemetry, ScenarioTelemetry
-from krkn_lib.utils.functions import decode_base64_file
+from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -263,7 +261,7 @@ class KrknTelemetry:
                         "impossible to convert base64 file, "
                         "source and destination file are the same"
                     )
-                decode_base64_file(item[1], decoded_filename)
+                utils.decode_base64_file(item[1], decoded_filename)
                 queue.put((volume_number, decoded_filename, 0))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
@@ -443,7 +441,7 @@ class KrknTelemetry:
         try:
             input_file_yaml = yaml.safe_load(input_file_data)
             # anonymize kubeconfig option in input
-            self.deep_set_attribute(
+            utils.deep_set_attribute(
                 "kubeconfig", "anonymized", input_file_yaml
             )
             input_file_data = yaml.safe_dump(input_file_yaml)
@@ -453,5 +451,3 @@ class KrknTelemetry:
         except Exception as e:
             raise Exception("telemetry: {0}".format(str(e)))
         scenario_telemetry.parametersBase64 = input_file_base64
-
-    # move it to utils package

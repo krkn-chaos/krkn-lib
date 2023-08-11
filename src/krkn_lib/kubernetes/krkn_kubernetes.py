@@ -16,7 +16,7 @@ from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
 
-from .models import (
+from krkn_lib.models.kubernetes import (
     Pod,
     PVC,
     ApiRequestException,
@@ -27,7 +27,7 @@ from .models import (
     ChaosEngine,
     ChaosResult,
 )
-from krkn_lib.telemetry import NodeInfo
+from krkn_lib.models.telemetry import NodeInfo
 from krkn_lib.utils.safe_logger import SafeLogger
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/kubernetes.io/serviceaccount/token"
