@@ -58,7 +58,7 @@ jobs:
           export TEST_WORKDIR=`pwd`/`date +%s`
           mkdir $TEST_WORKDIR
           # Run the unit tests
-          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib_kubernetes/tests/
+          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
           # Generate the coverage HTML report
           poetry run python3 -m coverage html
       - name: Publish coverage report to job summary
