@@ -3,7 +3,7 @@ import os
 import tempfile
 
 import yaml
-
+import krkn_lib.utils as utils
 from base_test import BaseTest
 from krkn_lib.utils import deep_set_attribute
 
@@ -26,7 +26,7 @@ class UtilFunctionTests(BaseTest):
                 )
                 source.write(encoded_test_byte.decode("utf-8"))
                 source.flush()
-                self.lib_telemetry.decode_base64_file(source.name, dest.name)
+                utils.decode_base64_file(source.name, dest.name)
                 test_read = dest.read()
                 self.assertEqual(test_string, test_read)
                 self.assertEqual(test_string, test_read)
