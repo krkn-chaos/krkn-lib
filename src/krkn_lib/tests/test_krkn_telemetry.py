@@ -7,7 +7,7 @@ import uuid
 import boto3
 import yaml
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
-from base_test import BaseTest
+from krkn_lib.tests import BaseTest
 
 
 class KrknTelemetryTests(BaseTest):

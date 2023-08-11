@@ -13,7 +13,7 @@ from kubernetes.client import ApiException
 from jinja2 import Environment, FileSystemLoader
 
 from krkn_lib.k8s import ApiRequestException
-from .base_test import BaseTest
+from krkn_lib.tests import BaseTest
 
 
 class KrknKubernetesTests(BaseTest):

@@ -4,7 +4,7 @@ import tempfile
 
 import yaml
 import krkn_lib.utils as utils
-from base_test import BaseTest
+from krkn_lib.tests import BaseTest
 from krkn_lib.utils import deep_set_attribute
 
 
