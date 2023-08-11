@@ -6,5 +6,5 @@ updates:
       interval: "daily"
     ignore:
       - dependency-name: "python*"
-      - dependency-name: "kubernetes*"
+      - dependency-name: "k8s*"
       - dependency-name: "sphinx*"

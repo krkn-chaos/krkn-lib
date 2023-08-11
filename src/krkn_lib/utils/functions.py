@@ -8,9 +8,11 @@ def decode_base64_file(source_filename: str, destination_filename: str):
     """
     Decodes a base64 file while it's read (no memory allocation).
     Suitable for big file conversion.
+
     :param source_filename: source base64 encoded file
     :param destination_filename: destination decoded file
     :return:
+
     """
     with open(source_filename, "rb") as encoded_source, open(
         destination_filename, "wb"
@@ -25,8 +27,7 @@ def log_exception(scenario: str = None):
     Logs an exception printing the file and the line
     number from where the method is called
 
-    :param scenario: if set will include the scenario name in the
-    log
+    :param scenario: if set will include the scenario name in the log
 
     """
     exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -54,6 +55,7 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     :param attribute: the attribute name in the object
     :param value: the value that will be set in the attribute if present
     :param obj: the object that will be traversed and modified
+
     """
     if isinstance(obj, list):
         for element in obj:

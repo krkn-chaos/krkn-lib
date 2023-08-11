@@ -19,11 +19,6 @@ jobs:
         python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
-#      - name: Check If PR comes from a fork
-#        if: github.event.pull_request.head.repo.full_name != github.repository
-#        run: |
-#          echo "Action cannot be executed from forked repos PR"
-#          exit 1
       - name: Create multi-node KinD cluster
         uses: redhat-chaos/actions/kind@main
       - name: Check out code
@@ -69,16 +64,16 @@ jobs:
       - name: Generate documentation
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-          poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Kubernetes library for Kraken"
+          poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Krkn Foundation Library"
           poetry run make -C docs html
           poetry run make -C docs markdown
-          cp docs/build/markdown/krkn_lib_kubernetes.client.md api.md
+          cp docs/build/markdown/* autodoc/
       - name: Push updated Markdown documentation
         if: ${{ matrix.python-version == '3.9' && github.event_name == 'push' && !(startsWith(github.ref, 'refs/tags/v')) }}
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
-          git add api.md
+          git add autodoc/
           git commit -m "[Actions Bot] API documentation update"
           git push
       - name: Build
