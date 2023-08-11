@@ -13,7 +13,7 @@ from kubernetes.client import ApiException
 from jinja2 import Environment, FileSystemLoader
 
 from krkn_lib.k8s import ApiRequestException
-from base_test import BaseTest
+from .base_test import BaseTest
 
 
 class KrknKubernetesTests(BaseTest):
@@ -52,7 +52,9 @@ class KrknKubernetesTests(BaseTest):
         result = self.lib_k8s.list_namespaces()
         self.assertTrue(len(result) > 1)
         # test filter by label
-        result = self.lib_k8s.list_namespaces("k8s.io/metadata.name=default")
+        result = self.lib_k8s.list_namespaces(
+            "kubernetes.io/metadata.name=default"
+        )
         self.assertTrue(len(result) == 1)
         self.assertIn("default", result)
 
