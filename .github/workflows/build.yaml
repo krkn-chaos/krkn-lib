@@ -104,7 +104,6 @@ jobs:
 
         - name: Copy documentation on GitHub Page Repo
           run: |
-            mv docs/build/html/modules.html docs/build/html/index.html
             cp -R docs/build/html/* krkn-lib-docs
         - name: Push updated HTML documentation
           #if: ${{ matrix.python-version == '3.9' && github.event_name == 'push' && !(startsWith(github.ref, 'refs/tags/v')) }}
