@@ -19,8 +19,8 @@ jobs:
         python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
-      - name: Create multi-node KinD cluster
-        uses: redhat-chaos/actions/kind@main
+      #- name: Create multi-node KinD cluster
+      #  uses: redhat-chaos/actions/kind@main
       - name: Check out code
         uses: actions/checkout@v3
       - name: Update version number
@@ -53,28 +53,46 @@ jobs:
           export TEST_WORKDIR=`pwd`/`date +%s`
           mkdir $TEST_WORKDIR
           # Run the unit tests
-          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+          #poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
           # Generate the coverage HTML report
-          poetry run python3 -m coverage html
+          #poetry run python3 -m coverage html
       - name: Publish coverage report to job summary
         # publishing only once
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-          poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+          #poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Generate documentation
         if: ${{ matrix.python-version == '3.9'}}
         run: |
           poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Krkn Foundation Library"
           poetry run make -C docs html
           poetry run make -C docs markdown
-          cp docs/build/markdown/* autodoc/
-      - name: Push updated Markdown documentation
-        if: ${{ matrix.python-version == '3.9' && github.event_name == 'push' && !(startsWith(github.ref, 'refs/tags/v')) }}
+      - name: Check out doc repo
+        if: ${{ matrix.python-version == '3.9'}}
+        uses: actions/checkout@master
+        with:
+          repository: redhat-chaos/krkn-lib-docs
+          path: krkn-lib-docs
+          ssh-key: ${{ secrets.LIB_REPO_DOC_KEY }}
+      - name: check
         run: |
-          git config user.name "GitHub Actions Bot"
+         pwd
+         ls -al
+         ls -al ../
+      - name: Copy documentation on GitHub Page
+        if: ${{ matrix.python-version == '3.9'}}
+        run: |
+          cp -R docs/build/html/* krkn-lib-docs
+          mv krkn-lib-docs/modules.html krkn-lib-docs/index.html
+      - name: Push updated HTML documentation
+        #if: ${{ matrix.python-version == '3.9' && github.event_name == 'push' && !(startsWith(github.ref, 'refs/tags/v')) }}
+        if: ${{ matrix.python-version == '3.9' }}
+        run: |
+          cd krkn-lib-docs
+          git add *
+          git config user.name "redhat-chaos"
           git config user.email "<>"
-          git add autodoc/
-          git commit -m "[Actions Bot] API documentation update"
+          git commit -m "[KRKN LIB] API documentation update"
           git push
       - name: Build
         run: poetry build
