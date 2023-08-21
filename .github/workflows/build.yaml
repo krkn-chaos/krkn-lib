@@ -64,7 +64,7 @@ jobs:
       - name: Generate documentation
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-          poetry run sphinx-apidoc -o docs/ -f -a -e src/ --doc-project "Krkn Foundation Library"
+          poetry run sphinx-apidoc -o docs/ -f -a -e src/krkn_lib --doc-project "Krkn Foundation Library"
           poetry run make -C docs html
           poetry run make -C docs markdown
       - name: Check out doc repo
