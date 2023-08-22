@@ -1,8 +1,12 @@
+![action](https://github.com/redhat-chaos/krkn-lib-kubernetes/actions/workflows/build.yaml/badge.svg)
+![coverage](https://redhat-chaos.github.io/krkn-lib-docs/coverage_badge.svg)
+![PyPI](https://img.shields.io/pypi/v/krkn-lib?label=krkn-lib)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/krkn-lib)
 # krkn-lib-kubernetes
 ## Krkn Chaos and resiliency testing tool Foundation Library
 
 ### Contents
-The Library contains Classes, Models and helper functions used in Kraken to interact with
+The Library contains Classes, Models and helper functions used in [Kraken](https://github.com/redhat-chaos/krkn) to interact with
 Kubernetes, Openshift and other external APIS.
 The goal of this library is to give to developers the building blocks to realize new Chaos 
 Scenarios and to increase the testability and the modularity of the Krkn codebase.

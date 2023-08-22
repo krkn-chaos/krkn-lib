@@ -21,7 +21,14 @@ class KrknKubernetesTests(BaseTest):
         namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
-        self.wait_pod("fedtools", namespace=namespace)
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
 
         try:
             cmd = ["-br", "addr", "show"]

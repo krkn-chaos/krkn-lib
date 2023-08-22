@@ -52,12 +52,20 @@ jobs:
           mkdir $TEST_WORKDIR
           poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
           poetry run python3 -m coverage html
+          poetry run python3 -m coverage json
+
       - name: Publish coverage report to job summary
         if: ${{ matrix.python-version == '3.9'}}
         run: |
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Build
         run: poetry build
+      - name: Upload json coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage.json
+          path: coverage.json
+          if-no-files-found: error
       - name: Upload dist artifact
         uses: actions/upload-artifact@v3
         with:
@@ -85,6 +93,10 @@ jobs:
             repository: redhat-chaos/krkn-lib-docs
             path: krkn-lib-docs
             ssh-key: ${{ secrets.LIB_REPO_DOC_KEY }}
+        - name: Download json coverage
+          uses: actions/download-artifact@v3
+          with:
+            name: coverage.json
         - name: Update version number
           if: startsWith(github.ref, 'refs/tags/')
           run: |
@@ -103,11 +115,20 @@ jobs:
           run: |
             poetry run sphinx-apidoc -o docs/ -f -a -e src/krkn_lib --doc-project "Krkn Foundation Library"
             poetry run make -C docs html
-
         - name: Copy documentation on GitHub Page Repo
+          env:
+            COLOR: red
           run: |
             find krkn-lib-docs/ -type f ! -name 'index.html' -type d ! -name '.git' -delete 
             cp -R docs/build/html/* krkn-lib-docs
+            
+            # generate coverage badge on previously calculated total coverage
+            # and copy in the docs page
+            export TOTAL=$(python -c "import json;print(json.load(open('coverage.json'))['totals']['percent_covered_display'])")
+            [[ $TOTAL > 70 ]] && COLOR=green
+            echo "TOTAL: $TOTAL"
+            echo "COLOR: $COLOR"
+            curl "https://img.shields.io/badge/coverage-$TOTAL%25-$COLOR" > ./krkn-lib-docs/coverage_badge.svg
         - name: Push updated HTML documentation
           run: |
             cd krkn-lib-docs
