@@ -54,9 +54,10 @@ class KrknKubernetes:
         KrknKubernetes Constructor. Can be invoked with kubeconfig_path
         or, optionally, with a kubeconfig in string
         format using the keyword argument
+
         :param kubeconfig_path: kubeconfig path
         :param kubeconfig_string: (keyword argument)
-        kubeconfig in string format
+            kubeconfig in string format
 
         Initialization with kubeconfig path:
 
@@ -89,7 +90,7 @@ class KrknKubernetes:
         Initialize all clients from kubeconfig path
 
         :param kubeconfig_path: kubeconfig path,
-        (optional default KUBE_CONFIG_DEFAULT_LOCATION)
+            (optional default KUBE_CONFIG_DEFAULT_LOCATION)
         """
         if kubeconfig_path is None:
             kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
@@ -169,6 +170,7 @@ class KrknKubernetes:
     def get_host(self) -> str:
         """
         Returns the Kubernetes server URL
+
         :return: k8s server URL
         """
 
@@ -203,8 +205,9 @@ class KrknKubernetes:
     def list_namespaces(self, label_selector: str = None) -> list[str]:
         """
         List all namespaces
+
         :param label_selector: filter by label
-        selector (optional default `None`)
+            selector (optional default `None`)
         :return: list of namespaces names
         """
 
@@ -274,9 +277,10 @@ class KrknKubernetes:
     ) -> list[str]:
         """
         Check if all the watch_namespaces are valid
+
         :param namespaces: list of namespaces to check
         :param label_selector: filter by label_selector
-        (optional default `None`)
+            (optional default `None`)
         :return: a list of matching namespaces
         """
         try:
@@ -307,8 +311,9 @@ class KrknKubernetes:
     def list_nodes(self, label_selector: str = None) -> list[str]:
         """
         List nodes in the cluster
+
         :param label_selector: filter by label
-        selector (optional default `None`)
+            selector (optional default `None`)
         :return: a list of node names
         """
         nodes = []
@@ -332,8 +337,9 @@ class KrknKubernetes:
     def list_killable_nodes(self, label_selector: str = None) -> list[str]:
         """
         List nodes in the cluster that can be killed (OpenShift only)
+
         :param label_selector: filter by label
-        selector (optional default `None`)
+            selector (optional default `None`)
         :return: a list of node names that can be killed
         """
         nodes = []
@@ -365,8 +371,9 @@ class KrknKubernetes:
     ) -> list[str]:
         """
         List managed clusters attached to the hub that can be killed
+
         :param label_selector: filter by label selector
-        (optional default `None`)
+            (optional default `None`)
         :return: a list of managed clusters names
         """
         managedclusters = []
@@ -403,9 +410,10 @@ class KrknKubernetes:
     ) -> list[str]:
         """
         List pods in the given namespace
+
         :param namespace: namespace to search for pods
         :param label_selector: filter by label selector
-        (optional default `None`)
+            (optional default `None`)
         :return: a list of pod names
         """
         pods = []
@@ -429,8 +437,9 @@ class KrknKubernetes:
     def get_all_pods(self, label_selector: str = None) -> list[[str, str]]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
+
         :param label_selector: filter by label_selector
-        (optional default `None`)
+            (optional default `None`)
         :return: list of tuples pod,namespace
         """
         pods = []
@@ -457,16 +466,17 @@ class KrknKubernetes:
         """
         Execute a base command and its parameters
         in a pod or a container
+
         :param command: command parameters list or full command string
-        if the command must be piped to `bash -c`
-        (in that case `base_command` parameter
-        must is omitted`)
+            if the command must be piped to `bash -c`
+            (in that case `base_command` parameter
+            must is omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command
-        must be executed (optional default `None`)
+            must be executed (optional default `None`)
         :param base_command: base command that must be executed
-        along the parameters (optional, default `bash -c`)
+            along the parameters (optional, default `bash -c`)
         :return: the command stdout
         """
         exec_command = []
@@ -645,10 +655,11 @@ class KrknKubernetes:
     ) -> client.V1Job:
         """
         Create a job in a namespace
+
         :param body: an object representation of a valid job yaml manifest
         :param namespace: namespace (optional default `default`),
-        `Note:` if namespace is specified in the body won't
-        overridden
+            `Note:` if namespace is specified in the body won't
+            override
         :return: V1Job API object
         """
         try:
@@ -677,8 +688,9 @@ class KrknKubernetes:
         Create an open cluster management manifestwork in a namespace.
         ManifestWork is used to define a group of Kubernetes resources
         on the hub to be applied to the managed cluster.
+
         :param body: an object representation of
-        a valid manifestwork yaml manifest
+            a valid manifestwork yaml manifest
         :param namespace: namespace (optional default `default`)
         :return: a custom object representing the newly created manifestwork
         """
@@ -793,9 +805,10 @@ class KrknKubernetes:
         """
         Monitor the status of the pods in the specified namespace
         and set the status to true or false
+
         :param namespace: namespace
         :return: the list of pods and the status
-        (if one or more pods are not running False otherwise True)
+            (if one or more pods are not running False otherwise True)
         """
         pods = self.list_pods(namespace)
         notready_pods = []
@@ -849,9 +862,10 @@ class KrknKubernetes:
     def apply_yaml(self, path, namespace="default") -> list[str]:
         """
         Apply yaml config to create Kubernetes resources
+
         :param path:  path to the YAML file
         :param namespace: namespace to create
-        the resource (optional default `default`)
+            the resource (optional default `default`)
         :return: the list of names of created objects
         """
 
@@ -862,11 +876,12 @@ class KrknKubernetes:
     def get_pod_info(self, name: str, namespace: str = "default") -> Pod:
         """
         Retrieve information about a specific pod
+
         :param name: pod name
         :param namespace: namespace (optional default `default`)
         :return: Data class object of type Pod with the output of the above
-        kubectl command in the given format if the pod exists.
-        Returns None if the pod doesn't exist
+            kubectl command in the given format if the pod exists.
+            Returns None if the pod doesn't exist
         """
 
         pod_exists = self.check_if_pod_exists(name=name, namespace=namespace)
@@ -928,6 +943,7 @@ class KrknKubernetes:
         self, kind: str, name: str, namespace: str = "default"
     ) -> LitmusChaosObject:
         """
+        Retrieves Litmus Chaos CRDs
 
         :param kind: the custom resource type
         :param name: the object name
@@ -996,9 +1012,10 @@ class KrknKubernetes:
     def check_if_namespace_exists(self, name: str) -> bool:
         """
         Check if a namespace exists by parsing through
+
         :param name: namespace name
         :return: boolean value indicating whether
-        the namespace exists or not
+            the namespace exists or not
         """
 
         v1_projects = self.dyn_client.resources.get(
@@ -1032,10 +1049,11 @@ class KrknKubernetes:
     ) -> bool:
         """
         Check if a PVC exists by parsing through the list of projects.
+
         :param name: PVC name
         :param namespace: namespace (optional default `default`)
         :return: boolean value indicating whether
-        the Persistent Volume Claim exists or not
+            the Persistent Volume Claim exists or not
         """
 
         namespace_exists = self.check_if_namespace_exists(namespace)
@@ -1054,12 +1072,13 @@ class KrknKubernetes:
         """
         Retrieve information about a Persistent Volume Claim in a
         given namespace
+
         :param name: name of the persistent volume claim
         :param namespace: namespace (optional default `default`)
         :return: A PVC data class containing the name, capacity, volume name,
-        namespace and associated pod names
-        of the PVC if the PVC exists
-        Returns None if the PVC doesn't exist
+            namespace and associated pod names
+            of the PVC if the PVC exists
+            Returns None if the PVC doesn't exist
         """
 
         pvc_exists = self.check_if_pvc_exists(name=name, namespace=namespace)
@@ -1175,6 +1194,7 @@ class KrknKubernetes:
     ):
         """
         Watch for a specific managedcluster status
+
         :param managedcluster: managedcluster name
         :param status: status of the resource
         :param timeout: timeout
@@ -1223,6 +1243,7 @@ class KrknKubernetes:
     def get_node_resource_version(self, node: str) -> str:
         """
         Get the resource version for the specified node
+
         :param node: node name
         :return: resource version
         """
@@ -1231,8 +1252,9 @@ class KrknKubernetes:
     def list_ready_nodes(self, label_selector: str = None) -> list[str]:
         """
         Returns a list of ready nodes
+
         :param label_selector: filter by label
-        selector (optional default `None`)
+            selector (optional default `None`)
         :return: a list of node names
         """
 
@@ -1439,7 +1461,7 @@ class KrknKubernetes:
     def get_nodes_infos(self) -> list[NodeInfo]:
         """
         Returns a list of NodeInfo objects
-        :return:
+        :return: the list of NodeInfo objects
         """
         instance_type_label = "node.k8s.io/instance-type"
         node_type_master_label = "node-role.k8s.io/master"
@@ -1482,6 +1504,7 @@ class KrknKubernetes:
     def get_cluster_infrastructure(self) -> str:
         """
         Get the cluster Cloud infrastructure name when available
+
         :return: the cluster infrastructure name or `Unknown` when unavailable
         """
         api_client = self.api_client
@@ -1516,6 +1539,7 @@ class KrknKubernetes:
     def get_cluster_network_plugins(self) -> list[str]:
         """
         Get the cluster Cloud network plugins list
+
         :return: the cluster infrastructure name or `Unknown` when unavailable
         """
         api_client = self.api_client
@@ -1553,11 +1577,12 @@ class KrknKubernetes:
     ):
         """
         Deletes a file from a pod
+
         :param pod_name: pod name
         :param container_name: container name
         :param namespace: namespace of the pod
         :param filename: full-path of the file that
-        will be removed from the pod
+            will be removed from the pod
         :return:
         """
         try:
@@ -1599,37 +1624,39 @@ class KrknKubernetes:
         the i-th tar volume popped from the queue itself.
         the file will be downloaded in base64 string format in order
         to avoid archive corruptions caused by the Kubernetes WebSocket API.
+
+
         :param pod_name: pod name from which the tar volume
-        must be downloaded
+            must be downloaded
         :param container_name: container name from which the
-        tar volume be downloaded
+            tar volume be downloaded
         :param namespace: namespace of the pod
         :param remote_archive_path: remote path where the archive volume
-        is stored
+            is stored
         :param remote_archive_prefix: prefix of the file used to
-        create the archive.to this prefix will be appended sequential
-        number of the archive assigned to
-        the worker in a two digit format and the tar exception
-        (ex for a prefix like prefix- the remote filename
-        will become prefix-00.tar)
+            create the archive.to this prefix will be appended sequential
+            number of the archive assigned to
+            the worker in a two digit format and the tar exception
+            (ex for a prefix like prefix- the remote filename
+            will become prefix-00.tar)
         :param local_download_path: local path where the tar volume
-        will be download
+            will be download
         :param local_file_prefix: local prefix to apply to the
-        local file downloaded.To the prefix will be appended the
-        sequential number of the archive assigned to the worker
-        and the extension tar.b64
+            local file downloaded.To the prefix will be appended the
+            sequential number of the archive assigned to the worker
+            and the extension tar.b64
         :param queue: the queue from which the sequential
-        number wil be popped
+            number wil be popped
         :param queue_size: total size of the queue
         :param downloaded_file_list: the list of
-        archive number and local filename  downloaded
-        file will be appended once the download terminates
-        shared between the threads
+            archive number and local filename  downloaded
+            file will be appended once the download terminates
+            shared between the threads
         :param delete_remote_after_download: if set True once
-        the download will terminate the remote file will be deleted.
+            the download will terminate the remote file will be deleted.
         :param thread_number: the assigned thread number
         :param safe_logger: SafeLogger class, will allow thread-safe
-        logging
+            logging
         :return:
         """
         while not queue.empty():
@@ -1726,34 +1753,35 @@ class KrknKubernetes:
         safe_logger: SafeLogger = None,
     ) -> list[(int, str)]:
         """
-        archives and downloads a folder content
+        Archives and downloads a folder content
         from container in a base64 tarball.
         The function is designed to leverage multi-threading
         in order to maximize the download speed.
         a `max_threads` number of `download_archive_part_from_pod`
         calls will be made in parallel.
+
         :param pod_name: pod name from which the folder
-        must be downloaded
+            must be downloaded
         :param container_name: container name from which the
-        folder must be downloaded
+            folder must be downloaded
         :param namespace: namespace of the pod
         :param remote_archive_path: path in the container
-        where the temporary archive
-        will be stored (will be deleted once the download
-        terminates, must be writable
-        and must have enough space to temporarly store the archive)
+            where the temporary archive
+            will be stored (will be deleted once the download
+            terminates, must be writable
+            and must have enough space to temporarly store the archive)
         :param target_path: the path that will be archived
-        and downloaded from the container
+            and downloaded from the container
         :param archive_files_prefix: prefix string that will be added
-        to the files
+            to the files
         :param download_path: the local path
-        where the archive will be saved
+            where the archive will be saved
         :param archive_part_size: the archive will splitted in multiple
-        files of the specified `archive_part_size`
+            files of the specified `archive_part_size`
         :param max_threads: maximum number of threads that will be launched
         :param safe_logger: SafeLogger, if omitted a default SafeLogger will
-        be instantiated that will simply use the logging package to print logs
-        to stdout.
+            be instantiated that will simply use the logging package
+            to print logs to stdout.
         :return: the list of the archive number and filenames downloaded
         """
         if safe_logger is None:

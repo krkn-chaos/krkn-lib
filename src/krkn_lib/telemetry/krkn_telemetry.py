@@ -30,6 +30,8 @@ class KrknTelemetry:
         chaos_telemetry: ChaosRunTelemetry,
     ):
         """
+        Sends Telemetry Data to the Telemetry Web Service
+
         :param telemetry_config: krkn telemetry conf section
         :param uuid: uuid used as folder in S3 bucket
         :param chaos_telemetry: already populated ChaosRunTelemetry object
@@ -108,10 +110,11 @@ class KrknTelemetry:
     ) -> list[(int, str)]:
         """
         Downloads the OCP prometheus metrics folder
+
         :param telemetry_config: krkn telemetry conf section
-        will be stored
+            will be stored
         :param request_id: uuid of the session that will represent the
-        temporary archive files
+            temporary archive files
         :return: the list of the archive number and filenames downloaded
         """
         file_list = list[(int, str)]()
@@ -211,11 +214,12 @@ class KrknTelemetry:
     ):
         """
         Puts a list of files on telemetry S3 bucket, mulithread.
+
         :param telemetry_config: telemetry section of kraken config.yaml
         :param archive_volumes: a list of tuples containing the
-        archive number, and the archive full path to be uploaded
+            archive number, and the archive full path to be uploaded
         :param request_id: uuid of the session that will represent the
-        S3 folder on which the prometheus files will be stored
+            S3 folder on which the prometheus files will be stored
         :return:
         """
         queue = Queue()
@@ -304,22 +308,23 @@ class KrknTelemetry:
         """
         Worker function that creates an s3 link to put files and upload
         and uploads the file on the bucket.
+
         :param queue: queue that will be consumed. The queue
-        elements must be tuples on which the first item must
-        be the file sequence number, the second a local filename full-path
-        that will be uploaded in the S3 bucket and the third will be a retry
-        counter updated by the thread on upload exception and compared with
-        max_retries.
+            elements must be tuples on which the first item must
+            be the file sequence number, the second a local filename full-path
+            that will be uploaded in the S3 bucket and the
+            third will be a retry counter updated by the thread
+            on upload exception and compared with max_retries.
         :param queue_size: total number of files
         :param request_id: uuid of the session that will represent the
-        S3 folder on which the prometheus files will be stored
+            S3 folder on which the prometheus files will be stored
         :param api_url: API endpoint to generate the S3 temporary link
         :param username: API username
         :param password: API password
         :param thread_number: Thread number
         :param uploaded_file_list: uploaded file list shared between threads
         :param max_retries: maximum number of retries from config.yaml.
-        If 0 will retry indefinitely.
+            If 0 will retry indefinitely.
         :return:
         """
         THREAD_SLEEP = 5  # NOQA
@@ -398,12 +403,13 @@ class KrknTelemetry:
     ) -> str:
         """
         Gets from the telemetry API a one shot S3 link to upload
-        prometheus data,
+        prometheus data
+
         :param api_url: telemetry base URL
         :param bucket_folder: folder on which the prometheus archives
-        will be stored
+            will be stored
         :param remote_filename: name of the file
-        that will be stored in the bucket
+            that will be stored in the bucket
         :param username: API username
         :param password: API password
         :return:

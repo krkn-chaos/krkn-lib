@@ -52,6 +52,9 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     """
     Recursively sets the attribute value in all the occurrences of the
     object.
+    An example usage is to anonimyze a yaml object setting all the
+    occurrences of the property `kubeconfig` with a dummy value.
+
     :param attribute: the attribute name in the object
     :param value: the value that will be set in the attribute if present
     :param obj: the object that will be traversed and modified

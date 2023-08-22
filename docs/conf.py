@@ -45,7 +45,7 @@ html_use_index = False
 html_show_sphinx = False
 htmlhelp_basename = "KrknLibDoc"
 html_show_sourcelink = False
-
+exclude_patterns = ["tests*.rst"]
 
 # -- Options for Code Examples output
 
