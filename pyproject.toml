@@ -20,7 +20,7 @@ sphinx-rtd-theme = "^1.2.2"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
-boto3 = "^1.28.12"
+boto3 = "^1.28.31"
 
 [tool.black]
 line-length = 79
