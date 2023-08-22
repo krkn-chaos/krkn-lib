@@ -307,7 +307,7 @@ class KrknTelemetry:
     ):
         """
         Worker function that creates an s3 link to put files and upload
-        and uploads the file on the bucket.
+        the file directly on the bucket.
 
         :param queue: queue that will be consumed. The queue
             elements must be tuples on which the first item must

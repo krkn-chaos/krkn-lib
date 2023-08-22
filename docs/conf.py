@@ -28,8 +28,8 @@ add_function_parentheses = True
 project = "Krkn Foundation Library"
 copyright = "Red Hat Chaos Team"
 
-version = ""
-release = ""
+version = "0.0.0"
+release = version
 
 # -- Options for HTML output
 
@@ -40,6 +40,11 @@ html_title = "Krkn Foundation Library"
 # html_logo = None
 # html_favicon = None
 html_static_path = ["_static"]
+html_logo = "redhat-chaos.png"
+html_theme_options = {
+    "logo_only": True,
+    "display_version": True,
+}
 html_domain_indices = False
 html_use_index = False
 html_show_sphinx = False

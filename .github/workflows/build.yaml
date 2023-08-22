@@ -12,20 +12,21 @@ permissions:
   contents: write
 jobs:
   build:
-    name: Build
+    name: Build & Test
     strategy:
       matrix:
         #python-version: [ '3.9', '3.10', 'pypy3.9' ]
         python-version: [ '3.9' ]
     runs-on: ubuntu-latest
     steps:
-      #- name: Create multi-node KinD cluster
-      #  uses: redhat-chaos/actions/kind@main
+      - name: Create multi-node KinD cluster
+        uses: redhat-chaos/actions/kind@main
       - name: Check out code
         uses: actions/checkout@v3
       - name: Update version number
         if: startsWith(github.ref, 'refs/tags/')
-        run: sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
+        run: | 
+          sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -49,15 +50,12 @@ jobs:
         run: |
           export TEST_WORKDIR=`pwd`/`date +%s`
           mkdir $TEST_WORKDIR
-          # Run the unit tests
-          #poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
-          # Generate the coverage HTML report
-          #poetry run python3 -m coverage html
+          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+          poetry run python3 -m coverage html
       - name: Publish coverage report to job summary
-        # publishing only once
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-          #poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+          poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Build
         run: poetry build
       - name: Upload dist artifact
@@ -73,10 +71,11 @@ jobs:
           path: htmlcov
           if-no-files-found: error
   doc:
-    name: Generate Docs and publish site
+    name: Generate and Publish Docs
     runs-on: ubuntu-latest
-      #needs:
-      #  - build
+    needs:
+      - build
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
         - name: Check out code
           uses: actions/checkout@v3
@@ -88,7 +87,9 @@ jobs:
             ssh-key: ${{ secrets.LIB_REPO_DOC_KEY }}
         - name: Update version number
           if: startsWith(github.ref, 'refs/tags/')
-          run: sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
+          run: |
+            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
+            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" ./docs/conf.py
         - name: Set up Python
           uses: actions/setup-python@v4
           with:
@@ -108,13 +109,12 @@ jobs:
             find krkn-lib-docs/ -type f ! -name 'index.html' -type d ! -name '.git' -delete 
             cp -R docs/build/html/* krkn-lib-docs
         - name: Push updated HTML documentation
-          #if: ${{ matrix.python-version == '3.9' && github.event_name == 'push' && !(startsWith(github.ref, 'refs/tags/v')) }}
           run: |
             cd krkn-lib-docs
             git add .
             git config user.name "redhat-chaos"
             git config user.email "<>"
-            git commit -m "[KRKN LIB] API documentation update"
+            git commit -m "[KRKN LIB] API documentation ${GITHUB_REF##*/}"
             git push
 
   publish:

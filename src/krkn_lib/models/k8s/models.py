@@ -85,7 +85,7 @@ class Pod:
     """
 
     name: str
-    """ 
+    """
     Pod Name
     """
     podIP: str
