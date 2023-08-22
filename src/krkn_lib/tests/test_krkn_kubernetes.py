@@ -9,18 +9,26 @@ import logging
 import random
 import re
 from kubernetes.client import ApiException
-from krkn_lib_kubernetes import ApiRequestException
+
 from jinja2 import Environment, FileSystemLoader
 
-from krkn_lib_kubernetes.tests.base_test import BaseTest
+from krkn_lib.k8s import ApiRequestException
+from krkn_lib.tests import BaseTest
 
 
-class KrknLibKubernetesTests(BaseTest):
+class KrknKubernetesTests(BaseTest):
     def test_exec_command(self):
         namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
-        self.wait_pod("fedtools", namespace=namespace)
+        count = 0
+        MAX_RETRIES = 5
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
 
         try:
             cmd = ["-br", "addr", "show"]
@@ -59,7 +67,7 @@ class KrknLibKubernetesTests(BaseTest):
 
         # test unexisting filter
         result = self.lib_k8s.list_namespaces(
-            "kubernetes.io/metadata.name=donotexist"
+            "k8s.io/metadata.name=donotexist"
         )
         self.assertTrue(len(result) == 0)
 

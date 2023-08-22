@@ -12,16 +12,18 @@ from jinja2 import FileSystemLoader, Environment
 from kubernetes import config
 from requests import ConnectTimeout
 
-from krkn_lib_kubernetes import KrknLibKubernetes, KrknTelemetry, SafeLogger
+from krkn_lib.k8s import KrknKubernetes
+from krkn_lib.telemetry import KrknTelemetry
+from krkn_lib.utils import SafeLogger
 
 
 class BaseTest(unittest.TestCase):
-    lib_k8s: KrknLibKubernetes
+    lib_k8s: KrknKubernetes
     lib_telemetry: KrknTelemetry
 
     @classmethod
     def setUpClass(cls):
-        cls.lib_k8s = KrknLibKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
+        cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry = KrknTelemetry(SafeLogger(), cls.lib_k8s)
         host = cls.lib_k8s.api_client.configuration.host
         logging.disable(logging.CRITICAL)
@@ -30,8 +32,8 @@ class BaseTest(unittest.TestCase):
         except ConnectTimeout:
             logging.error(
                 "Unable to connect to Kubernetes API %s.\n"
-                "To run the tests please setup a running kubernetes cluster.\n"
-                "To have a local working kubernetes cluster "
+                "To run the tests please setup a running k8s cluster.\n"
+                "To have a local working k8s cluster "
                 "visit https://minikube.sigs.k8s.io/docs/\n",
                 host,
             )

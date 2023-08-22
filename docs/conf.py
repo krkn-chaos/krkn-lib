@@ -4,7 +4,9 @@ import sys
 import os
 
 sys.path.insert(0, os.path.abspath("extensions"))
-
+for x in os.walk("../src"):
+    print(x[0])
+    sys.path.append(x[0])
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
@@ -23,27 +25,32 @@ add_function_parentheses = True
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
 
-project = "Kubernetes client library helper for Kraken"
+project = "Krkn Foundation Library"
 copyright = "Red Hat Chaos Team"
 
-version = ""
-release = ""
+version = "0.0.0"
+release = version
 
 # -- Options for HTML output
 
-html_theme = "classic"
+html_theme = "sphinx_rtd_theme"
 html_theme_path = ["themes"]
-html_title = "Kubernetes library for Kraken"
+html_title = "Krkn Foundation Library"
 # html_short_title = None
 # html_logo = None
 # html_favicon = None
 html_static_path = ["_static"]
+html_logo = "redhat-chaos.png"
+html_theme_options = {
+    "logo_only": True,
+    "display_version": True,
+}
 html_domain_indices = False
 html_use_index = False
 html_show_sphinx = False
-htmlhelp_basename = "KrknKubernetesLibDoc"
+htmlhelp_basename = "KrknLibDoc"
 html_show_sourcelink = False
-
+exclude_patterns = ["tests*.rst"]
 
 # -- Options for Code Examples output
 

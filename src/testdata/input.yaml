@@ -6,7 +6,7 @@ input_list:
   node_selector: {}
   # node selector example
   # node_selector:
-  #   kubernetes.io/hostname: master
+  #   k8s.io/hostname: master
   kubeconfig: "testkubeconfig"
   namespace: default
 

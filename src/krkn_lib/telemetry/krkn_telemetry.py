@@ -1,29 +1,24 @@
 import base64
-import logging
-import sys
 import threading
 import time
 
 import yaml
 import requests
 import os
+import krkn_lib.utils as utils
 from queue import Queue
-from base64io import Base64IO
+from krkn_lib.k8s import KrknKubernetes
+from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 
-from krkn_lib_kubernetes import (
-    ChaosRunTelemetry,
-    ScenarioTelemetry,
-    KrknLibKubernetes,
-    SafeLogger,
-)
+from krkn_lib.utils.safe_logger import SafeLogger
 
 
 class KrknTelemetry:
-    kubecli: KrknLibKubernetes = None
+    kubecli: KrknKubernetes = None
     safe_logger: SafeLogger = None
 
     def __init__(
-        self, safe_logger: SafeLogger, lib_kubernetes: KrknLibKubernetes
+        self, safe_logger: SafeLogger, lib_kubernetes: KrknKubernetes
     ):
         self.kubecli = lib_kubernetes
         self.safe_logger = safe_logger
@@ -35,6 +30,8 @@ class KrknTelemetry:
         chaos_telemetry: ChaosRunTelemetry,
     ):
         """
+        Sends Telemetry Data to the Telemetry Web Service
+
         :param telemetry_config: krkn telemetry conf section
         :param uuid: uuid used as folder in S3 bucket
         :param chaos_telemetry: already populated ChaosRunTelemetry object
@@ -113,10 +110,11 @@ class KrknTelemetry:
     ) -> list[(int, str)]:
         """
         Downloads the OCP prometheus metrics folder
+
         :param telemetry_config: krkn telemetry conf section
-        will be stored
+            will be stored
         :param request_id: uuid of the session that will represent the
-        temporary archive files
+            temporary archive files
         :return: the list of the archive number and filenames downloaded
         """
         file_list = list[(int, str)]()
@@ -216,11 +214,12 @@ class KrknTelemetry:
     ):
         """
         Puts a list of files on telemetry S3 bucket, mulithread.
+
         :param telemetry_config: telemetry section of kraken config.yaml
         :param archive_volumes: a list of tuples containing the
-        archive number, and the archive full path to be uploaded
+            archive number, and the archive full path to be uploaded
         :param request_id: uuid of the session that will represent the
-        S3 folder on which the prometheus files will be stored
+            S3 folder on which the prometheus files will be stored
         :return:
         """
         queue = Queue()
@@ -266,7 +265,7 @@ class KrknTelemetry:
                         "impossible to convert base64 file, "
                         "source and destination file are the same"
                     )
-                self.decode_base64_file(item[1], decoded_filename)
+                utils.decode_base64_file(item[1], decoded_filename)
                 queue.put((volume_number, decoded_filename, 0))
                 total_size += os.stat(decoded_filename).st_size / (1024 * 1024)
                 os.unlink(item[1])
@@ -308,23 +307,24 @@ class KrknTelemetry:
     ):
         """
         Worker function that creates an s3 link to put files and upload
-        and uploads the file on the bucket.
+        the file directly on the bucket.
+
         :param queue: queue that will be consumed. The queue
-        elements must be tuples on which the first item must
-        be the file sequence number, the second a local filename full-path
-        that will be uploaded in the S3 bucket and the third will be a retry
-        counter updated by the thread on upload exception and compared with
-        max_retries.
+            elements must be tuples on which the first item must
+            be the file sequence number, the second a local filename full-path
+            that will be uploaded in the S3 bucket and the
+            third will be a retry counter updated by the thread
+            on upload exception and compared with max_retries.
         :param queue_size: total number of files
         :param request_id: uuid of the session that will represent the
-        S3 folder on which the prometheus files will be stored
+            S3 folder on which the prometheus files will be stored
         :param api_url: API endpoint to generate the S3 temporary link
         :param username: API username
         :param password: API password
         :param thread_number: Thread number
         :param uploaded_file_list: uploaded file list shared between threads
         :param max_retries: maximum number of retries from config.yaml.
-        If 0 will retry indefinitely.
+            If 0 will retry indefinitely.
         :return:
         """
         THREAD_SLEEP = 5  # NOQA
@@ -403,12 +403,13 @@ class KrknTelemetry:
     ) -> str:
         """
         Gets from the telemetry API a one shot S3 link to upload
-        prometheus data,
+        prometheus data
+
         :param api_url: telemetry base URL
         :param bucket_folder: folder on which the prometheus archives
-        will be stored
+            will be stored
         :param remote_filename: name of the file
-        that will be stored in the bucket
+            that will be stored in the bucket
         :param username: API username
         :param password: API password
         :return:
@@ -446,7 +447,7 @@ class KrknTelemetry:
         try:
             input_file_yaml = yaml.safe_load(input_file_data)
             # anonymize kubeconfig option in input
-            self.deep_set_attribute(
+            utils.deep_set_attribute(
                 "kubeconfig", "anonymized", input_file_yaml
             )
             input_file_data = yaml.safe_dump(input_file_yaml)
@@ -456,54 +457,3 @@ class KrknTelemetry:
         except Exception as e:
             raise Exception("telemetry: {0}".format(str(e)))
         scenario_telemetry.parametersBase64 = input_file_base64
-
-    # move it to utils package
-    def deep_set_attribute(self, attribute: str, value: str, obj: any) -> any:
-        if isinstance(obj, list):
-            for element in obj:
-                self.deep_set_attribute(attribute, value, element)
-        if isinstance(obj, dict):
-            for key in obj.keys():
-                if isinstance(obj[key], dict):
-                    self.deep_set_attribute(attribute, value, obj[key])
-                elif isinstance(obj[key], list):
-                    for element in obj[key]:
-                        self.deep_set_attribute(attribute, value, element)
-                if key == attribute:
-                    obj[key] = value
-        return obj
-
-    def log_exception(self, scenario: str = None):
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        if scenario is None:
-            logging.error(
-                "exception: %s file: %s line: %s",
-                exc_type,
-                exc_tb.tb_frame.f_code.co_filename,
-                exc_tb.tb_lineno,
-            )
-        else:
-            logging.error(
-                "scenario: %s failed with exception: %s file: %s line: %s",
-                scenario,
-                exc_type,
-                exc_tb.tb_frame.f_code.co_filename,
-                exc_tb.tb_lineno,
-            )
-
-    def decode_base64_file(
-        self, source_filename: str, destination_filename: str
-    ):
-        """
-        Decodes a base64 file while it's read (no memory allocation).
-        Suitable for big file conversion.
-        :param source_filename: source base64 encoded file
-        :param destination_filename: destination decoded file
-        :return:
-        """
-        with open(source_filename, "rb") as encoded_source, open(
-            destination_filename, "wb"
-        ) as target:
-            with Base64IO(encoded_source) as source:
-                for line in source:
-                    target.write(line)
