@@ -1,6 +1,6 @@
 ![action](https://github.com/redhat-chaos/krkn-lib-kubernetes/actions/workflows/build.yaml/badge.svg)
 ![coverage](https://redhat-chaos.github.io/krkn-lib-docs/coverage_badge.svg)
-![PyPI](https://img.shields.io/pypi/v/krkn-lib?label=krkn-lib)
+![PyPI](https://img.shields.io/pypi/v/krkn-lib?label=PyPi)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/krkn-lib)
 # krkn-lib
 ## Krkn Chaos and resiliency testing tool Foundation Library
