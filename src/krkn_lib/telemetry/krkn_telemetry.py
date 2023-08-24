@@ -1,6 +1,7 @@
 import base64
 import threading
 import time
+from typing import Optional
 
 import yaml
 import requests
@@ -28,14 +29,14 @@ class KrknTelemetry:
         telemetry_config: dict,
         uuid: str,
         chaos_telemetry: ChaosRunTelemetry,
-    ):
+    ) -> Optional[str]:
         """
         Sends Telemetry Data to the Telemetry Web Service
 
         :param telemetry_config: krkn telemetry conf section
         :param uuid: uuid used as folder in S3 bucket
         :param chaos_telemetry: already populated ChaosRunTelemetry object
-        :return:
+        :return: the telemetry object json string
         """
         enabled = telemetry_config.get("enabled")
         if enabled:
@@ -102,6 +103,7 @@ class KrknTelemetry:
                 raise Exception(error_message)
             else:
                 self.safe_logger.info("successfully sent telemetry data")
+                return json_data
 
     def get_ocp_prometheus_data(
         self,
