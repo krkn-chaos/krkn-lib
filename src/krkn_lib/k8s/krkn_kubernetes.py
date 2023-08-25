@@ -1568,7 +1568,10 @@ class KrknKubernetes:
                 for plugin in json_obj["items"]:
                     network_plugins.append(plugin["status"]["networkType"])
             except Exception as e:
-                logging.warning("V1ApiException -> %s", str(e))
+                logging.warning(
+                    "Impossible to retrieve cluster Network plugins  -> %s",
+                    str(e),
+                )
                 network_plugins.append("Unknown")
         return network_plugins
 
