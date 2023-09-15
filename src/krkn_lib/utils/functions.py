@@ -52,7 +52,7 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     """
     Recursively sets the attribute value in all the occurrences of the
     object.
-    An example usage is to anonimyze a yaml object setting all the
+    An example usage is to anonymize a yaml object setting all the
     occurrences of the property `kubeconfig` with a dummy value.
 
     :param attribute: the attribute name in the object
@@ -73,3 +73,15 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
             if key == attribute:
                 obj[key] = value
     return obj
+
+
+def get_scenario_items(cont: any, item: str, default: any) -> any:
+    """
+    Sets default value if none is set in scenario yaml file.
+
+    :param cont: content of scenario yaml file
+    :param item: the name of the item in scenario yaml
+    :param default: the default value
+
+    """
+    return default if cont.get(item) is None else cont.get(item)
