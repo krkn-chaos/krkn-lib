@@ -11,8 +11,6 @@ def decode_base64_file(source_filename: str, destination_filename: str):
 
     :param source_filename: source base64 encoded file
     :param destination_filename: destination decoded file
-    :return:
-
     """
     with open(source_filename, "rb") as encoded_source, open(
         destination_filename, "wb"
@@ -28,7 +26,6 @@ def log_exception(scenario: str = None):
     number from where the method is called
 
     :param scenario: if set will include the scenario name in the log
-
     """
     exc_type, exc_obj, exc_tb = sys.exc_info()
     if scenario is None:
@@ -52,13 +49,13 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     """
     Recursively sets the attribute value in all the occurrences of the
     object.
-    An example usage is to anonimyze a yaml object setting all the
+    An example usage is to anonymize a yaml object setting all the
     occurrences of the property `kubeconfig` with a dummy value.
 
     :param attribute: the attribute name in the object
     :param value: the value that will be set in the attribute if present
     :param obj: the object that will be traversed and modified
-
+    :return: obj
     """
     if isinstance(obj, list):
         for element in obj:
@@ -73,3 +70,15 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
             if key == attribute:
                 obj[key] = value
     return obj
+
+
+def get_scenario_items(cont: dict[str, any], item: str, default: any) -> any:
+    """
+    Sets the value of item from scenario yaml.
+
+    :param cont: content of scenario yaml file
+    :param item: the name of the item in scenario yaml
+    :param default: the default value
+    :return: item value - if not specified the default value is returned
+    """
+    return default if cont.get(item) is None else cont.get(item)
