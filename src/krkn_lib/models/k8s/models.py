@@ -88,6 +88,10 @@ class Pod:
     """
     Pod Name
     """
+    status: str
+    """
+    Status of the Pod
+    """
     podIP: str
     """
     Pod ip address
