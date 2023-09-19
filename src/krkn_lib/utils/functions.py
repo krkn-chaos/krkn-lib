@@ -72,13 +72,13 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     return obj
 
 
-def get_scenario_items(cont: dict[str, any], item: str, default: any) -> any:
+def get_yaml_item_value(cont: dict[str, any], item: str, default: any) -> any:
     """
-    Sets the value of item from scenario yaml.
+    Sets the value of item from yaml.
 
-    :param cont: content of scenario yaml file
-    :param item: the name of the item in scenario yaml
-    :param default: the default value
+    :param cont: dict of all items from yaml file
+    :param item: name of the item in scenario yaml
+    :param default: default value
     :return: item value - if not specified the default value is returned
     """
     return default if cont.get(item) is None else cont.get(item)
