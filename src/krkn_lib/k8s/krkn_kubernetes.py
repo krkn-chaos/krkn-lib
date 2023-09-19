@@ -1032,7 +1032,7 @@ class KrknKubernetes:
 
         :param name: pod name
         :param namespace: namespace (optional default `default`)
-        :return:
+        :return: boolean value indicating whether the pod exists or not
         """
 
         namespace_exists = self.check_if_namespace_exists(namespace)
@@ -1191,13 +1191,14 @@ class KrknKubernetes:
     # TODO: Implement this with a watcher instead of polling
     def watch_managedcluster_status(
         self, managedcluster: str, status: str, timeout: int
-    ):
+    ) -> bool:
         """
         Watch for a specific managedcluster status
 
         :param managedcluster: managedcluster name
         :param status: status of the resource
         :param timeout: timeout
+        :return: boolean value indicating if the timeout occurred
         """
         elapsed_time = 0
         while True:
@@ -1284,12 +1285,12 @@ class KrknKubernetes:
         self, node_name: str, label_selector: str, instance_kill_count: int
     ) -> list[str]:
         """
-        Returns active node(s)
+        Gets active node(s)
 
         :param node_name: node name
         :param label_selector: filter by label
         :param instance_kill_count:
-        :return:
+        :return: active node(s)
         """
         if node_name in self.list_ready_nodes():
             return [node_name]
@@ -1586,7 +1587,6 @@ class KrknKubernetes:
         :param namespace: namespace of the pod
         :param filename: full-path of the file that
             will be removed from the pod
-        :return:
         """
         try:
             # delete the backup file
@@ -1640,7 +1640,7 @@ class KrknKubernetes:
             create the archive.to this prefix will be appended sequential
             number of the archive assigned to
             the worker in a two digit format and the tar exception
-            (ex for a prefix like prefix- the remote filename
+            (ex for a prefix like prefix - the remote filename
             will become prefix-00.tar)
         :param local_download_path: local path where the tar volume
             will be download
@@ -1660,7 +1660,6 @@ class KrknKubernetes:
         :param thread_number: the assigned thread number
         :param safe_logger: SafeLogger class, will allow thread-safe
             logging
-        :return:
         """
         while not queue.empty():
             file_number = queue.get()
@@ -1779,7 +1778,7 @@ class KrknKubernetes:
             to the files
         :param download_path: the local path
             where the archive will be saved
-        :param archive_part_size: the archive will splitted in multiple
+        :param archive_part_size: the archive will be split into multiple
             files of the specified `archive_part_size`
         :param max_threads: maximum number of threads that will be launched
         :param safe_logger: SafeLogger, if omitted a default SafeLogger will
@@ -1882,9 +1881,7 @@ class KrknKubernetes:
         Checks if a pod and all its containers are running
 
         :param pod_name:str: the name of the pod to check
-
         :param namespace:str: the namespace of the pod to check
-
         :return: True if is running or False if not
         """
         try:

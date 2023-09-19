@@ -222,7 +222,6 @@ class KrknTelemetry:
             archive number, and the archive full path to be uploaded
         :param request_id: uuid of the session that will represent the
             S3 folder on which the prometheus files will be stored
-        :return:
         """
         queue = Queue()
         prometheus_backup = telemetry_config.get("prometheus_backup")
@@ -327,7 +326,6 @@ class KrknTelemetry:
         :param uploaded_file_list: uploaded file list shared between threads
         :param max_retries: maximum number of retries from config.yaml.
             If 0 will retry indefinitely.
-        :return:
         """
         THREAD_SLEEP = 5  # NOQA
         while not queue.empty():
@@ -381,7 +379,6 @@ class KrknTelemetry:
         Puts a local file on an url
         :param url: url where the file will be put
         :param local_filename: local file full-path
-        :return:
         """
         try:
             with open(local_filename, "rb") as file:
