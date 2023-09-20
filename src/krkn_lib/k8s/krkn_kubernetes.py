@@ -435,6 +435,20 @@ class KrknKubernetes:
             pods.append(pod.metadata.name)
         return pods
 
+    def get_daemonset(self, namespace) -> list[str]:
+        """
+        Return a list of tuples containing pod name [0] and namespace [1]
+
+        :param label_selector: filter by label_selector
+            (optional default `None`)
+        :return: list of tuples pod,namespace
+        """
+        daemonsets = []
+        ret = self.apps_api.list_namespaced_daemon_set(namespace, pretty=True)
+        for daemonset in ret.items:
+            daemonsets.append(daemonset.metadata.name)
+        return daemonsets
+
     def get_deployment_ns(self, namespace) -> list[str]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
@@ -458,6 +472,17 @@ class KrknKubernetes:
                 logging.info("Deployment already deleted")
             else:
                 logging.error("Failed to delete deployment %s", str(e))
+                raise e
+    
+    def delete_daemonset(self,name, namespace): 
+        
+        try:
+            self.apps_api.delete_namespaced_daemon_set(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Daemon Set already deleted")
+            else:
+                logging.error("Failed to delete daemon set %s", str(e))
                 raise e
     
 
