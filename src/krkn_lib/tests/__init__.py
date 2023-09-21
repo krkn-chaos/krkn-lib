@@ -1,1 +1,1 @@
-from base_test import *  # NOQA
+from .base_test import *  # NOQA

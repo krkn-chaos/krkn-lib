@@ -1,12 +1,16 @@
 import base64
 import os
+import re
 import tempfile
 
 import yaml
 import krkn_lib.utils as utils
 from krkn_lib.tests import BaseTest
-from krkn_lib.utils import deep_set_attribute
-from krkn_lib.utils import get_yaml_item_value
+from krkn_lib.utils import (
+    deep_set_attribute,
+    filter_log_line,
+    get_scenario_items,
+)
 
 
 class UtilFunctionTests(BaseTest):
@@ -57,6 +61,119 @@ class UtilFunctionTests(BaseTest):
         self.assertEqual(unserialized_updated_object.count("__UPDATED__"), 4)
         self.assertEqual(unserialized_updated_object.count("__MARKER__"), 0)
 
+    def test_filter_file_log(self):
+        pattern = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+")
+        logs = [
+            "2023-09-15T11:20:36.123425532Z before",
+            "2023-09-15T11:28:00.000000000Z now",
+            "2023-09-15T11:31:41.531143432Z after",
+        ]
+        # Friday, September 15, 2023 13:28:10 GMT+02:00 DST
+        start_timestamp = 1694777280
+        # Friday, September 15, 2023 13:30:00 AM
+        end_timestamp = 1694777400
+
+        self.assertIsNone(
+            filter_log_line(
+                logs[0],
+                start_timestamp,
+                end_timestamp,
+                "UTC",
+                "Europe/Rome",
+                [pattern],
+            )
+        )
+        self.assertIsNotNone(
+            filter_log_line(
+                logs[1],
+                start_timestamp,
+                end_timestamp,
+                "UTC",
+                "Europe/Rome",
+                [pattern],
+            )
+        )
+        self.assertIsNone(
+            filter_log_line(
+                logs[2],
+                start_timestamp,
+                end_timestamp,
+                "UTC",
+                "Europe/Rome",
+                [pattern],
+            )
+        )
+
+        # START TIMESTAMP ONLY
+        # (RUN START TIMESTAMP) 13:28 GMT +2
+        # >
+        # 11:20 UTC (LOG TIME) = LOG SKIPPED
+        self.assertIsNone(
+            filter_log_line(
+                logs[0], start_timestamp, None, "UTC", "Europe/Rome", [pattern]
+            )
+        )
+
+        # (RUN START TIMESTAMP) 13:28 GMT +3
+        # <
+        # 11:20 UTC (LOG TIME) = LOG CAPTURED
+        self.assertIsNotNone(
+            filter_log_line(
+                logs[0], start_timestamp, None, "UTC", "EET", [pattern]
+            )
+        )
+
+        # END TIMESTAMP ONLY
+        # (RUN END TIMESTAMP) 13:30 GMT +2
+        # <
+        # 11:31 UTC (LOG TIME) = LOG SKIPPED
+        self.assertIsNone(
+            filter_log_line(
+                logs[2], None, end_timestamp, "UTC", "Europe/Rome", [pattern]
+            )
+        )
+
+        # (RUN END TIMESTAMP) 13:30 GMT -5
+        # >
+        # 11:31 UTC (LOG TIME) = LOG CAPTURED
+        self.assertIsNotNone(
+            filter_log_line(
+                logs[2], None, end_timestamp, "UTC", "EST", [pattern]
+            )
+        )
+
+        # if a pattern do not contains a group will raise an exception
+        broken_pattern_no_group = re.compile(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z.+"
+        )
+        with self.assertRaises(Exception):
+            self.assertIsNotNone(
+                filter_log_line(
+                    logs[2],
+                    None,
+                    end_timestamp,
+                    "UTC",
+                    "EST",
+                    [broken_pattern_no_group],
+                )
+            )
+
+        # if a pattern contains more than one group will raise an exception
+        broken_pattern_multiple_groups = re.compile(
+            r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+)(Z.+)"
+        )
+
+        with self.assertRaises(Exception):
+            self.assertIsNotNone(
+                filter_log_line(
+                    logs[2],
+                    None,
+                    end_timestamp,
+                    "UTC",
+                    "EST",
+                    [broken_pattern_multiple_groups],
+                )
+            )
     def test_get_yaml_item_value(self):
         cont = {
             "n_int": 1,
