@@ -6,7 +6,7 @@ import yaml
 import krkn_lib.utils as utils
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import deep_set_attribute
-from krkn_lib.utils import get_scenario_items
+from krkn_lib.utils import get_yaml_item_value
 
 
 class UtilFunctionTests(BaseTest):
@@ -57,7 +57,7 @@ class UtilFunctionTests(BaseTest):
         self.assertEqual(unserialized_updated_object.count("__UPDATED__"), 4)
         self.assertEqual(unserialized_updated_object.count("__MARKER__"), 0)
 
-    def test_get_scenario_items(self):
+    def test_get_yaml_item_value(self):
         cont = {
             "n_int": 1,
             "n_str": "value",
@@ -65,10 +65,10 @@ class UtilFunctionTests(BaseTest):
             "d_str": None
         }
 
-        n_int = get_scenario_items(cont, "n_int", 0)
-        n_str = get_scenario_items(cont, "n_str", "default")
-        d_int = get_scenario_items(cont, "d_int", 0)
-        d_str = get_scenario_items(cont, "d_str", "default")
+        n_int = get_yaml_item_value(cont, "n_int", 0)
+        n_str = get_yaml_item_value(cont, "n_str", "default")
+        d_int = get_yaml_item_value(cont, "d_int", 0)
+        d_str = get_yaml_item_value(cont, "d_str", "default")
 
         self.assertEqual(n_int, 1)
         self.assertEqual(n_str, "value")
