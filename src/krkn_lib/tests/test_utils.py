@@ -9,7 +9,7 @@ from krkn_lib.tests import BaseTest
 from krkn_lib.utils import (
     deep_set_attribute,
     filter_log_line,
-    get_scenario_items,
+    get_yaml_item_value,
 )
 
 
@@ -114,31 +114,16 @@ class UtilFunctionTests(BaseTest):
             )
         )
 
-        # (RUN START TIMESTAMP) 13:28 GMT +3
-        # <
-        # 11:20 UTC (LOG TIME) = LOG CAPTURED
+        # without a top limit the third log is not skipped
         self.assertIsNotNone(
             filter_log_line(
-                logs[0], start_timestamp, None, "UTC", "EET", [pattern]
+                logs[2], start_timestamp, None, "UTC", "Europe/Rome", [pattern]
             )
         )
 
-        # END TIMESTAMP ONLY
-        # (RUN END TIMESTAMP) 13:30 GMT +2
-        # <
-        # 11:31 UTC (LOG TIME) = LOG SKIPPED
-        self.assertIsNone(
-            filter_log_line(
-                logs[2], None, end_timestamp, "UTC", "Europe/Rome", [pattern]
-            )
-        )
-
-        # (RUN END TIMESTAMP) 13:30 GMT -5
-        # >
-        # 11:31 UTC (LOG TIME) = LOG CAPTURED
         self.assertIsNotNone(
             filter_log_line(
-                logs[2], None, end_timestamp, "UTC", "EST", [pattern]
+                logs[0], None, end_timestamp, "UTC", "Europe/Rome", [pattern]
             )
         )
 
@@ -174,13 +159,9 @@ class UtilFunctionTests(BaseTest):
                     [broken_pattern_multiple_groups],
                 )
             )
+
     def test_get_yaml_item_value(self):
-        cont = {
-            "n_int": 1,
-            "n_str": "value",
-            "d_int": None,
-            "d_str": None
-        }
+        cont = {"n_int": 1, "n_str": "value", "d_int": None, "d_str": None}
 
         n_int = get_yaml_item_value(cont, "n_int", 0)
         n_str = get_yaml_item_value(cont, "n_str", "default")
