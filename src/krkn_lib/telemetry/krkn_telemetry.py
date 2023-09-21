@@ -1,17 +1,17 @@
 import base64
+import os
 import datetime
 import threading
 import time
+from queue import Queue
 from typing import Optional
 
-import yaml
 import requests
-import os
+import yaml
+
 import krkn_lib.utils as utils
-from queue import Queue
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
-
 from krkn_lib.utils.safe_logger import SafeLogger
 
 

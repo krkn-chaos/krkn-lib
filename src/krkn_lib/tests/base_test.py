@@ -5,11 +5,13 @@ import sys
 import tempfile
 import time
 import unittest
-from typing import List, Dict
+from typing import Dict, List
 
 import requests
-from jinja2 import FileSystemLoader, Environment
+import yaml
+from jinja2 import Environment, FileSystemLoader
 from kubernetes import config
+from kubernetes.client.rest import ApiException
 from requests import ConnectTimeout
 
 from krkn_lib.k8s import KrknKubernetes
@@ -101,6 +103,23 @@ class BaseTest(unittest.TestCase):
         template = self.template_to_pvc(name, storage_class, namespace)
         self.apply_template(template)
 
+    def deploy_deployment(self, name: str, namespace: str = "default"):
+        self.create_deployment(name, namespace)
+
+    def deploy_statefulset(
+        self, name: str, namespace: str = "default"
+    ):
+        self.create_statefulset(name, namespace)
+
+    def deploy_replicaset(self, name: str, namespace: str = "default"):
+        self.create_replicaset(name, namespace)
+
+    def deploy_service(self, name: str = "pause", namespace: str = "default"):
+        self.create_service(name, namespace)
+
+    def deploy_daemonset(self, name: str, namespace: str = "default"):
+        self.create_daemonset(name, namespace)
+
     def delete_fake_kraken(self, namespace: str = "default"):
         self.lib_k8s.delete_pod("kraken-deployment", namespace)
 
@@ -160,11 +179,23 @@ class BaseTest(unittest.TestCase):
         )
         return content
 
+    def file_to_template(self, file: str, name: str, namespace: str):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template(file)
+        content = template.render(name=name, namespace=namespace)
+        return content
+
     def apply_template(self, template: str):
         with tempfile.NamedTemporaryFile(mode="w") as file:
             file.write(template)
             file.flush()
             self.lib_k8s.apply_yaml(file.name, "")
+
+    def apply_apps_template(self, template: str):
+        with tempfile.NamedTemporaryFile(mode="w") as file:
+            file.write(template)
+            file.flush()
+            self.lib_k8s.apply_apps_yaml(file.name, "")
 
     def get_random_string(self, length: int) -> str:
         letters = string.ascii_lowercase
@@ -178,3 +209,134 @@ class BaseTest(unittest.TestCase):
             return True
         except Exception:
             return False
+
+    def create_deployment(self, name: str, namespace: str = "default"):
+        """
+        Create a deployment in a namespace
+
+        :param name: deployment name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        content = self.file_to_template("deployment.j2", name, namespace)
+
+        dep = yaml.safe_load(content)
+        self.lib_k8s.apps_api.create_namespaced_deployment(
+            body=dep, namespace=namespace
+        )
+
+    def create_daemonset(self, name: str, namespace: str = "default"):
+        """
+        Create a daemonset in a namespace
+
+        :param name: daemonset name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        try:
+            content = self.file_to_template("daemonset.j2", name, namespace)
+
+            daemonset = yaml.safe_load(content)
+            self.lib_k8s.apps_api.create_namespaced_daemon_set(
+                body=daemonset, namespace=namespace
+            )
+        except ApiException as api:
+            print(
+                "Exception when calling AppsV1Api->create_daemonset: %s", api
+            )
+            if api.status == 409:
+                print("DaemonSet already present")
+        except Exception as e:
+            logging.error(
+                "Exception when calling "
+                "BatchV1Api->create_namespaced_job: %s",
+                str(e),
+            )
+            raise e
+
+    def create_replicaset(self, name: str, namespace: str):
+        """
+        Create a replicaset in a namespace
+
+        :param name: replicaset name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        try:
+            content = self.file_to_template("replicaset.j2", name, namespace)
+
+            replicaset = yaml.safe_load(content)
+            self.lib_k8s.apps_api.create_namespaced_replica_set(
+                body=replicaset, namespace=namespace
+            )
+        except ApiException as api:
+            print(
+                "Exception when calling AppsV1Api->create_replicaset: %s", api
+            )
+            if api.status == 409:
+                print("Replicaset already present")
+        except Exception as e:
+            logging.error(
+                "Exception when calling " "AppsV1Api->create_replicaset: %s",
+                str(e),
+            )
+            raise e
+
+    def create_statefulset(self, name: str, namespace: str):
+        """
+        Create a statefulset in a namespace
+
+        :param name: statefulset name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        try:
+            content = self.file_to_template("statefulset.j2", name, namespace)
+
+            statefulset = yaml.safe_load(content)
+            self.lib_k8s.apps_api.create_namespaced_stateful_set(
+                body=statefulset, namespace=namespace
+            )
+        except ApiException as api:
+            print(
+                "Exception when calling AppsV1Api->create_statefulset: %s", api
+            )
+            if api.status == 409:
+                print("Statefulset already present")
+        except Exception as e:
+            logging.error(
+                "Exception when calling " "AppsV1Api->create_replicaset: %s",
+                str(e),
+            )
+            raise e
+
+    def create_service(self, name: str, namespace: str):
+        """
+        Create a service in a namespace
+
+        :param name: service name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        try:
+            content = self.file_to_template("service.j2", name, namespace)
+
+            service_manifest = yaml.safe_load(content)
+            self.lib_k8s.cli.create_namespaced_service(
+                body=service_manifest, namespace=namespace
+            )
+        except ApiException as api:
+            print("Exception when calling CoreV1Api->create_service: %s", api)
+            if api.status == 409:
+                print("Service already present")
+        except Exception as e:
+            logging.error(
+                "Exception when calling " "CoreV1Api->create_service: %s",
+                str(e),
+            )
+            raise e

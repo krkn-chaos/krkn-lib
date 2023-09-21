@@ -1,6 +1,6 @@
 import datetime
 import logging
-from queue import Queue, Empty
+from queue import Empty, Queue
 from threading import Thread
 
 

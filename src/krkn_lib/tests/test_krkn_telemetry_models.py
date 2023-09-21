@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from krkn_lib.models.telemetry import ScenarioTelemetry, ChaosRunTelemetry
+from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 
 
 class KrknTelemetryModelsTests(unittest.TestCase):
