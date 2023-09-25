@@ -24,6 +24,41 @@ class KrknTelemetry:
         self.kubecli = lib_kubernetes
         self.safe_logger = safe_logger
 
+    def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
+        """
+        Collects useful cluster metadata:
+        - cloud infrastructure
+        - network plugins
+        - number of objects deployed
+        - node system infos
+        to enrich the ChaosRunTelemetry object that will be sent to the
+        telemetry service:
+
+        :param chaos_telemetry: the chaos telemetry to be enriched by
+            the cluster metadata
+        """
+        self.safe_logger.info("collecting telemetry data, please wait....")
+        chaos_telemetry.cloud_infrastructure = (
+            self.kubecli.get_cluster_infrastructure()
+        )
+        chaos_telemetry.network_plugins = (
+            self.kubecli.get_cluster_network_plugins()
+        )
+        chaos_telemetry.kubernetes_objects_count = (
+            self.kubecli.get_all_kubernetes_object_count(
+                [
+                    "Deployment",
+                    "Pod",
+                    "Secret",
+                    "ConfigMap",
+                    "Build",
+                    "Route",
+                ]
+            )
+        )
+        chaos_telemetry.node_infos = self.kubecli.get_nodes_infos()
+        chaos_telemetry.node_count = len(chaos_telemetry.node_infos)
+
     def send_telemetry(
         self,
         telemetry_config: dict,
@@ -40,28 +75,6 @@ class KrknTelemetry:
         """
         enabled = telemetry_config.get("enabled")
         if enabled:
-            self.safe_logger.info("collecting telemetry data, please wait....")
-            chaos_telemetry.cloud_infrastructure = (
-                self.kubecli.get_cluster_infrastructure()
-            )
-            chaos_telemetry.network_plugins = (
-                self.kubecli.get_cluster_network_plugins()
-            )
-            chaos_telemetry.kubernetes_objects_count = (
-                self.kubecli.get_all_kubernetes_object_count(
-                    [
-                        "Deployment",
-                        "Pod",
-                        "Secret",
-                        "ConfigMap",
-                        "Build",
-                        "Route",
-                    ]
-                )
-            )
-            chaos_telemetry.node_infos = self.kubecli.get_nodes_infos()
-            chaos_telemetry.node_count = len(chaos_telemetry.node_infos)
-
             url = telemetry_config.get("api_url")
             username = telemetry_config.get("username")
             password = telemetry_config.get("password")

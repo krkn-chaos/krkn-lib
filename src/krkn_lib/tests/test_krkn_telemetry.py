@@ -186,6 +186,22 @@ class KrknTelemetryTests(BaseTest):
         )
         self.assertEqual(len(remote_files["Contents"]), len(file_list))
 
+    def test_collect_cluster_metadata(self):
+        chaos_telemetry = ChaosRunTelemetry()
+        self.assertEqual(len(chaos_telemetry.node_infos), 0)
+        self.assertEqual(chaos_telemetry.node_count, 0)
+        self.assertEqual(
+            len(chaos_telemetry.kubernetes_objects_count.keys()), 0
+        )
+        self.assertEqual(len(chaos_telemetry.network_plugins), 0)
+        self.lib_telemetry.collect_cluster_metadata(chaos_telemetry)
+        self.assertNotEqual(len(chaos_telemetry.node_infos), 0)
+        self.assertNotEqual(chaos_telemetry.node_count, 0)
+        self.assertNotEqual(
+            len(chaos_telemetry.kubernetes_objects_count.keys()), 0
+        )
+        self.assertNotEqual(len(chaos_telemetry.network_plugins), 0)
+
     def test_send_telemetry(self):
         request_id = f"test_folder/{int(time.time())}"
         telemetry_config = {
@@ -199,6 +215,7 @@ class KrknTelemetryTests(BaseTest):
             "enabled": True,
         }
         chaos_telemetry = ChaosRunTelemetry()
+        self.lib_telemetry.collect_cluster_metadata(chaos_telemetry)
         try:
             self.lib_telemetry.send_telemetry(
                 telemetry_config, request_id, chaos_telemetry

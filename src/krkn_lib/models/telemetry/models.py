@@ -107,7 +107,16 @@ class ChaosRunTelemetry:
     """
     List of the scenarios performed during the chaos run
     """
-    node_infos: list[NodeInfo] = list[NodeInfo]
+    node_infos: list[NodeInfo]
+    """
+    Cloud infrastructure (if available) of the target cluster
+    """
+    kubernetes_objects_count: dict[str, int]
+    """
+    Dictionary containing the number of objects deployed
+    in the cluster during the chaos run
+    """
+    network_plugins: list[str]
     """
     List of node Infos collected from the target cluster
     """
@@ -117,15 +126,6 @@ class ChaosRunTelemetry:
     """
     cloud_infrastructure: str = "Unknown"
     """
-    Cloud infrastructure (if available) of the target cluster
-    """
-    kubernetes_objects_count: dict[str, int] = dict[str, int]
-    """
-    Dictionary containing the number of objects deployed
-    in the cluster during the chaos run
-    """
-    network_plugins: list[str] = list[str]
-    """
     Network plugins deployed in the target cluster
     """
     run_uuid: str = ""
@@ -134,7 +134,10 @@ class ChaosRunTelemetry:
     """
 
     def __init__(self, json_object: any = None):
-        self.scenarios = []
+        self.scenarios = list[ScenarioTelemetry]()
+        self.node_infos = list[NodeInfo]()
+        self.kubernetes_objects_count = dict[str, int]()
+        self.network_plugins = list[str]()
         if json_object is not None:
             scenarios = json_object.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
