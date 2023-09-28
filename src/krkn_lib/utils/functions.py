@@ -135,8 +135,6 @@ def filter_log_line(
                 ).replace(tzinfo=remote_tz)
                 break
 
-        logging.error("-----START CHECK ----")
-        logging.error(f"log: {localized_log_date}")
         if start_timestamp is not None:
             start_date = datetime.datetime.fromtimestamp(
                 start_timestamp, tz=local_tz
@@ -149,12 +147,8 @@ def filter_log_line(
             end_check = localized_log_date <= end_date
 
         if start_check and end_check:
-            logging.error("GRABBED")
-            logging.error("-----END CHECK ----")
             return log_line
         else:
-            logging.error("SKIPPED")
-            logging.error("-----END CHECK ----")
             return None
     except ParserError:
         logging.warning(f"failed to parse date from line: {log_line}")
