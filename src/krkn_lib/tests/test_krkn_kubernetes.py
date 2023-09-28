@@ -17,6 +17,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.tests import BaseTest
+from krkn_lib.utils import SafeLogger
 
 
 class KrknKubernetesTests(BaseTest):
@@ -774,6 +775,7 @@ class KrknKubernetesTests(BaseTest):
             end,
             filter_patterns,
             5,
+            SafeLogger(),
         )
 
 

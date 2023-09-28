@@ -2036,6 +2036,7 @@ class KrknKubernetes:
         end_timestamp: Optional[int],
         log_filter_patterns: list[str],
         threads: int,
+        safe_logger: SafeLogger,
         oc_path: str = None,
     ) -> str:
         """
@@ -2056,6 +2057,8 @@ class KrknKubernetes:
         :param log_filter_patterns: a list of regex that will match and
             extract the time info that will be parsed by dateutil.parser
             (it supports several formats by default but not every date format)
+        :param safe_logger: thread safe logger used to log
+            the output on a file stream
         :param oc_path: the path of the `oc` CLI, if None will
             be searched in the PATH
 
@@ -2065,7 +2068,7 @@ class KrknKubernetes:
         OC_COMMAND = "oc"
 
         if oc_path is None and shutil.which(OC_COMMAND) is None:
-            logging.error(
+            safe_logger.error(
                 f"{OC_COMMAND} command not found in $PATH,"
                 f" skipping log collection"
             )
@@ -2073,7 +2076,7 @@ class KrknKubernetes:
         oc = shutil.which(OC_COMMAND)
         if oc_path is not None:
             if not os.path.exists(oc_path):
-                logging.error(
+                safe_logger.error(
                     f"provided oc command path: {oc_path} is not valid"
                 )
                 raise Exception(
@@ -2090,7 +2093,7 @@ class KrknKubernetes:
             dst_dir = os.path.expanduser(dst_dir)
 
         if not os.path.exists(kubeconfig_path):
-            logging.error(
+            safe_logger.error(
                 f"provided kubeconfig path: {kubeconfig_path} is not valid"
             )
             raise Exception(
@@ -2098,17 +2101,17 @@ class KrknKubernetes:
             )
 
         if not os.path.exists(src_dir):
-            logging.error(f"provided workdir path: {src_dir} is not valid")
+            safe_logger.error(f"provided workdir path: {src_dir} is not valid")
             raise Exception(f"provided workdir path: {src_dir} is not valid")
 
         if not os.path.exists(dst_dir):
-            logging.error(f"provided workdir path: {dst_dir} is not valid")
+            safe_logger.error(f"provided workdir path: {dst_dir} is not valid")
             raise Exception(f"provided workdir path: {dst_dir} is not valid")
 
         # COLLECT: run must-gather in workdir folder
         cur_dir = os.getcwd()
         os.chdir(src_dir)
-        logging.info(f"collecting openshift logs in {src_dir}....")
+        safe_logger.info(f"collecting openshift logs in {src_dir}...")
         try:
             subprocess.Popen(
                 [oc, "adm", "must-gather", "--kubeconfig", kubeconfig_path],
@@ -2116,7 +2119,7 @@ class KrknKubernetes:
             ).wait()
             os.chdir(cur_dir)
         except Exception as e:
-            logging.error(
+            safe_logger.error(
                 f"failed to collect data from openshift "
                 f"with oc command: {str(e)}"
             )
@@ -2124,7 +2127,7 @@ class KrknKubernetes:
 
         # FILTER: filtering logs in
         try:
-            logging.info(f"filtering openshift logs in {dst_dir}...")
+            safe_logger.info(f"filtering openshift logs in {dst_dir}...")
             self.filter_must_gather_ocp_log_folder(
                 src_dir,
                 dst_dir,
@@ -2135,7 +2138,7 @@ class KrknKubernetes:
                 log_filter_patterns,
             )
         except Exception as e:
-            logging.error(f"failed to filter logs: {str(e)}")
+            safe_logger.error(f"failed to filter logs: {str(e)}")
             raise e
 
         # ARCHIVE: creating tar archive of filtered files
@@ -2146,6 +2149,6 @@ class KrknKubernetes:
                     path = os.path.join(dst_dir, file)
                     tar.add(path, arcname=file)
         except Exception as e:
-            logging.error(f"failed to create logs archive: {str(e)}")
+            safe_logger.error(f"failed to create logs archive: {str(e)}")
 
         return archive_name

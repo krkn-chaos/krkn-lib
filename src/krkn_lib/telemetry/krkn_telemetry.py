@@ -1,6 +1,5 @@
 import base64
 import datetime
-import logging
 import threading
 import time
 from typing import Optional
@@ -417,6 +416,7 @@ class KrknTelemetry:
                 end_timestamp,
                 logs_filter_patterns,
                 backup_threads,
+                self.safe_logger,
                 oc_cli_path,
             )
             # volume_number : 0 only one file
@@ -424,12 +424,13 @@ class KrknTelemetry:
             # retries: 0
             queue.put((0, archive_path, 0))
         except Exception as e:
-            logging.error(f"failed to collect ocp logs: {str(e)}")
+            self.safe_logger.error(f"failed to collect ocp logs: {str(e)}")
             raise e
         # this parameter has doesn't have an utility in this context
         # used to match the method signature and reuse it (Poor design?)
         uploaded_files = list[str]()
         queue_size = queue.qsize()
+        self.safe_logger.info("uploading ocp logs...")
         worker = threading.Thread(
             target=self.generate_url_and_put_to_s3_worker,
             args=(
@@ -449,6 +450,7 @@ class KrknTelemetry:
         worker.daemon = True
         worker.start()
         queue.join()
+        self.safe_logger.info("ocp logs successfully uploaded")
 
     def generate_url_and_put_to_s3_worker(
         self,
