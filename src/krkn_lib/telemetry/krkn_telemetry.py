@@ -417,7 +417,6 @@ class KrknTelemetry:
                 end_timestamp,
                 logs_filter_patterns,
                 backup_threads,
-                request_id,
                 oc_cli_path,
             )
             # volume_number : 0 only one file
