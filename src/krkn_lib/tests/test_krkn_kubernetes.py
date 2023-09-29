@@ -657,16 +657,6 @@ class KrknKubernetesTests(BaseTest):
             self.assertTrue(node.kernel_version)
             self.assertTrue(node.kubelet_version)
 
-    def test_get_cluster_infrastructure(self):
-        resp = self.lib_k8s.get_cluster_infrastructure()
-        self.assertTrue(resp)
-        self.assertEqual(resp, "Unknown")
-
-    def test_get_cluster_network_plugins(self):
-        resp = self.lib_k8s.get_cluster_network_plugins()
-        self.assertTrue(len(resp) > 0)
-        self.assertEqual(resp[0], "Unknown")
-
     def test_download_folder_from_pod_as_archive(self):
         workdir_basepath = os.getenv("TEST_WORKDIR")
         workdir = self.get_random_string(10)

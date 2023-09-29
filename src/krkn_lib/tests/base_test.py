@@ -15,17 +15,20 @@ from kubernetes.client.rest import ApiException
 from requests import ConnectTimeout
 
 from krkn_lib.k8s import KrknKubernetes
+from krkn_lib.openshift import KrknOpenshift
 from krkn_lib.telemetry import KrknTelemetry
 from krkn_lib.utils import SafeLogger
 
 
 class BaseTest(unittest.TestCase):
     lib_k8s: KrknKubernetes
+    lib_ocp: KrknOpenshift
     lib_telemetry: KrknTelemetry
 
     @classmethod
     def setUpClass(cls):
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
+        cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry = KrknTelemetry(SafeLogger(), cls.lib_k8s)
         host = cls.lib_k8s.api_client.configuration.host
         # logging.disable(logging.CRITICAL)
