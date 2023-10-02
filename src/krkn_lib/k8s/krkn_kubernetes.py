@@ -8,7 +8,6 @@ import tarfile
 import tempfile
 import threading
 import time
-from pathlib import Path
 from queue import Queue
 from typing import Dict, List, Optional
 import arcaflow_lib_kubernetes
@@ -19,7 +18,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
-from tzlocal import get_localzone
+
 from krkn_lib.models.k8s import (
     PVC,
     ApiRequestException,
