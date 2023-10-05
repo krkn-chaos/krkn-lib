@@ -28,7 +28,7 @@ class BaseTest(unittest.TestCase):
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry = KrknTelemetry(SafeLogger(), cls.lib_k8s)
         host = cls.lib_k8s.api_client.configuration.host
-        # logging.disable(logging.CRITICAL)
+        logging.disable(logging.CRITICAL)
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:
@@ -106,9 +106,7 @@ class BaseTest(unittest.TestCase):
     def deploy_deployment(self, name: str, namespace: str = "default"):
         self.create_deployment(name, namespace)
 
-    def deploy_statefulset(
-        self, name: str, namespace: str = "default"
-    ):
+    def deploy_statefulset(self, name: str, namespace: str = "default"):
         self.create_statefulset(name, namespace)
 
     def deploy_replicaset(self, name: str, namespace: str = "default"):
