@@ -1,4 +1,7 @@
+import ast
 import logging
+import os
+import random
 import re
 import subprocess
 import tarfile
@@ -8,30 +11,25 @@ import time
 from pathlib import Path
 from queue import Queue
 from typing import Dict, List, Optional
-import ast
-
 import arcaflow_lib_kubernetes
 import kubernetes
-import os
-import random
-
-from kubernetes import client, config, utils, watch
 from kubeconfig import KubeConfig
+from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
 from tzlocal import get_localzone
 from krkn_lib.models.k8s import (
-    Pod,
     PVC,
     ApiRequestException,
-    VolumeMount,
-    Container,
-    Volume,
-    LitmusChaosObject,
     ChaosEngine,
     ChaosResult,
+    Container,
+    LitmusChaosObject,
+    Pod,
+    Volume,
+    VolumeMount,
 )
 from krkn_lib.models.telemetry import NodeInfo
 from krkn_lib.utils import filter_log_file_worker, find_executable_in_path
@@ -53,6 +51,7 @@ class KrknKubernetes:
     dyn_client: kubernetes.dynamic.client.DynamicClient = None
     __kubeconfig_string: str = None
     __kubeconfig_path: str = None
+    apps_api: client.AppsV1Api = None
 
     def __init__(
         self,
@@ -135,6 +134,7 @@ class KrknKubernetes:
                 config_file=kubeconfig_path
             )
             self.cli = client.CoreV1Api(self.k8s_client)
+            self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
             self.custom_object_client = client.CustomObjectsApi(
                 self.k8s_client
@@ -167,6 +167,7 @@ class KrknKubernetes:
             self.api_client = arcaflow_lib_kubernetes.connect(connection)
             self.cli = client.CoreV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.api_client)
+            self.apps_api = client.AppsV1Api(self.api_client)
             self.watch_resource = watch.Watch()
             self.custom_object_client = client.CustomObjectsApi(
                 self.api_client
@@ -436,7 +437,6 @@ class KrknKubernetes:
                 managedclusters.append(managedcluster["metadata"]["name"])
         return managedclusters
 
-    #
     def list_pods(
         self, namespace: str, label_selector: str = None
     ) -> list[str]:
@@ -466,6 +466,166 @@ class KrknKubernetes:
             pods.append(pod.metadata.name)
         return pods
 
+    def get_daemonset(self, namespace: str) -> list[str]:
+        """
+        Return a list of daemon set names
+
+        :param namespace: namespace to find daemonsets in
+        :return: list of daemonset names
+        """
+        daemonsets = []
+        try:
+            ret = self.apps_api.list_namespaced_daemon_set(
+                namespace, pretty=True
+            )
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_daemon_set: %s\n",
+                str(e),
+            )
+            raise e
+        for daemonset in ret.items:
+            daemonsets.append(daemonset.metadata.name)
+        return daemonsets
+
+    def get_deployment_ns(self, namespace: str) -> list[str]:
+        """
+        Return a list of deployment set names
+
+        :param namespace: namespace to find deployments in
+        :return: list of deployment names
+        """
+        deployments = []
+        try:
+            ret = self.apps_api.list_namespaced_deployment(
+                namespace, pretty=True
+            )
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_deployment: %s\n",
+                str(e),
+            )
+            raise e
+        for deployment in ret.items:
+            deployments.append(deployment.metadata.name)
+        return deployments
+
+    def delete_deployment(self, name: str, namespace: str):
+        """
+        Delete a deployments given a certain name and namespace
+
+        :param name: name of deployment
+        :param namespace: namespace deployment is in
+        """
+        try:
+            self.apps_api.delete_namespaced_deployment(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Deployment already deleted")
+            else:
+                logging.error("Failed to delete deployment %s", str(e))
+                raise e
+
+    def delete_daemonset(self, name: str, namespace: str):
+        """
+        Delete a daemonset given a certain name and namespace
+
+        :param name: name of daemonset
+        :param namespace: namespace daemonset is in
+        """
+        try:
+            self.apps_api.delete_namespaced_daemon_set(name, namespace)
+            while self.apps_api.read_namespaced_daemon_set(
+                name=name, namespace=namespace
+            ):
+                time.sleep(1)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Daemon Set already deleted")
+            else:
+                logging.error("Failed to delete daemonset %s", str(e))
+                raise e
+
+    def delete_statefulset(self, name: str, namespace: str):
+        """
+        Delete a statefulset given a certain name and namespace
+
+        :param name: name of statefulset
+        :param namespace: namespace statefulset is in
+        """
+        try:
+            self.apps_api.delete_namespaced_stateful_set(name, namespace)
+            while self.apps_api.read_namespaced_stateful_set(
+                name=name, namespace=namespace
+            ):
+                time.sleep(1)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Statefulset already deleted")
+            else:
+                logging.error("Failed to delete statefulset %s", str(e))
+                raise e
+
+    def delete_replicaset(self, name: str, namespace: str):
+        """
+        Delete a replicaset given a certain name and namespace
+
+        :param name: name of replicaset
+        :param namespace: namespace replicaset is in
+        """
+        try:
+            self.apps_api.delete_namespaced_replica_set(name, namespace)
+            while self.apps_api.read_namespaced_replica_set(
+                name=name, namespace=namespace
+            ):
+                time.sleep(1)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Replica set already deleted")
+            else:
+                logging.error("Failed to delete replicaset %s", str(e))
+                raise e
+
+    def delete_services(self, name: str, namespace: str):
+        """
+        Delete a service given a certain name and namespace
+
+        :param name: name of service
+        :param namespace: namespace service is in
+        """
+        try:
+            self.cli.delete_namespaced_service(name, namespace)
+            while self.cli.read_namespaced_service(
+                name=name, namespace=namespace
+            ):
+                time.sleep(1)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Service already deleted")
+            else:
+                logging.error("Failed to delete service %s", str(e))
+                raise e
+
+    def get_deployment_ready(self, name: str, namespace: str):
+        """
+        Return a deployments detailed information
+
+        :param name: name of deployment
+        :param namespace: namespace deployment is in
+        """
+        try:
+            return self.apps_api.read_namespaced_deployment_scale(
+                name, namespace
+            )
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Get deployment data")
+            else:
+                logging.error("Failed to get deployment data %s", str(e))
+                raise e
+
     def get_all_pods(self, label_selector: str = None) -> list[[str, str]]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
@@ -484,6 +644,73 @@ class KrknKubernetes:
         for pod in ret.items:
             pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
+
+    def get_all_statefulset(self, namespace) -> list[str]:
+        """
+        Return a list of statefulset names
+
+        :param namespace: find only statefulset in given namespace
+        :return: list of statefulset names
+        """
+        sss = []
+        try:
+            ret = self.apps_api.list_namespaced_stateful_set(
+                namespace, pretty=True
+            )
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_stateful_set: %s\n",
+                str(e),
+            )
+            raise e
+        for ss in ret.items:
+            sss.append(ss.metadata.name)
+        return sss
+
+    def get_all_replicasets(self, namespace: str) -> list[str]:
+        """
+        Return a list of replicasets names
+
+        :param namespace: find only replicasets in given namespace
+        :return: list of replicasets names
+        """
+        rss = []
+        try:
+            ret = self.apps_api.list_namespaced_replica_set(
+                namespace, pretty=True
+            )
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_replica_set: %s\n",
+                str(e),
+            )
+            raise e
+        for rs in ret.items:
+            rss.append(rs.metadata.name)
+        return rss
+
+    def get_all_services(self, namespace: str) -> list[str]:
+        """
+        Return a list of service names
+
+        :param namespace: find only services in given namespace
+        :return: list of service names
+        """
+        services = []
+        try:
+            ret = self.cli.list_namespaced_service(namespace, pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "CoreV1Api->list_namespaced_service: %s\n",
+                str(e),
+            )
+            raise e
+        for serv in ret.items:
+            services.append(serv.metadata.name)
+        return services
 
     # to be tested, return value not sure
     def exec_cmd_in_pod(
@@ -963,6 +1190,7 @@ class KrknKubernetes:
                 containers=container_list,
                 nodeName=response.spec.node_name,
                 volumes=volume_list,
+                status=response.status.phase,
             )
             return pod_info
         else:

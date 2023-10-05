@@ -1,20 +1,16 @@
 import datetime
 import os
+import random
+import re
 import tempfile
 import time
 import unittest
 import uuid
-
 import yaml
 import logging
-import random
-import re
-
 from kubernetes import config
 from kubernetes.client import ApiException
-
 from jinja2 import Environment, FileSystemLoader
-
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
@@ -282,6 +278,67 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
+
+    def test_delete_deployment(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.deploy_deployment(name, namespace)
+        deps = self.lib_k8s.get_deployment_ns(namespace=namespace)
+        self.assertTrue(len(deps) == 1)
+        self.lib_k8s.delete_deployment(name, namespace)
+        deps = self.lib_k8s.get_deployment_ns(namespace=namespace)
+        self.assertTrue(len(deps) == 0)
+        self.lib_k8s.delete_namespace(namespace)
+
+    def test_delete_statefulsets(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.deploy_statefulset(name, namespace)
+        ss = self.lib_k8s.get_all_statefulset(namespace=namespace)
+        self.assertTrue(len(ss) == 1)
+        self.lib_k8s.delete_statefulset(name, namespace)
+        ss = self.lib_k8s.get_all_statefulset(namespace=namespace)
+        self.assertTrue(len(ss) == 0)
+        self.lib_k8s.delete_namespace(namespace)
+
+    def test_delete_daemonset(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.deploy_daemonset(name, namespace)
+        daemonset = self.lib_k8s.get_daemonset(namespace=namespace)
+        self.assertTrue(len(daemonset) == 1)
+        self.lib_k8s.delete_daemonset(name, namespace)
+
+        daemonset = self.lib_k8s.get_daemonset(namespace=namespace)
+        self.assertTrue(len(daemonset) == 0)
+        self.lib_k8s.delete_namespace(namespace)
+
+    def test_delete_services(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.deploy_service(name, namespace)
+        services = self.lib_k8s.get_all_services(namespace=namespace)
+        self.assertTrue(len(services) == 1)
+        self.lib_k8s.delete_services(name, namespace)
+        services = self.lib_k8s.get_all_services(namespace=namespace)
+        self.assertTrue(len(services) == 0)
+        self.lib_k8s.delete_namespace(namespace)
+
+    def test_delete_replicaset(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.deploy_replicaset(name, namespace)
+        replicaset = self.lib_k8s.get_all_replicasets(namespace=namespace)
+        self.assertTrue(len(replicaset) == 1)
+        self.lib_k8s.delete_replicaset(name, namespace)
+        replicaset = self.lib_k8s.get_all_replicasets(namespace=namespace)
+        self.assertTrue(len(replicaset) == 0)
+        self.lib_k8s.delete_namespace(namespace)
 
     def test_delete_job(self):
         namespace = "test-ns-" + self.get_random_string(10)
