@@ -494,9 +494,9 @@ class KrknKubernetes:
 
     def delete_deployment(self, name: str, namespace: str):
         """
-        Return a list of deployment set names
+        Delete a deployments given a certain name and namespace
 
-        :param name: name of deployments 
+        :param name: name of deployment
         :param namespace: namespace deployment is in 
         """
         try:
@@ -510,7 +510,7 @@ class KrknKubernetes:
 
     def delete_daemonset(self, name: str, namespace: str):
         """
-        Return a list of daemonset set names
+        Delete a daemonset given a certain name and namespace
 
         :param name: name of daemonset 
         :param namespace: namespace daemonset is in 
@@ -530,10 +530,10 @@ class KrknKubernetes:
 
     def delete_statefulset(self, name: str, namespace: str):
         """
-        Return a list of daemonset set names
+        Delete a statefulset given a certain name and namespace
 
-        :param name: name of daemonset 
-        :param namespace: namespace daemonset is in 
+        :param name: name of statefulset 
+        :param namespace: namespace statefulset is in 
         """
         try:
             self.apps_api.delete_namespaced_stateful_set(name, namespace)
@@ -550,7 +550,7 @@ class KrknKubernetes:
 
     def delete_replicaset(self, name: str, namespace: str):
         """
-        Return a list of replicaset set names
+        Delete a replicaset given a certain name and namespace
 
         :param name: name of replicaset 
         :param namespace: namespace replicaset is in 
@@ -570,7 +570,7 @@ class KrknKubernetes:
 
     def delete_services(self, name: str, namespace: str):
         """
-        Return a list of service set names
+        Delete a service given a certain name and namespace
 
         :param name: name of service 
         :param namespace: namespace service is in 
@@ -601,9 +601,9 @@ class KrknKubernetes:
             )
         except ApiException as e:
             if e.status == 404:
-                logging.info("Deployment already deleted")
+                logging.info("Get deployment data")
             else:
-                logging.error("Failed to delete deployment %s", str(e))
+                logging.error("Failed to get deployment data %s", str(e))
                 raise e
 
     def get_all_pods(self, label_selector: str = None) -> list[[str, str]]:
