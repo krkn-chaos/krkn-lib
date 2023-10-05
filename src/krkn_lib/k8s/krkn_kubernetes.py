@@ -474,7 +474,14 @@ class KrknKubernetes:
         :return: list of daemonset names
         """
         daemonsets = []
-        ret = self.apps_api.list_namespaced_daemon_set(namespace, pretty=True)
+        try: 
+            ret = self.apps_api.list_namespaced_daemon_set(namespace, pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling AppsV1Api->list_namespaced_daemon_set: %s\n",
+                str(e),
+            )
+            raise e
         for daemonset in ret.items:
             daemonsets.append(daemonset.metadata.name)
         return daemonsets
@@ -487,7 +494,14 @@ class KrknKubernetes:
         :return: list of deployment names
         """
         deployments = []
-        ret = self.apps_api.list_namespaced_deployment(namespace, pretty=True)
+        try: 
+            ret = self.apps_api.list_namespaced_deployment(namespace, pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling AppsV1Api->list_namespaced_deployment: %s\n",
+                str(e),
+            )
+            raise e
         for deployment in ret.items:
             deployments.append(deployment.metadata.name)
         return deployments
@@ -525,7 +539,7 @@ class KrknKubernetes:
             if e.status == 404:
                 logging.info("Daemon Set already deleted")
             else:
-                logging.error("Failed to delete daemon set %s", str(e))
+                logging.error("Failed to delete daemonset %s", str(e))
                 raise e
 
     def delete_statefulset(self, name: str, namespace: str):
@@ -545,7 +559,7 @@ class KrknKubernetes:
             if e.status == 404:
                 logging.info("Statefulset already deleted")
             else:
-                logging.error("Failed to delete stateful set %s", str(e))
+                logging.error("Failed to delete statefulset %s", str(e))
                 raise e
 
     def delete_replicaset(self, name: str, namespace: str):
@@ -565,7 +579,7 @@ class KrknKubernetes:
             if e.status == 404:
                 logging.info("Replica set already deleted")
             else:
-                logging.error("Failed to delete replica set %s", str(e))
+                logging.error("Failed to delete replicaset %s", str(e))
                 raise e
 
     def delete_services(self, name: str, namespace: str):
@@ -630,41 +644,59 @@ class KrknKubernetes:
         Return a list of statefulset names
 
         :param namespace: find only statefulset in given namespace
-            (optional default `None`)
         :return: list of statefulset names
         """
         sss = []
-        ret = self.apps_api.list_namespaced_stateful_set(
-            namespace, pretty=True
-        )
+        try: 
+            ret = self.apps_api.list_namespaced_stateful_set(
+                namespace, pretty=True
+            )
+        except ApiException as e:
+            logging.error(
+                "Exception when calling AppsV1Api->list_namespaced_stateful_set: %s\n",
+                str(e),
+            )
+            raise e
         for ss in ret.items:
             sss.append(ss.metadata.name)
         return sss
 
-    def get_all_replicasets(self, namespace) -> list[str]:
+    def get_all_replicasets(self, namespace: str) -> list[str]:
         """
         Return a list of replicasets names
 
         :param namespace: find only replicasets in given namespace
-            (optional default `None`)
         :return: list of replicasets names
         """
         rss = []
-        ret = self.apps_api.list_namespaced_replica_set(namespace, pretty=True)
+        try: 
+            ret = self.apps_api.list_namespaced_replica_set(namespace, pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling AppsV1Api->list_namespaced_replica_set: %s\n",
+                str(e),
+            )
+            raise e
         for rs in ret.items:
             rss.append(rs.metadata.name)
         return rss
 
-    def get_all_services(self, namespace) -> list[str]:
+    def get_all_services(self, namespace: str) -> list[str]:
         """
-        Return a list of tuples containing pod name [0] and namespace [1]
+        Return a list of service names
 
-        :param label_selector: filter by label_selector
-            (optional default `None`)
-        :return: list of tuples pod,namespace
+        :param namespace: find only services in given namespace
+        :return: list of service names
         """
         services = []
-        ret = self.cli.list_namespaced_service(namespace, pretty=True)
+        try: 
+            ret = self.cli.list_namespaced_service(namespace, pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->list_namespaced_service: %s\n",
+                str(e),
+            )
+            raise e
         for serv in ret.items:
             services.append(serv.metadata.name)
         return services
@@ -1087,20 +1119,6 @@ class KrknKubernetes:
 
         return utils.create_from_yaml(
             self.api_client, yaml_file=path, namespace=namespace
-        )
-
-    def apply_apps_yaml(self, path, namespace="default") -> list[str]:
-        """
-        Apply yaml config to create Kubernetes resources
-
-        :param path:  path to the YAML file
-        :param namespace: namespace to create
-            the resource (optional default `default`)
-        :return: the list of names of created objects
-        """
-
-        return utils.create_from_yaml(
-            self.apps_api, yaml_file=path, namespace=namespace
         )
 
     def get_pod_info(self, name: str, namespace: str = "default") -> Pod:

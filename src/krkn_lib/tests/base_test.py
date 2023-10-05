@@ -191,12 +191,6 @@ class BaseTest(unittest.TestCase):
             file.flush()
             self.lib_k8s.apply_yaml(file.name, "")
 
-    def apply_apps_template(self, template: str):
-        with tempfile.NamedTemporaryFile(mode="w") as file:
-            file.write(template)
-            file.flush()
-            self.lib_k8s.apply_apps_yaml(file.name, "")
-
     def get_random_string(self, length: int) -> str:
         letters = string.ascii_lowercase
         return "".join(random.choice(letters) for i in range(length))
