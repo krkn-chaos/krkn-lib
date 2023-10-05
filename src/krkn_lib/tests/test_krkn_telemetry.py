@@ -1,4 +1,5 @@
 import base64
+import datetime
 import os
 import tempfile
 import time
@@ -6,8 +7,12 @@ import unittest
 import uuid
 import boto3
 import yaml
+
+from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
+from krkn_lib.telemetry import KrknTelemetry
 from krkn_lib.tests import BaseTest
+from krkn_lib.utils import SafeLogger
 
 
 class KrknTelemetryTests(BaseTest):
@@ -159,7 +164,7 @@ class KrknTelemetryTests(BaseTest):
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
             "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-            "backup_threads": "6",
+            "backup_threads": 6,
             "archive_path": test_workdir,
             "prometheus_backup": "True",
         }
@@ -209,7 +214,7 @@ class KrknTelemetryTests(BaseTest):
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
             "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-            "backup_threads": "6",
+            "backup_threads": 6,
             "archive_path": request_id,
             "prometheus_backup": "True",
             "enabled": True,
@@ -241,7 +246,7 @@ class KrknTelemetryTests(BaseTest):
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
             "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-            "backup_threads": "6",
+            "backup_threads": 6,
             "archive_path": test_workdir,
             "prometheus_backup": "True",
             "enabled": True,
@@ -273,6 +278,49 @@ class KrknTelemetryTests(BaseTest):
                 )
             except Exception as e:
                 self.assertTrue(False, f"test failed with exception: {str(e)}")
+
+    def _test_put_ocp_logs(self):
+        ##################################################
+        # This test is incomplete and inactive because   #
+        # we don't have an OCP Integration     env yet.  #
+        ##################################################
+
+        krkn_kubernetes = KrknKubernetes(
+            kubeconfig_path="~/OCP/auth/kubeconfig"
+        )
+        safe_logger = SafeLogger()
+        krkn_telemetry = KrknTelemetry(safe_logger, krkn_kubernetes)
+
+        test_workdir = "/tmp/"
+        telemetry_config = {
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "backup_threads": 6,
+            "archive_path": test_workdir,
+            "prometheus_backup": "True",
+            "enabled": True,
+            "logs_backup": True,
+            "logs_filter_patterns": [
+                # Sep 9 11:20:36.123425532
+                r"(\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2}\.\d+).+",
+                # kinit 2023/09/15 11:20:36 log
+                r"kinit (\d+/\d+/\d+\s\d{2}:\d{2}:\d{2})\s+",
+                # 2023-09-15T11:20:36.123425532Z log
+                r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+",
+            ],
+        }
+        now = datetime.datetime.now()
+
+        ten_minutes_ago = now - datetime.timedelta(minutes=10)
+        ten_minutes_fwd = now + datetime.timedelta(minutes=10)
+        krkn_telemetry.put_ocp_logs(
+            f"test-must-gather-{str(uuid.uuid1())}",
+            telemetry_config,
+            int(ten_minutes_ago.timestamp()),
+            int(ten_minutes_fwd.timestamp()),
+        )
 
 
 if __name__ == "__main__":

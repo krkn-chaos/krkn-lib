@@ -1,4 +1,5 @@
 import base64
+import datetime
 import threading
 import time
 from typing import Optional
@@ -155,6 +156,11 @@ class KrknTelemetry:
         if backup_threads is None:
             exceptions.append("telemetry -> backup_threads is missing")
             is_exception = True
+        if not isinstance(backup_threads, int):
+            exceptions.append(
+                "telemetry -> backup_threads must be a number" "not a string"
+            )
+            is_exception = True
         if url is None:
             exceptions.append("telemetry -> api_url is missing")
             is_exception = True
@@ -205,7 +211,7 @@ class KrknTelemetry:
                 target_path,
                 request_id,
                 archive_path,
-                max_threads=int(backup_threads),
+                max_threads=backup_threads,
                 archive_part_size=archive_size,
                 safe_logger=self.safe_logger,
             )
@@ -251,6 +257,11 @@ class KrknTelemetry:
         if backup_threads is None:
             exceptions.append("telemetry -> backup_threads is missing")
             is_exception = True
+        if not isinstance(backup_threads, int):
+            exceptions.append(
+                "telemetry -> backup_threads must be a number" "not a string"
+            )
+            is_exception = True
         if url is None:
             exceptions.append("telemetry -> api_url is missing")
             is_exception = True
@@ -285,7 +296,7 @@ class KrknTelemetry:
                 os.unlink(item[1])
             uploaded_files = list[str]()
             queue_size = queue.qsize()
-            for i in range(int(backup_threads)):
+            for i in range(backup_threads):
                 worker = threading.Thread(
                     target=self.generate_url_and_put_to_s3_worker,
                     args=(
@@ -298,6 +309,8 @@ class KrknTelemetry:
                         i,
                         uploaded_files,
                         max_retries,
+                        "prometheus-",
+                        ".tar",
                     ),
                 )
                 worker.daemon = True
@@ -306,6 +319,138 @@ class KrknTelemetry:
 
         except Exception as e:
             self.safe_logger.error(str(e))
+
+    def put_ocp_logs(
+        self,
+        request_id: str,
+        telemetry_config: dict,
+        start_timestamp: int,
+        end_timestamp: int,
+    ):
+        """
+        Collects, filters, archive and put on the telemetry S3 Buckets
+        Openshift logs. Built on top of the `oc adm must-gather` command
+        and custom filtering.
+
+        :param request_id: uuid of the session that will represent the
+            S3 folder on which the filtered log files archive will be stored
+        :param telemetry_config: telemetry section of kraken config.yaml
+        :param start_timestamp: timestamp of the first relevant entry, if None
+            will start filter starting from the earliest
+        :param end_timestamp: timestamp of the last relevant entry, if None
+            will end filtering until the latest
+        """
+
+        queue = Queue()
+        logs_backup = telemetry_config.get("logs_backup")
+        url = telemetry_config.get("api_url")
+        username = telemetry_config.get("username")
+        password = telemetry_config.get("password")
+        backup_threads = telemetry_config.get("backup_threads")
+        max_retries = telemetry_config.get("max_retries")
+        archive_path = telemetry_config.get("archive_path")
+        logs_filter_patterns = telemetry_config.get("logs_filter_patterns")
+        oc_cli_path = telemetry_config.get("oc_cli_path")
+        exceptions = []
+        is_exception = False
+        if logs_backup is None:
+            exceptions.append("telemetry -> logs_backup flag is missing")
+            is_exception = True
+        if backup_threads is None:
+            exceptions.append("telemetry -> backup_threads is missing")
+            is_exception = True
+
+        if not isinstance(backup_threads, int):
+            exceptions.append(
+                "telemetry -> backup_threads must be a number not a string"
+            )
+            is_exception = True
+        if url is None:
+            exceptions.append("telemetry -> api_url is missing")
+            is_exception = True
+        if username is None:
+            exceptions.append("telemetry -> username is missing")
+            is_exception = True
+        if password is None:
+            exceptions.append("telemetry -> password is missing")
+            is_exception = True
+        if max_retries is None:
+            exceptions.append("telemetry -> max_retries is missing")
+            is_exception = True
+        if archive_path is None:
+            exceptions.append("telemetry -> archive_path is missing")
+            is_exception = True
+        if logs_filter_patterns is None:
+            exceptions.append("telemetry -> logs_filter_pastterns is missing")
+            is_exception = True
+
+        # if oc_cli_path is set to empty will be set to
+        # None to let the config flexible
+        if oc_cli_path == "":
+            oc_cli_path = None
+
+        if not isinstance(logs_filter_patterns, list):
+            exceptions.append(
+                "telemetry -> logs_filter_pastterns must be a "
+                "list of regex pattern"
+            )
+            is_exception = True
+
+        if is_exception:
+            raise Exception(", ".join(exceptions))
+
+        if not logs_backup:
+            return
+
+        try:
+            timestamp = datetime.datetime.now().timestamp()
+            workdir = os.path.join(archive_path, f"gathered-logs-{timestamp}")
+            dst_dir = os.path.join(archive_path, f"filtered-logs-{timestamp}")
+            os.mkdir(workdir)
+            os.mkdir(dst_dir)
+            archive_path = self.kubecli.collect_filter_archive_ocp_logs(
+                workdir,
+                dst_dir,
+                self.kubecli.get_kubeconfig_path(),
+                start_timestamp,
+                end_timestamp,
+                logs_filter_patterns,
+                backup_threads,
+                self.safe_logger,
+                oc_cli_path,
+            )
+            # volume_number : 0 only one file
+            # archive_path: path of the archived logs
+            # retries: 0
+            queue.put((0, archive_path, 0))
+        except Exception as e:
+            self.safe_logger.error(f"failed to collect ocp logs: {str(e)}")
+            raise e
+        # this parameter has doesn't have an utility in this context
+        # used to match the method signature and reuse it (Poor design?)
+        uploaded_files = list[str]()
+        queue_size = queue.qsize()
+        self.safe_logger.info("uploading ocp logs...")
+        worker = threading.Thread(
+            target=self.generate_url_and_put_to_s3_worker,
+            args=(
+                queue,
+                queue_size,
+                request_id,
+                f"{url}/presigned-url",
+                username,
+                password,
+                0,
+                uploaded_files,
+                max_retries,
+                "logs-",
+                ".tar.gz",
+            ),
+        )
+        worker.daemon = True
+        worker.start()
+        queue.join()
+        self.safe_logger.info("ocp logs successfully uploaded")
 
     def generate_url_and_put_to_s3_worker(
         self,
@@ -318,6 +463,8 @@ class KrknTelemetry:
         thread_number: int,
         uploaded_file_list: list[str],
         max_retries: int,
+        remote_file_prefix: str,
+        remote_file_extension: str,
     ):
         """
         Worker function that creates an s3 link to put files and upload
@@ -339,6 +486,12 @@ class KrknTelemetry:
         :param uploaded_file_list: uploaded file list shared between threads
         :param max_retries: maximum number of retries from config.yaml.
             If 0 will retry indefinitely.
+        :param remote_file_prefix: the prefix that will given to the file
+            in the S3 bucket along with the progressive number
+            (if is a multiple file archive)
+        :param remote_file_extension: the extension of the remote
+            file on the S3 bucket
+        :return:
         """
         THREAD_SLEEP = 5  # NOQA
         while not queue.empty():
@@ -350,7 +503,9 @@ class KrknTelemetry:
                 s3_url = self.get_bucket_url_for_filename(
                     api_url,
                     request_id,
-                    f"prometheus-{file_number:02d}.tar",
+                    f"{remote_file_prefix}"
+                    f"{file_number:02d}"
+                    f"{remote_file_extension}",
                     username,
                     password,
                 )
@@ -424,7 +579,7 @@ class KrknTelemetry:
             that will be stored in the bucket
         :param username: API username
         :param password: API password
-        :return:
+        :return: the url where the file will be uploaded
         """
         url_params = {
             "request_id": bucket_folder,
