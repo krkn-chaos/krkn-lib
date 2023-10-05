@@ -6,17 +6,11 @@ import tempfile
 import time
 import unittest
 import uuid
-
 import yaml
 import logging
-import random
-import re
-
 from kubernetes import config
 from kubernetes.client import ApiException
-
 from jinja2 import Environment, FileSystemLoader
-
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger

@@ -470,15 +470,18 @@ class KrknKubernetes:
         """
         Return a list of daemon set names
 
-        :param namespace: namespace to find daemonsets in 
+        :param namespace: namespace to find daemonsets in
         :return: list of daemonset names
         """
         daemonsets = []
-        try: 
-            ret = self.apps_api.list_namespaced_daemon_set(namespace, pretty=True)
+        try:
+            ret = self.apps_api.list_namespaced_daemon_set(
+                namespace, pretty=True
+            )
         except ApiException as e:
             logging.error(
-                "Exception when calling AppsV1Api->list_namespaced_daemon_set: %s\n",
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_daemon_set: %s\n",
                 str(e),
             )
             raise e
@@ -490,15 +493,18 @@ class KrknKubernetes:
         """
         Return a list of deployment set names
 
-        :param namespace: namespace to find deployments in 
+        :param namespace: namespace to find deployments in
         :return: list of deployment names
         """
         deployments = []
-        try: 
-            ret = self.apps_api.list_namespaced_deployment(namespace, pretty=True)
+        try:
+            ret = self.apps_api.list_namespaced_deployment(
+                namespace, pretty=True
+            )
         except ApiException as e:
             logging.error(
-                "Exception when calling AppsV1Api->list_namespaced_deployment: %s\n",
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_deployment: %s\n",
                 str(e),
             )
             raise e
@@ -511,7 +517,7 @@ class KrknKubernetes:
         Delete a deployments given a certain name and namespace
 
         :param name: name of deployment
-        :param namespace: namespace deployment is in 
+        :param namespace: namespace deployment is in
         """
         try:
             self.apps_api.delete_namespaced_deployment(name, namespace)
@@ -526,8 +532,8 @@ class KrknKubernetes:
         """
         Delete a daemonset given a certain name and namespace
 
-        :param name: name of daemonset 
-        :param namespace: namespace daemonset is in 
+        :param name: name of daemonset
+        :param namespace: namespace daemonset is in
         """
         try:
             self.apps_api.delete_namespaced_daemon_set(name, namespace)
@@ -546,8 +552,8 @@ class KrknKubernetes:
         """
         Delete a statefulset given a certain name and namespace
 
-        :param name: name of statefulset 
-        :param namespace: namespace statefulset is in 
+        :param name: name of statefulset
+        :param namespace: namespace statefulset is in
         """
         try:
             self.apps_api.delete_namespaced_stateful_set(name, namespace)
@@ -566,8 +572,8 @@ class KrknKubernetes:
         """
         Delete a replicaset given a certain name and namespace
 
-        :param name: name of replicaset 
-        :param namespace: namespace replicaset is in 
+        :param name: name of replicaset
+        :param namespace: namespace replicaset is in
         """
         try:
             self.apps_api.delete_namespaced_replica_set(name, namespace)
@@ -586,8 +592,8 @@ class KrknKubernetes:
         """
         Delete a service given a certain name and namespace
 
-        :param name: name of service 
-        :param namespace: namespace service is in 
+        :param name: name of service
+        :param namespace: namespace service is in
         """
         try:
             self.cli.delete_namespaced_service(name, namespace)
@@ -604,10 +610,10 @@ class KrknKubernetes:
 
     def get_deployment_ready(self, name: str, namespace: str):
         """
-        Return a deployments detailed information 
+        Return a deployments detailed information
 
-        :param name: name of deployment 
-        :param namespace: namespace deployment is in 
+        :param name: name of deployment
+        :param namespace: namespace deployment is in
         """
         try:
             return self.apps_api.read_namespaced_deployment_scale(
@@ -647,13 +653,14 @@ class KrknKubernetes:
         :return: list of statefulset names
         """
         sss = []
-        try: 
+        try:
             ret = self.apps_api.list_namespaced_stateful_set(
                 namespace, pretty=True
             )
         except ApiException as e:
             logging.error(
-                "Exception when calling AppsV1Api->list_namespaced_stateful_set: %s\n",
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_stateful_set: %s\n",
                 str(e),
             )
             raise e
@@ -669,11 +676,14 @@ class KrknKubernetes:
         :return: list of replicasets names
         """
         rss = []
-        try: 
-            ret = self.apps_api.list_namespaced_replica_set(namespace, pretty=True)
+        try:
+            ret = self.apps_api.list_namespaced_replica_set(
+                namespace, pretty=True
+            )
         except ApiException as e:
             logging.error(
-                "Exception when calling AppsV1Api->list_namespaced_replica_set: %s\n",
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_replica_set: %s\n",
                 str(e),
             )
             raise e
@@ -689,11 +699,12 @@ class KrknKubernetes:
         :return: list of service names
         """
         services = []
-        try: 
+        try:
             ret = self.cli.list_namespaced_service(namespace, pretty=True)
         except ApiException as e:
             logging.error(
-                "Exception when calling CoreV1Api->list_namespaced_service: %s\n",
+                "Exception when calling "
+                "CoreV1Api->list_namespaced_service: %s\n",
                 str(e),
             )
             raise e
