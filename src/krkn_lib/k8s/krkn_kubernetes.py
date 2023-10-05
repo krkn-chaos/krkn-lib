@@ -1,6 +1,5 @@
 import logging
 import re
-import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -35,7 +34,7 @@ from krkn_lib.models.k8s import (
     ChaosResult,
 )
 from krkn_lib.models.telemetry import NodeInfo
-from krkn_lib.utils import filter_log_file_worker
+from krkn_lib.utils import filter_log_file_worker, find_executable_in_path
 from krkn_lib.utils.safe_logger import SafeLogger
 
 
@@ -2067,13 +2066,13 @@ class KrknKubernetes:
 
         OC_COMMAND = "oc"
 
-        if oc_path is None and shutil.which(OC_COMMAND) is None:
+        if oc_path is None and find_executable_in_path(OC_COMMAND) is None:
             safe_logger.error(
                 f"{OC_COMMAND} command not found in $PATH,"
                 f" skipping log collection"
             )
             return
-        oc = shutil.which(OC_COMMAND)
+        oc = find_executable_in_path(OC_COMMAND)
         if oc_path is not None:
             if not os.path.exists(oc_path):
                 safe_logger.error(

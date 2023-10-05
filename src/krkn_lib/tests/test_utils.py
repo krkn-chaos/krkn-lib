@@ -10,6 +10,7 @@ from krkn_lib.utils import (
     deep_set_attribute,
     filter_log_line,
     get_yaml_item_value,
+    find_executable_in_path,
 )
 
 
@@ -172,3 +173,9 @@ class UtilFunctionTests(BaseTest):
         self.assertEqual(n_str, "value")
         self.assertEqual(d_int, 0)
         self.assertEqual(d_str, "default")
+
+    def test_find_executable_in_path(self):
+        path = find_executable_in_path("ls")
+        self.assertIsNotNone(path)
+        path = find_executable_in_path("do_not_exists")
+        self.assertIsNone(path)

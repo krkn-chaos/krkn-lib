@@ -260,3 +260,13 @@ def get_yaml_item_value(cont: dict[str, any], item: str, default: any) -> any:
     :return: item value - if not specified the default value is returned
     """
     return default if cont.get(item) is None else cont.get(item)
+
+
+def find_executable_in_path(executable_name: str) -> Optional[str]:
+    path = os.getenv("PATH")
+    for subpath in path.split(":"):
+        test_path = os.path.join(subpath, executable_name)
+        if os.path.exists(test_path):
+            if os.access(test_path, os.X_OK):
+                return test_path
+    return None
