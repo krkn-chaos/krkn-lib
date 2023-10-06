@@ -19,7 +19,7 @@ base64io = "^1.0.3"
 sphinx-rtd-theme = "^1.2.2"
 tzlocal = "5.1"
 pytz = "^2023.3"
-PyYAML = "^6.0.1"
+PyYAML = "5.4.1"
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
 boto3 = "^1.28.12"
