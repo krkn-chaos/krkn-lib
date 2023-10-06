@@ -273,10 +273,14 @@ class KrknTelemetryTests(BaseTest):
                     Bucket=bucket_name, Prefix=test_workdir
                 )
                 self.assertTrue("Contents" in remote_files.keys())
-                self.assertEqual(
-                    remote_files["Contents"][0]["Key"],
-                    f"{test_workdir}/{os.path.basename(file.name)}",
-                )
+                check = False
+                for key in remote_files["Contents"]:
+                    if (
+                        key["Key"]
+                        == f"{test_workdir}/{os.path.basename(file.name)}"
+                    ):
+                        check = True
+                self.assertTrue(check)
             except Exception as e:
                 self.assertTrue(False, f"test failed with exception: {str(e)}")
 
