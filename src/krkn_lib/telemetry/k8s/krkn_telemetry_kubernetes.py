@@ -517,13 +517,13 @@ class KrknTelemetryKubernetes:
         """
 
         queue = Queue()
-        logs_backup = telemetry_config.get("logs_backup")
+        events_backup = telemetry_config.get("events_backup")
         url = telemetry_config.get("api_url")
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         max_retries = telemetry_config.get("max_retries")
         exceptions = []
-        if logs_backup is None:
+        if events_backup is None:
             exceptions.append("telemetry -> logs_backup flag is missing")
         if url is None:
             exceptions.append("telemetry -> api_url is missing")
@@ -534,7 +534,7 @@ class KrknTelemetryKubernetes:
         if max_retries is None:
             exceptions.append("telemetry -> max_retries is missing")
 
-        if not logs_backup:
+        if not events_backup:
             self.safe_logger.info(
                 "logs_backup is False: skipping events collection"
             )

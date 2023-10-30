@@ -242,7 +242,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
     def test_put_cluster_events(self):
         request_id = f"test_folder/{int(time.time())}"
         telemetry_config = {
-            "logs_backup": True,
+            "events_backup": True,
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
