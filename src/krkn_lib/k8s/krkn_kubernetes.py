@@ -20,6 +20,7 @@ from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
 from tzlocal import get_localzone
+
 from krkn_lib.models.k8s import (
     PVC,
     ApiRequestException,
@@ -209,31 +210,6 @@ class KrknKubernetes:
 
         return self.cli.api_client.configuration.get_default_copy().host
 
-    def get_clusterversion_string(self) -> str:
-        """
-        Return clusterversion status text on OpenShift, empty string
-        on other distributions
-
-        :return: clusterversion status
-        """
-
-        try:
-            cvs = self.custom_object_client.list_cluster_custom_object(
-                "config.openshift.io",
-                "v1",
-                "clusterversions",
-            )
-            for cv in cvs["items"]:
-                for condition in cv["status"]["conditions"]:
-                    if condition["type"] == "Progressing":
-                        return condition["message"]
-            return ""
-        except client.exceptions.ApiException as e:
-            if e.status == 404:
-                return ""
-            else:
-                raise e
-
     #
     def list_namespaces(self, label_selector: str = None) -> list[str]:
         """
@@ -369,7 +345,7 @@ class KrknKubernetes:
     # TODO: refactoring to work both in k8s and OpenShift
     def list_killable_nodes(self, label_selector: str = None) -> list[str]:
         """
-        List nodes in the cluster that can be killed (OpenShift only)
+        List nodes in the cluster that can be killed
 
         :param label_selector: filter by label
             selector (optional default `None`)
@@ -1761,80 +1737,6 @@ class KrknKubernetes:
             result.append(node_info)
 
         return result
-
-    def get_cluster_infrastructure(self) -> str:
-        """
-        Get the cluster Cloud infrastructure name when available
-
-        :return: the cluster infrastructure name or `Unknown` when unavailable
-        """
-        api_client = self.api_client
-        if api_client:
-            try:
-                path_params: Dict[str, str] = {}
-                query_params: List[str] = []
-                header_params: Dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
-                )
-
-                path = "/apis/config.openshift.io/v1/infrastructures/cluster"
-                (data) = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="str",
-                    auth_settings=auth_settings,
-                )
-                json_obj = ast.literal_eval(data[0])
-                return json_obj["status"]["platform"]
-            except Exception as e:
-                logging.warning("V1ApiException -> %s", str(e))
-                return "Unknown"
-
-        return None
-
-    def get_cluster_network_plugins(self) -> list[str]:
-        """
-        Get the cluster Cloud network plugins list
-
-        :return: the cluster infrastructure name or `Unknown` when unavailable
-        """
-        api_client = self.api_client
-        network_plugins = list[str]()
-        if api_client:
-            try:
-                path_params: Dict[str, str] = {}
-                query_params: List[str] = []
-                header_params: Dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
-                )
-
-                path = "/apis/config.openshift.io/v1/networks"
-                (data) = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="str",
-                    auth_settings=auth_settings,
-                )
-                json_obj = ast.literal_eval(data[0])
-                for plugin in json_obj["items"]:
-                    network_plugins.append(plugin["status"]["networkType"])
-            except Exception as e:
-                logging.warning(
-                    "Impossible to retrieve cluster Network plugins  -> %s",
-                    str(e),
-                )
-                network_plugins.append("Unknown")
-        return network_plugins
 
     def delete_file_from_pod(
         self, pod_name: str, container_name: str, namespace: str, filename: str

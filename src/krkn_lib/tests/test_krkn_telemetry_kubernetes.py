@@ -1,5 +1,4 @@
 import base64
-import datetime
 import os
 import tempfile
 import time
@@ -9,19 +8,18 @@ import uuid
 import boto3
 import yaml
 
-from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
-from krkn_lib.telemetry import KrknTelemetry
 from krkn_lib.tests import BaseTest
-from krkn_lib.utils import SafeLogger
 
 
-class KrknTelemetryTests(BaseTest):
+class KrknTelemetryKubernetesTests(BaseTest):
     def test_set_parameters_base_64(self):
         file_path = "src/testdata/input.yaml"
         scenario_telemetry = ScenarioTelemetry()
 
-        self.lib_telemetry.set_parameters_base64(scenario_telemetry, file_path)
+        self.lib_telemetry_k8s.set_parameters_base64(
+            scenario_telemetry, file_path
+        )
         with open(file_path, "rb") as file_stream:
             input_file_data_orig = file_stream.read().decode("utf-8")
             self.assertIsNotNone(input_file_data_orig)
@@ -180,7 +178,7 @@ class KrknTelemetryTests(BaseTest):
             archive_part_size=100,
             download_path=test_workdir,
         )
-        self.lib_telemetry.put_ocp_prometheus_data(
+        self.lib_telemetry_k8s.put_prometheus_data(
             telemetry_config, file_list, bucket_folder
         )
 
@@ -199,8 +197,9 @@ class KrknTelemetryTests(BaseTest):
         self.assertEqual(
             len(chaos_telemetry.kubernetes_objects_count.keys()), 0
         )
-        self.assertEqual(len(chaos_telemetry.network_plugins), 0)
-        self.lib_telemetry.collect_cluster_metadata(chaos_telemetry)
+        self.assertEqual(len(chaos_telemetry.network_plugins), 1)
+        self.assertEqual(chaos_telemetry.network_plugins[0], "Unknown")
+        self.lib_telemetry_k8s.collect_cluster_metadata(chaos_telemetry)
         self.assertNotEqual(len(chaos_telemetry.node_infos), 0)
         self.assertNotEqual(chaos_telemetry.node_count, 0)
         self.assertNotEqual(
@@ -221,9 +220,9 @@ class KrknTelemetryTests(BaseTest):
             "enabled": True,
         }
         chaos_telemetry = ChaosRunTelemetry()
-        self.lib_telemetry.collect_cluster_metadata(chaos_telemetry)
+        self.lib_telemetry_k8s.collect_cluster_metadata(chaos_telemetry)
         try:
-            self.lib_telemetry.send_telemetry(
+            self.lib_telemetry_k8s.send_telemetry(
                 telemetry_config, request_id, chaos_telemetry
             )
         except Exception as e:
@@ -258,14 +257,14 @@ class KrknTelemetryTests(BaseTest):
             file.flush()
 
             try:
-                url = self.lib_telemetry.get_bucket_url_for_filename(
+                url = self.lib_telemetry_k8s.get_bucket_url_for_filename(
                     f'{telemetry_config["api_url"]}/presigned-url',
                     test_workdir,
                     os.path.basename(file.name),
                     telemetry_config["username"],
                     telemetry_config["password"],
                 )
-                self.lib_telemetry.put_file_to_url(url, file.name)
+                self.lib_telemetry_k8s.put_file_to_url(url, file.name)
 
                 bucket_name = os.getenv("BUCKET_NAME")
                 s3 = boto3.client("s3")
@@ -283,49 +282,6 @@ class KrknTelemetryTests(BaseTest):
                 self.assertTrue(check)
             except Exception as e:
                 self.assertTrue(False, f"test failed with exception: {str(e)}")
-
-    def _test_put_ocp_logs(self):
-        ##################################################
-        # This test is incomplete and inactive because   #
-        # we don't have an OCP Integration     env yet.  #
-        ##################################################
-
-        krkn_kubernetes = KrknKubernetes(
-            kubeconfig_path="~/OCP/auth/kubeconfig"
-        )
-        safe_logger = SafeLogger()
-        krkn_telemetry = KrknTelemetry(safe_logger, krkn_kubernetes)
-
-        test_workdir = "/tmp/"
-        telemetry_config = {
-            "username": os.getenv("API_USER"),
-            "password": os.getenv("API_PASSWORD"),
-            "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
-            "backup_threads": 6,
-            "archive_path": test_workdir,
-            "prometheus_backup": "True",
-            "enabled": True,
-            "logs_backup": True,
-            "logs_filter_patterns": [
-                # Sep 9 11:20:36.123425532
-                r"(\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2}\.\d+).+",
-                # kinit 2023/09/15 11:20:36 log
-                r"kinit (\d+/\d+/\d+\s\d{2}:\d{2}:\d{2})\s+",
-                # 2023-09-15T11:20:36.123425532Z log
-                r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+",
-            ],
-        }
-        now = datetime.datetime.now()
-
-        ten_minutes_ago = now - datetime.timedelta(minutes=10)
-        ten_minutes_fwd = now + datetime.timedelta(minutes=10)
-        krkn_telemetry.put_ocp_logs(
-            f"test-must-gather-{str(uuid.uuid1())}",
-            telemetry_config,
-            int(ten_minutes_ago.timestamp()),
-            int(ten_minutes_fwd.timestamp()),
-        )
 
 
 if __name__ == "__main__":

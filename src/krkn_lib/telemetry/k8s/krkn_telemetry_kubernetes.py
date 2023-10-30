@@ -1,21 +1,19 @@
 import base64
-import os
-import datetime
 import threading
 import time
-from queue import Queue
-from typing import Optional
-
-import requests
 import yaml
-
+import requests
+import os
 import krkn_lib.utils as utils
+
+from queue import Queue
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
+from typing import Optional
 from krkn_lib.utils.safe_logger import SafeLogger
 
 
-class KrknTelemetry:
+class KrknTelemetryKubernetes:
     kubecli: KrknKubernetes = None
     safe_logger: SafeLogger = None
 
@@ -39,12 +37,7 @@ class KrknTelemetry:
             the cluster metadata
         """
         self.safe_logger.info("collecting telemetry data, please wait....")
-        chaos_telemetry.cloud_infrastructure = (
-            self.kubecli.get_cluster_infrastructure()
-        )
-        chaos_telemetry.network_plugins = (
-            self.kubecli.get_cluster_network_plugins()
-        )
+
         chaos_telemetry.kubernetes_objects_count = (
             self.kubecli.get_all_kubernetes_object_count(
                 [
@@ -119,18 +112,30 @@ class KrknTelemetry:
                 self.safe_logger.info("successfully sent telemetry data")
                 return json_data
 
-    def get_ocp_prometheus_data(
+    def get_prometheus_pod_data(
         self,
         telemetry_config: dict,
         request_id: str,
+        prometheus_pod_name: str,
+        prometheus_container_name: str,
+        prometheus_namespace: str,
+        remote_archive_path: str = "/prometheus",
     ) -> list[(int, str)]:
         """
-        Downloads the OCP prometheus metrics folder
+        Downloads the prometheus metrics folder from a prometheus pod
 
         :param telemetry_config: krkn telemetry conf section
             will be stored
         :param request_id: uuid of the session that will represent the
             temporary archive files
+        :param prometheus_pod_name: the name of the prometheus pod from
+            which the data will be archived
+        :param prometheus_container_name: the name of the container in the
+            prometheus pod
+        :param prometheus_namespace: the namespace in which the prometheus
+            pod lives
+        :param remote_archive_path: (Optional) the path where prometheus logs
+            are stored, if not specified will default to `/prometheus`
         :return: the list of the archive number and filenames downloaded
         """
         file_list = list[(int, str)]()
@@ -182,10 +187,6 @@ class KrknTelemetry:
         if not prometheus_backup:
             return file_list
 
-        prometheus_pod_name = "prometheus-k8s-0"
-        prometheus_container_name = "prometheus"
-        prometheus_namespace = "openshift-monitoring"
-        remote_archive_path = "/prometheus"
         prometheus_pod = self.kubecli.get_pod_info(
             prometheus_pod_name, prometheus_namespace
         )
@@ -227,14 +228,14 @@ class KrknTelemetry:
             self.safe_logger.error(exception_string)
             raise Exception(exception_string)
 
-    def put_ocp_prometheus_data(
+    def put_prometheus_data(
         self,
         telemetry_config: dict,
         archive_volumes: list[(int, str)],
         request_id: str,
     ):
         """
-        Puts a list of files on telemetry S3 bucket, mulithread.
+        Puts a list of files on telemetry S3 bucket, multithreading.
 
         :param telemetry_config: telemetry section of kraken config.yaml
         :param archive_volumes: a list of tuples containing the
@@ -319,138 +320,6 @@ class KrknTelemetry:
 
         except Exception as e:
             self.safe_logger.error(str(e))
-
-    def put_ocp_logs(
-        self,
-        request_id: str,
-        telemetry_config: dict,
-        start_timestamp: int,
-        end_timestamp: int,
-    ):
-        """
-        Collects, filters, archive and put on the telemetry S3 Buckets
-        Openshift logs. Built on top of the `oc adm must-gather` command
-        and custom filtering.
-
-        :param request_id: uuid of the session that will represent the
-            S3 folder on which the filtered log files archive will be stored
-        :param telemetry_config: telemetry section of kraken config.yaml
-        :param start_timestamp: timestamp of the first relevant entry, if None
-            will start filter starting from the earliest
-        :param end_timestamp: timestamp of the last relevant entry, if None
-            will end filtering until the latest
-        """
-
-        queue = Queue()
-        logs_backup = telemetry_config.get("logs_backup")
-        url = telemetry_config.get("api_url")
-        username = telemetry_config.get("username")
-        password = telemetry_config.get("password")
-        backup_threads = telemetry_config.get("backup_threads")
-        max_retries = telemetry_config.get("max_retries")
-        archive_path = telemetry_config.get("archive_path")
-        logs_filter_patterns = telemetry_config.get("logs_filter_patterns")
-        oc_cli_path = telemetry_config.get("oc_cli_path")
-        exceptions = []
-        is_exception = False
-        if logs_backup is None:
-            exceptions.append("telemetry -> logs_backup flag is missing")
-            is_exception = True
-        if backup_threads is None:
-            exceptions.append("telemetry -> backup_threads is missing")
-            is_exception = True
-
-        if not isinstance(backup_threads, int):
-            exceptions.append(
-                "telemetry -> backup_threads must be a number not a string"
-            )
-            is_exception = True
-        if url is None:
-            exceptions.append("telemetry -> api_url is missing")
-            is_exception = True
-        if username is None:
-            exceptions.append("telemetry -> username is missing")
-            is_exception = True
-        if password is None:
-            exceptions.append("telemetry -> password is missing")
-            is_exception = True
-        if max_retries is None:
-            exceptions.append("telemetry -> max_retries is missing")
-            is_exception = True
-        if archive_path is None:
-            exceptions.append("telemetry -> archive_path is missing")
-            is_exception = True
-        if logs_filter_patterns is None:
-            exceptions.append("telemetry -> logs_filter_pastterns is missing")
-            is_exception = True
-
-        # if oc_cli_path is set to empty will be set to
-        # None to let the config flexible
-        if oc_cli_path == "":
-            oc_cli_path = None
-
-        if not isinstance(logs_filter_patterns, list):
-            exceptions.append(
-                "telemetry -> logs_filter_pastterns must be a "
-                "list of regex pattern"
-            )
-            is_exception = True
-
-        if is_exception:
-            raise Exception(", ".join(exceptions))
-
-        if not logs_backup:
-            return
-
-        try:
-            timestamp = datetime.datetime.now().timestamp()
-            workdir = os.path.join(archive_path, f"gathered-logs-{timestamp}")
-            dst_dir = os.path.join(archive_path, f"filtered-logs-{timestamp}")
-            os.mkdir(workdir)
-            os.mkdir(dst_dir)
-            archive_path = self.kubecli.collect_filter_archive_ocp_logs(
-                workdir,
-                dst_dir,
-                self.kubecli.get_kubeconfig_path(),
-                start_timestamp,
-                end_timestamp,
-                logs_filter_patterns,
-                backup_threads,
-                self.safe_logger,
-                oc_cli_path,
-            )
-            # volume_number : 0 only one file
-            # archive_path: path of the archived logs
-            # retries: 0
-            queue.put((0, archive_path, 0))
-        except Exception as e:
-            self.safe_logger.error(f"failed to collect ocp logs: {str(e)}")
-            raise e
-        # this parameter has doesn't have an utility in this context
-        # used to match the method signature and reuse it (Poor design?)
-        uploaded_files = list[str]()
-        queue_size = queue.qsize()
-        self.safe_logger.info("uploading ocp logs...")
-        worker = threading.Thread(
-            target=self.generate_url_and_put_to_s3_worker,
-            args=(
-                queue,
-                queue_size,
-                request_id,
-                f"{url}/presigned-url",
-                username,
-                password,
-                0,
-                uploaded_files,
-                max_retries,
-                "logs-",
-                ".tar.gz",
-            ),
-        )
-        worker.daemon = True
-        worker.start()
-        queue.join()
-        self.safe_logger.info("ocp logs successfully uploaded")
 
     def generate_url_and_put_to_s3_worker(
         self,
