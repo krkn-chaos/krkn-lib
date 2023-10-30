@@ -1,10 +1,10 @@
 import base64
+import datetime
 import os
 import tempfile
 import time
 import unittest
 import uuid
-
 import boto3
 import yaml
 
@@ -239,6 +239,37 @@ class KrknTelemetryKubernetesTests(BaseTest):
             f"{request_id}/telemetry.json",
         )
 
+    def test_put_cluster_events(self):
+        request_id = f"test_folder/{int(time.time())}"
+        telemetry_config = {
+            "logs_backup": True,
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "backup_threads": 6,
+        }
+        now = datetime.datetime.now()
+        one_hour_ago = now - datetime.timedelta(hours=1)
+
+        self.lib_telemetry_k8s.put_cluster_events(
+            request_id,
+            telemetry_config,
+            int(one_hour_ago.timestamp()),
+            int(now.timestamp()),
+        )
+
+        bucket_name = os.getenv("BUCKET_NAME")
+        s3 = boto3.client("s3")
+        remote_files = s3.list_objects_v2(
+            Bucket=bucket_name, Prefix=request_id
+        )
+        self.assertTrue("Contents" in remote_files.keys())
+        self.assertEqual(
+            remote_files["Contents"][0]["Key"],
+            f"{request_id}/events-00.json",
+        )
+
     def test_get_bucket_url_for_filename(self):
         test_workdir = f"test_folder/{int(time.time())}"
         telemetry_config = {
@@ -272,14 +303,10 @@ class KrknTelemetryKubernetesTests(BaseTest):
                     Bucket=bucket_name, Prefix=test_workdir
                 )
                 self.assertTrue("Contents" in remote_files.keys())
-                check = False
-                for key in remote_files["Contents"]:
-                    if (
-                        key["Key"]
-                        == f"{test_workdir}/{os.path.basename(file.name)}"
-                    ):
-                        check = True
-                self.assertTrue(check)
+                self.assertEqual(
+                    remote_files["Contents"][0]["Key"],
+                    f"{test_workdir}/{os.path.basename(file.name)}",
+                )
             except Exception as e:
                 self.assertTrue(False, f"test failed with exception: {str(e)}")
 

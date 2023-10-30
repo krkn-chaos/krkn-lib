@@ -80,6 +80,50 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     return obj
 
 
+def check_date_in_localized_interval(
+    start_timestamp: Optional[int],
+    end_timestamp: Optional[int],
+    check_timestamp: int,
+    check_timezone: str,
+    interval_timezone: str,
+) -> bool:
+    """
+    Checks if a timestamp is within an interval localizing with timezones
+
+    :param start_timestamp: bottom limit of the interval, if None no bottom
+        limit is set
+    :param end_timestamp: top limit of the interval, if None no top limit is
+        set
+    :param check_timestamp: timestamp checked in the interval
+    :param check_timezone: timezone string to be applied to the check timestamp
+    :param interval_timezone: timezone string to be applied to the interval
+        timestamps
+    """
+
+    start_check = True
+    end_check = True
+
+    interval_tz = pytz.timezone(interval_timezone)
+    check_tz = pytz.timezone(check_timezone)
+
+    localized_check_date = datetime.datetime.fromtimestamp(
+        check_timestamp, tz=check_tz
+    )
+
+    if start_timestamp is not None:
+        start_date = datetime.datetime.fromtimestamp(
+            start_timestamp, tz=interval_tz
+        )
+        start_check = localized_check_date >= start_date
+    if end_timestamp is not None:
+        end_date = datetime.datetime.fromtimestamp(
+            end_timestamp, tz=interval_tz
+        )
+        end_check = localized_check_date <= end_date
+
+    return start_check and end_check
+
+
 def filter_log_line(
     log_line: str,
     start_timestamp: Optional[int],
@@ -111,12 +155,7 @@ def filter_log_line(
     :return: the log line if matches the criteria above otherwise None
     """
     try:
-        start_check = True
-        end_check = True
-        local_tz = pytz.timezone(local_timezone)
-        remote_tz = pytz.timezone(remote_timezone)
-
-        localized_log_date = None
+        log_date = None
         for pattern in log_filter_patterns:
             if pattern.groups != 1:
                 logging.error(
@@ -130,26 +169,21 @@ def filter_log_line(
                     f"the date to be parsed, skipping"
                 )
             if pattern.match(log_line):
-                localized_log_date = parser.parse(
-                    pattern.search(log_line).groups()[0]
-                ).replace(tzinfo=remote_tz)
+                log_date = parser.parse(pattern.search(log_line).groups()[0])
                 break
 
-        if start_timestamp is not None:
-            start_date = datetime.datetime.fromtimestamp(
-                start_timestamp, tz=local_tz
-            )
-            start_check = localized_log_date >= start_date
-        if end_timestamp is not None:
-            end_date = datetime.datetime.fromtimestamp(
-                end_timestamp, tz=local_tz
-            )
-            end_check = localized_log_date <= end_date
+        is_in_interval = check_date_in_localized_interval(
+            start_timestamp,
+            end_timestamp,
+            int(log_date.timestamp()),
+            remote_timezone,
+            local_timezone,
+        )
 
-        if start_check and end_check:
+        if is_in_interval:
             return log_line
-        else:
-            return None
+
+        return None
     except ParserError:
         logging.warning(f"failed to parse date from line: {log_line}")
         return None
@@ -161,6 +195,52 @@ def filter_log_line(
     except Exception as e:
         logging.error(str(e))
         raise e
+
+
+def filter_dictionary(
+    dictionary: dict[str, any],
+    datetime_key: str,
+    start_timestamp: Optional[int],
+    end_timestamp: Optional[int],
+    dictionary_timezone: str,
+    interval_timezone: str,
+) -> Optional[dict[str, any]]:
+    """
+    Filters a dictionary by datetime string attribute
+
+    :param dictionary: the dictionary that needs to be filtered
+    :param datetime_key: the key of the dictionary representing
+        the time of the dictionary
+    :param start_timestamp: timestamp representing the minimum date after that
+        the dictionary becomes relevant, if None no bottom limit applied
+    :param end_timestamp: timestamp representing the maximum date before that
+        the dictionary is still relevant, if None no top limit applied
+    :param dictionary_timezone: timezone of the date contained
+        in the dictionary
+    :param interval_timezone: timezone of the interval within
+        the dictionary will be checked
+    """
+    date_time = dictionary.get(datetime_key)
+    if not date_time:
+        return None
+
+    try:
+        log_date = parser.parse(date_time)
+        if check_date_in_localized_interval(
+            start_timestamp,
+            end_timestamp,
+            int(log_date.timestamp()),
+            dictionary_timezone,
+            interval_timezone,
+        ):
+            return dictionary
+        return None
+    except ParserError:
+        logging.error(f"impossible to parse date: {str(date_time)}")
+        return None
+    except TypeError:
+        logging.error(f"{str(date_time)} does not represent a valid datetime")
+        return None
 
 
 def filter_log_file_worker(

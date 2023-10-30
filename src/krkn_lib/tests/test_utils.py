@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import re
 import tempfile
@@ -11,6 +12,8 @@ from krkn_lib.utils import (
     deep_set_attribute,
     filter_log_line,
     get_yaml_item_value,
+    check_date_in_localized_interval,
+    filter_dictionary,
     find_executable_in_path,
 )
 
@@ -62,6 +65,65 @@ class UtilFunctionTests(BaseTest):
         unserialized_updated_object = yaml.safe_dump(deep_obj, indent=4)
         self.assertEqual(unserialized_updated_object.count("__UPDATED__"), 4)
         self.assertEqual(unserialized_updated_object.count("__MARKER__"), 0)
+
+    def test_check_date_in_localized_interval(self):
+        timezone = "UTC"
+
+        now = 1696408614  # Wednesday, October 4, 2023 8:36:54 AM
+        in_ten_minutes = 1696409214  # Wednesday, October 4, 2023 8:46:54 AM
+        ten_minutes_ago = 1696408014  # Wednesday, October 4, 2023 8:26:54 AM
+        yesterday = 1696322214  # Tuesday, October 3, 2023 8:36:54 AM
+        tomorrow = 1696495014  # Thursday, October 5, 2023 8:36:54 AM
+
+        self.assertTrue(
+            check_date_in_localized_interval(
+                ten_minutes_ago,
+                in_ten_minutes,
+                now,
+                timezone,
+                timezone,
+            )
+        )
+
+        self.assertFalse(
+            check_date_in_localized_interval(
+                ten_minutes_ago,
+                in_ten_minutes,
+                yesterday,
+                timezone,
+                timezone,
+            )
+        )
+
+        self.assertFalse(
+            check_date_in_localized_interval(
+                ten_minutes_ago,
+                in_ten_minutes,
+                tomorrow,
+                timezone,
+                timezone,
+            )
+        )
+
+        self.assertTrue(
+            check_date_in_localized_interval(
+                None,
+                in_ten_minutes,
+                yesterday,
+                timezone,
+                timezone,
+            )
+        )
+
+        self.assertTrue(
+            check_date_in_localized_interval(
+                ten_minutes_ago,
+                None,
+                tomorrow,
+                timezone,
+                timezone,
+            )
+        )
 
     def test_filter_file_log(self):
         pattern = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+")
@@ -161,6 +223,74 @@ class UtilFunctionTests(BaseTest):
                     [broken_pattern_multiple_groups],
                 )
             )
+
+    def test_filter_dictionary(self):
+        event = """
+                {
+            "apiVersion": "v1",
+            "count": 1,
+            "eventTime": null,
+            "firstTimestamp": "2023-10-04T09:51:06Z",
+            "involvedObject": {
+                "kind": "Node",
+                "name": "ip-10-0-143-127.us-west-2.compute.internal",
+                "uid": "ip-10-0-143-127.us-west-2.compute.internal"
+            },
+            "kind": "Event",
+            "lastTimestamp": "2023-10-04T09:51:06Z",
+            "message": "Starting kubelet.",
+            "metadata": {
+                "creationTimestamp": "2023-10-04T09:51:07Z",
+                "name": "ip-10-0-143-127.us-west-2.compute.internal.178adeb2335c61fe",
+                "namespace": "default",
+                "resourceVersion": "13109",
+                "uid": "e119423c-a5af-4bdc-b8ea-042d01390387"
+            },
+            "reason": "Starting",
+            "reportingComponent": "",
+            "reportingInstance": "",
+            "source": {
+                "component": "kubelet",
+                "host": "ip-10-0-143-127.us-west-2.compute.internal"
+            },
+            "type": "Normal"
+        }
+        """  # NOQA
+        ten_minutes_ago = 1696412513  # Wednesday, October 4, 2023 9:41:53 AM
+        in_ten_minutes = 1696413713  # Wednesday, October 4, 2023 10:01:53 AM
+
+        event_dict = json.loads(event)
+
+        result = filter_dictionary(
+            event_dict,
+            "firstTimestamp",
+            ten_minutes_ago,
+            in_ten_minutes,
+            "UTC",
+            "UTC",
+        )
+        self.assertEqual(result, event_dict)
+
+        result = filter_dictionary(
+            event_dict,
+            "firstTimestamp",
+            in_ten_minutes,
+            None,
+            "UTC",
+            "UTC",
+        )
+
+        self.assertIsNone(result)
+
+        result = filter_dictionary(
+            event_dict,
+            "apiVersion",
+            in_ten_minutes,
+            None,
+            "UTC",
+            "UTC",
+        )
+        self.assertIsNone(result)
 
     def test_get_yaml_item_value(self):
         cont = {"n_int": 1, "n_str": "value", "d_int": None, "d_str": None}

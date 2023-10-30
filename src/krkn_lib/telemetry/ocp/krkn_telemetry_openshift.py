@@ -131,6 +131,9 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             raise Exception(", ".join(exceptions))
 
         if not logs_backup:
+            self.safe_logger.info(
+                "logs_backup is False: skipping OCP logs collection"
+            )
             return
 
         try:
