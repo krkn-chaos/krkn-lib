@@ -1,3 +1,5 @@
+import datetime
+import json
 import os
 import random
 import re
@@ -12,6 +14,7 @@ from kubernetes.client import ApiException
 from jinja2 import Environment, FileSystemLoader
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.tests import BaseTest
+from tzlocal import get_localzone
 
 
 class KrknKubernetesTests(BaseTest):
@@ -729,6 +732,19 @@ class KrknKubernetesTests(BaseTest):
             continue
         result = self.lib_k8s.is_pod_running("do_not_exist", "do_not_exist")
         self.assertFalse(result)
+
+    def test_collect_cluster_events(self):
+        local_timezone = f"{get_localzone()}"
+        now = datetime.datetime.now()
+        one_hour_ago = now - datetime.timedelta(hours=1)
+
+        event_file = self.lib_k8s.collect_cluster_events(
+            int(one_hour_ago.timestamp()), int(now.timestamp()), local_timezone
+        )
+        self.assertIsNotNone(event_file)
+        with open(event_file) as file:
+            obj_list = json.load(file)
+            self.assertTrue(len(obj_list) > 0)
 
 
 if __name__ == "__main__":
