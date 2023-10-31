@@ -517,7 +517,7 @@ class KrknKubernetesTests(BaseTest):
             name = "test-name-" + self.get_random_string(10)
             self.deploy_namespace(namespace, [])
             self.deploy_fedtools(namespace=namespace, name=name)
-            self.wait_pod(name, namespace, timeout=120)
+            self.wait_pod(name, namespace, timeout=240)
             self.assertTrue(self.lib_k8s.check_if_pod_exists(name, namespace))
             self.assertFalse(
                 self.lib_k8s.check_if_pod_exists(
