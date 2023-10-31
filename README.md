@@ -15,8 +15,12 @@ Scenarios and to increase the testability and the modularity of the Krkn codebas
 
 The library is subdivided in several Packages
 
-- **k8s:** Kubernetes/Openshift Integration
-- **telemetry:** Krkn Telemetry collection and distribution
+- **ocp:** Openshift Integration
+- **k8s:** Kubernetes Integration
+- **telemetry:** 
+- - **k8s:** Kubernetes Telemetry collection and distribution
+- - **ocp:** Openshift Telemetry collection and distribution
+- **models:** Krkn shared data models
 - **utils:** common functions
 
 ### Documentation
