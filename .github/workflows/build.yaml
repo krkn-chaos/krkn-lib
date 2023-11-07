@@ -21,6 +21,33 @@ jobs:
     steps:
       - name: Create multi-node KinD cluster
         uses: redhat-chaos/actions/kind@main
+      - name: Install Helm & add repos
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add stable https://charts.helm.sh/stable
+          helm repo update
+      - name: Deploy prometheus & Port Forwarding
+        run: |
+          kubectl create namespace monitoring
+          helm install \
+          --wait --timeout 360s \
+          kind-prometheus \
+          prometheus-community/kube-prometheus-stack \
+          --namespace monitoring \
+          --set prometheus.service.nodePort=30000 \
+          --set prometheus.service.type=NodePort \
+          --set grafana.service.nodePort=31000 \
+          --set grafana.service.type=NodePort \
+          --set alertmanager.service.nodePort=32000 \
+          --set alertmanager.service.type=NodePort \
+          --set prometheus-node-exporter.service.nodePort=32001 \
+          --set prometheus-node-exporter.service.type=NodePort
+
+          SELECTOR=`kubectl -n monitoring get service kind-prometheus-kube-prome-prometheus -o wide --no-headers=true | awk '{ print $7 }'`
+          POD_NAME=`kubectl -n monitoring get pods --selector="$SELECTOR" --no-headers=true | awk '{ print $1 }'`
+          kubectl -n monitoring port-forward $POD_NAME 9090:9090 &
+          sleep 5
       - name: Check out code
         uses: actions/checkout@v3
       - name: Update version number
