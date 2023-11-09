@@ -11,6 +11,15 @@ class KrknPrometheus:
     def __init__(
         self, prometheus_url: str, prometheus_bearer_token: str = None
     ):
+        """
+        Instantiates a KrknPrometheus class with the Prometheus API
+        Endpoint url and the bearer token to access it (optional if
+        the endpoint doesn't need authentication).
+
+        :param prometheus_url: the prometheus API endpoint
+        :param prometheus_bearer_token: the bearer token to authenticate
+            the query (optional).
+        """
         headers = {}
         if prometheus_bearer_token is not None:
             bearer = "Bearer " + prometheus_bearer_token
@@ -24,7 +33,13 @@ class KrknPrometheus:
             sys.exit(1)
 
     # Process custom prometheus query
-    def process_prom_query(self, query):
+    def process_prom_query(self, query: str) -> list[dict[str:any]]:
+        """
+        Executes a query to the Prometheus API in PromQL language
+
+        :param query: promQL query
+        :return: a list of records in dictionary format
+        """
         if self.prom_cli:
             try:
                 return self.prom_cli.custom_query(query=query, params=None)
@@ -39,6 +54,42 @@ class KrknPrometheus:
             )
 
     def process_alert(self, alert: dict[str, str]):
+        """
+        Processes Krkn alarm in the format
+
+        expr: <promQL query>
+        description: <the message that will be logged in the console>
+        severity <the log level that will be used>
+
+        Description:
+        The description may contain two kind of expressions that will be
+        properly replaced and valorized; the supported expression are:
+
+        - `{{$value}}` the scalar value returned by the query (if the query
+        is designed to return a scalar value
+
+        - `{{$label.<label_name>}}` one of the metric properties
+        returned by the query
+
+        If a value is not found in the the description won't be replaced.
+
+        Severity:
+        The severity represents the log level that will be used to print the
+        description in the console. The supported levels are:
+        - info
+        - debug
+        - warning
+        - error
+        - critical
+
+        If a non existing value is set an error message will be print instead
+        of the the description.
+
+        :params alert: a dictionary containing the following keys :
+            expr, description, severity
+
+
+        """
         if "expr" not in alert.keys():
             logging.error(
                 f"invalid alert: {alert} `expr` field is missing, skipping."
@@ -84,6 +135,17 @@ class KrknPrometheus:
             )
 
     def parse_metric(self, description: str, record: dict[str:any]) -> str:
+        """
+        Parses the expression contained in the Krkn alert description replacing
+        them with the respective values contained in the record
+        previously returned by a PromQL query.
+
+        :param description: the description containing the expression
+            in the Krkn alert format
+        :param record: the PromQL record from where the data will be extracted
+        :return: the description with the expressions replaced by the correct
+            values
+        """
         result = description
         expressions = re.findall(r"{{\$[\w\-_]+[.[\w\-_]+]*}}", description)
         for expression in expressions:

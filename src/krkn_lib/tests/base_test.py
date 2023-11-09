@@ -38,7 +38,7 @@ class BaseTest(unittest.TestCase):
             SafeLogger(), cls.lib_ocp
         )
         host = cls.lib_k8s.api_client.configuration.host
-        # logging.disable(logging.CRITICAL)
+        logging.disable(logging.CRITICAL)
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:

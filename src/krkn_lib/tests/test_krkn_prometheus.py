@@ -1,3 +1,5 @@
+import logging
+
 from krkn_lib.prometheus.krkn_prometheus import KrknPrometheus
 from krkn_lib.tests import BaseTest
 
@@ -18,7 +20,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert(self):
         prom_cli = KrknPrometheus(self.url)
         res = prom_cli.process_prom_query("node_boot_time_seconds")
-
+        logging.disable(logging.NOTSET)
         control = (
             f"container: {res[0]['metric']['container']}, "
             f"endpoint: {res[0]['metric']['endpoint']}, "
