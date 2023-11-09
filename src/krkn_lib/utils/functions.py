@@ -155,6 +155,12 @@ def filter_log_line(
     :return: the log line if matches the criteria above otherwise None
     """
     try:
+        if len(log_filter_patterns) == 0:
+            logging.error(
+                "no log filter patterns has been defined in config file,"
+                "unable to filter logfile. Skipping"
+            )
+            return None
         log_date = None
         for pattern in log_filter_patterns:
             if pattern.groups != 1:
@@ -172,13 +178,15 @@ def filter_log_line(
                 log_date = parser.parse(pattern.search(log_line).groups()[0])
                 break
 
-        is_in_interval = check_date_in_localized_interval(
-            start_timestamp,
-            end_timestamp,
-            int(log_date.timestamp()),
-            remote_timezone,
-            local_timezone,
-        )
+        is_in_interval = False
+        if log_date is not None and isinstance(log_date, datetime.datetime):
+            is_in_interval = check_date_in_localized_interval(
+                start_timestamp,
+                end_timestamp,
+                int(log_date.timestamp()),
+                remote_timezone,
+                local_timezone,
+            )
 
         if is_in_interval:
             return log_line
