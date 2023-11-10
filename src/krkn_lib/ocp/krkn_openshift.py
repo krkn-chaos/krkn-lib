@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tarfile
 import threading
+from collections import namedtuple
 
 from pathlib import Path
 from queue import Queue
@@ -353,3 +354,65 @@ class KrknOpenshift(KrknKubernetes):
             safe_logger.error(f"failed to create logs archive: {str(e)}")
 
         return archive_name
+
+    def get_prometheus_api_connection_data(
+        self, namespace: str = "openshift-monitoring"
+    ) -> Optional[
+        namedtuple("PrometheusConnectionData", ["token", "endpoint"])  # NOQA
+    ]:
+        named_tuple = namedtuple(
+            "PrometheusConnectionData", ["token", "endpoint"]
+        )
+        prometheus_namespace = "openshift-monitoring"
+        prometheus_route = "prometheus-k8s"
+        token = self.create_token_for_sa(
+            prometheus_namespace, "prometheus-k8s"
+        )
+        if token is None:
+            return None
+
+        try:
+            path = (
+                "/apis/route.openshift.io/v1/"
+                "namespaces/openshift-monitoring/routes"
+            )
+            path_params: dict[str, str] = {}
+            query_params: list[str] = []
+            header_params: dict[str, str] = {}
+            auth_settings = ["BearerToken"]
+            header_params["Accept"] = self.api_client.select_header_accept(
+                ["application/json"]
+            )
+
+            (data) = self.api_client.call_api(
+                path,
+                "GET",
+                path_params,
+                query_params,
+                header_params,
+                response_type="str",
+                auth_settings=auth_settings,
+            )
+            json_obj = ast.literal_eval(data[0])
+            endpoint = None
+            for item in json_obj["items"]:
+                if item["metadata"]["name"] == "prometheus-k8s":
+                    endpoint = item["spec"]["host"]
+                    break
+
+            if endpoint is None:
+                logging.error(
+                    f"prometheus Route not found in cluster, "
+                    f"namespace{prometheus_namespace}, "
+                    f"Route: {prometheus_route}"
+                )
+                return None
+
+            return named_tuple(token=token, endpoint=endpoint)
+        except Exception:
+            logging.error(
+                f"failed to fetch prometheus route"
+                f"namespace{prometheus_namespace}, "
+                f"Route: {prometheus_route}"
+            )
+            return None

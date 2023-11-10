@@ -2127,3 +2127,56 @@ class KrknKubernetes:
         except Exception as e:
             logging.error(str(e))
             return None
+
+    def create_token_for_sa(
+        self, namespace: str, service_account: str, token_expiration=43200
+    ) -> Optional[str]:
+        """
+        Creates a token for an existing ServiceAccount in a namespace
+        that will expire in <token_expiration> seconds (optional)
+
+        :param namespace: the namespace where the SA belongs
+        :param service_account: the name of the SA
+        :param token_expiration: the duration of the SA in seconds,
+            default 12h
+        :return: the token or None if something went wrong.
+        """
+        body = {
+            "kind": "TokenRequest",
+            "apiVersion": "authentication.k8s.io/v1",
+            "spec": {
+                "expirationSeconds": token_expiration,
+            },
+        }
+
+        path = (
+            f"/api/v1/namespaces/{namespace}/"
+            f"serviceaccounts/{service_account}/token"
+        )
+
+        path_params: Dict[str, str] = {}
+        query_params: List[str] = []
+        header_params: Dict[str, str] = {}
+        auth_settings = ["BearerToken"]
+        header_params["Accept"] = self.api_client.select_header_accept(
+            ["application/json"]
+        )
+        try:
+            (data) = self.api_client.call_api(
+                path,
+                "POST",
+                path_params,
+                query_params,
+                header_params,
+                body=body,
+                response_type="str",
+                auth_settings=auth_settings,
+            )
+            json_obj = ast.literal_eval(data[0])
+            return json_obj["status"]["token"]
+        except Exception as e:
+            logging.error(
+                f"failed to create token for SA: {service_account} "
+                f"on namespace: {namespace} with error: {e}"
+            )
+            return None
