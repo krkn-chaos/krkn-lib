@@ -746,6 +746,15 @@ class KrknKubernetesTests(BaseTest):
             obj_list = json.load(file)
             self.assertTrue(len(obj_list) > 0)
 
+    def test_create_token_for_namespace(self):
+        token = self.lib_k8s.create_token_for_sa("default", "default")
+        self.assertIsNotNone(token)
+
+        not_token = self.lib_k8s.create_token_for_sa(
+            "do_not_exists", "do_not_exists"
+        )
+        self.assertIsNone(not_token)
+
 
 if __name__ == "__main__":
     unittest.main()
