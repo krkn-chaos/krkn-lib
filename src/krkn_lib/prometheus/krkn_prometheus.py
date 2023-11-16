@@ -1,6 +1,8 @@
 import logging
+import math
 import re
 import sys
+from datetime import datetime, timedelta
 
 from prometheus_api_client import PrometheusConnect
 
@@ -33,19 +35,37 @@ class KrknPrometheus:
             sys.exit(1)
 
     # Process custom prometheus query
-    def process_prom_query(self, query: str) -> list[dict[str:any]]:
+    def process_prom_query_in_range(
+        self,
+        query: str,
+        start_time: datetime = datetime.now() - timedelta(days=1),
+        end_time: datetime = datetime.now(),
+    ) -> list[dict[str:any]]:
         """
         Executes a query to the Prometheus API in PromQL language
 
         :param query: promQL query
+        :param start_time: start time of the result set (default now - 1 day)
+        :param end_time: end time of the result set (default min datetime)
+
         :return: a list of records in dictionary format
         """
+
+        granularity = math.ceil(
+            (end_time - start_time).total_seconds() / 11000
+        )
+        granularity = granularity if granularity > 0 else 1
         if self.prom_cli:
             try:
-                return self.prom_cli.custom_query(query=query, params=None)
+                return self.prom_cli.custom_query_range(
+                    query=query,
+                    start_time=start_time,
+                    end_time=end_time,
+                    step=f"{granularity}s",
+                )
             except Exception as e:
                 logging.error("Failed to get the metrics: %s" % e)
-                sys.exit(1)
+                raise e
         else:
             logging.info(
                 "Skipping the prometheus query as the "
@@ -53,7 +73,9 @@ class KrknPrometheus:
                 "be initialized\n"
             )
 
-    def process_alert(self, alert: dict[str, str]):
+    def process_alert(
+        self, alert: dict[str, str], start_time: datetime, end_time: datetime
+    ):
         """
         Processes Krkn alarm in the format
 
@@ -87,6 +109,11 @@ class KrknPrometheus:
 
         :params alert: a dictionary containing the following keys :
             expr, description, severity
+        :param start_time: start time of the result set (if None
+            no time filter is applied to the query)
+        :param end_time: end time of the result set (if None
+            no time filter is applied to the query)
+
 
 
         """
@@ -119,7 +146,9 @@ class KrknPrometheus:
             return
 
         try:
-            records = self.process_prom_query(alert["expr"])
+            records = self.process_prom_query_in_range(
+                alert["expr"], start_time, end_time
+            )
             if len(records) == 0:
                 return
 
@@ -127,8 +156,9 @@ class KrknPrometheus:
             if log_alert is None:
                 raise Exception()
             for record in records:
-                result = self.parse_metric(alert["description"], record)
-                log_alert(result)
+                results = self.parse_metric(alert["description"], record)
+                for result in results:
+                    log_alert(result)
         except Exception as e:
             logging.error(
                 f"failed to execute query: {alert['expr']} with exception {e}"
@@ -146,30 +176,28 @@ class KrknPrometheus:
         :return: the description with the expressions replaced by the correct
             values
         """
-        result = description
-        expressions = re.findall(r"{{\$[\w\-_]+[.[\w\-_]+]*}}", description)
-        for expression in expressions:
-            if expression == "{{$value}}":
-                value = None
-                if "value" in record:
-                    if isinstance(record["value"], list):
-                        if len(record["value"]) > 0:
-                            if len(record["value"]) == 1:
-                                value = record["value"][0]
-                            else:
-                                value = record["value"][1]
-                    else:
-                        value = record["value"]
-                if value is not None:
-                    result = result.replace(expression, value)
 
-            elif re.match(r"^{{\$labels\.([\w\-_]+)}}$", expression):
-                label = re.findall(r"^{{\$labels\.([\w\-_]+)}}", expression)
-                if (
-                    "metric" in record.keys()
-                    and label[0] in record["metric"].keys()
-                ):
-                    result = result.replace(
-                        expression, record["metric"][label[0]]
-                    )
-        return result
+        values = []
+        results = []
+        if "values" in record:
+            if isinstance(record["values"], list):
+                for value in record["values"]:
+                    if isinstance(value, list):
+                        values.append(value[1])
+
+        labels = re.findall(r"{{\$labels\.([\w\-_]+)}}", description)
+        for label in labels:
+            if "metric" in record.keys() and label in record["metric"].keys():
+                placeholder = "{{{{$labels.{0}}}}}".format(label)
+                description = description.replace(
+                    placeholder, record["metric"][label]
+                )
+
+        if "{{$value}}" in description:
+            for value in values:
+                results.append(description.replace("{{$value}}", value))
+
+        if len(results) == 0:
+            results.append(description)
+
+        return results

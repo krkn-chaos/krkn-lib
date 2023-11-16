@@ -397,7 +397,7 @@ class KrknOpenshift(KrknKubernetes):
             endpoint = None
             for item in json_obj["items"]:
                 if item["metadata"]["name"] == "prometheus-k8s":
-                    endpoint = item["spec"]["host"]
+                    endpoint = f"https://{item['spec']['host']}"
                     break
 
             if endpoint is None:
