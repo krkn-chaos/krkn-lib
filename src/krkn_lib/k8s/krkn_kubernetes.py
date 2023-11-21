@@ -206,6 +206,31 @@ class KrknKubernetes:
         """
 
         return self.cli.api_client.configuration.get_default_copy().host
+    
+    def list_continue_helper(self,func, *args, **keyword_args):
+        """
+        List continue helper, be able to get all objects past the request limit
+
+        :param func: function to call of the kubernetes cli
+        :param args: any set arguments for the function
+        :param keyword_args: key value pair arguments to pass to the function
+        :return: list of all resources after segmentation
+        """
+        ret_overall = []
+        try:
+            ret = func(*args, **keyword_args)
+            ret_overall.append(ret)
+            continue_string = ret.metadata._continue
+
+            while continue_string:
+                ret = func(*args, **keyword_args, _continue=continue_string)
+                ret_overall.append(ret)
+                continue_string = ret.metadata._continue
+
+        except ApiException as e:
+            logging.error("Exception when calling CoreV1Api->%s: %s\n" % (str(func), e))
+
+        return ret_overall
 
     #
     def list_namespaces(self, label_selector: str = None) -> list[str]:
@@ -224,7 +249,7 @@ class KrknKubernetes:
                     pretty=True, label_selector=label_selector
                 )
             else:
-                ret = self.cli.list_namespace(pretty=True)
+                ret = self.list_continue_helper(self.cli.list_namespace,pretty=True)
         except ApiException as e:
             logging.error(
                 "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
@@ -290,7 +315,7 @@ class KrknKubernetes:
         :return: a list of matching namespaces
         """
         try:
-            valid_namespaces = self.list_namespaces(label_selector)
+            valid_namespaces = self.list_continue_helper(self.list_namespaces,label_selector)
             regex_namespaces = set(namespaces) - set(valid_namespaces)
             final_namespaces = set(namespaces) - set(regex_namespaces)
             valid_regex = set()
@@ -325,11 +350,11 @@ class KrknKubernetes:
         nodes = []
         try:
             if label_selector:
-                ret = self.cli.list_node(
+                ret = self.list_continue_helper(self.cli.list_node,
                     pretty=True, label_selector=label_selector
                 )
             else:
-                ret = self.cli.list_node(pretty=True)
+                ret = self.list_continue_helper(self.cli.list_node,pretty=True)
         except ApiException as e:
             logging.error(
                 "Exception when calling CoreV1Api->list_node: %s\n", str(e)
@@ -424,11 +449,11 @@ class KrknKubernetes:
         pods = []
         try:
             if label_selector:
-                ret = self.cli.list_namespaced_pod(
+                ret = self.list_continue_helper(self.cli.list_namespaced_pod,
                     namespace, pretty=True, label_selector=label_selector
                 )
             else:
-                ret = self.cli.list_namespaced_pod(namespace, pretty=True)
+                ret = self.list_continue_helper(self.cli.list_namespaced_pod,namespace, pretty=True)
         except ApiException as e:
             logging.error(
                 "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
@@ -609,11 +634,11 @@ class KrknKubernetes:
         """
         pods = []
         if label_selector:
-            ret = self.cli.list_pod_for_all_namespaces(
+            ret = self.list_continue_helper(self.cli.list_pod_for_all_namespaces,
                 pretty=True, label_selector=label_selector
             )
         else:
-            ret = self.cli.list_pod_for_all_namespaces(pretty=True)
+            ret = self.list_continue_helper(self.cli.list_pod_for_all_namespaces,pretty=True)
         for pod in ret.items:
             pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
@@ -1704,7 +1729,7 @@ class KrknKubernetes:
         node_type_workload_label = "node-role.k8s.io/workload"
         node_type_application_label = "node-role.k8s.io/app"
         result = list[NodeInfo]()
-        resp = self.cli.list_node()
+        resp = self.list_continue_helper(self.cli.list_node)
         for node in resp.items:
             node_info = NodeInfo()
             if instance_type_label in node.metadata.labels.keys():
