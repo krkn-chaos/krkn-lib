@@ -237,6 +237,35 @@ class KrknKubernetes:
 
         return ret_overall
 
+
+    # Return of all data of namespaces
+    def list_all_namespaces(self, label_selector: str = None) -> list[str]:
+        """
+        List all namespaces with info
+
+        :param label_selector: filter by label
+            selector (optional default `None`)
+        :return: list of namespaces json data
+        """
+
+        namespaces = []
+        try:
+            if label_selector:
+                ret = self.list_continue_helper(self.cli.list_namespace,
+                    pretty=True, label_selector=label_selector,limit=self.request_chunk_size
+                )
+            else:
+                ret = self.list_continue_helper(self.cli.list_namespace,pretty=True, limit=self.request_chunk_size)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
+                str(e),
+            )
+            raise e
+        
+        return ret
+
+
     #
     def list_namespaces(self, label_selector: str = None) -> list[str]:
         """
@@ -366,8 +395,9 @@ class KrknKubernetes:
                 "Exception when calling CoreV1Api->list_node: %s\n", str(e)
             )
             raise ApiRequestException(str(e))
-        for node in ret.items:
-            nodes.append(node.metadata.name)
+        for ret_list in ret: 
+            for node in ret_list.items:
+                nodes.append(node.metadata.name)
         return nodes
 
     # TODO: refactoring to work both in k8s and OpenShift
@@ -466,8 +496,9 @@ class KrknKubernetes:
                 str(e),
             )
             raise e
-        for pod in ret.items:
-            pods.append(pod.metadata.name)
+        for ret_list in ret: 
+            for pod in ret_list.items:
+                pods.append(pod.metadata.name)
         return pods
 
     def get_daemonset(self, namespace: str) -> list[str]:
@@ -645,8 +676,9 @@ class KrknKubernetes:
             )
         else:
             ret = self.list_continue_helper(self.cli.list_pod_for_all_namespaces,pretty=True, limit=self.request_chunk_size)
-        for pod in ret.items:
-            pods.append([pod.metadata.name, pod.metadata.namespace])
+        for ret_list in ret: 
+            for pod in ret_list.items:
+                pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
 
     def get_all_statefulset(self, namespace) -> list[str]:
@@ -715,6 +747,8 @@ class KrknKubernetes:
         for serv in ret.items:
             services.append(serv.metadata.name)
         return services
+    
+
     # Outputs a json blob with informataion about all pods in a given namespace
     def get_all_pod_info(self, namespace: str = "default") -> list[str]:
         """
