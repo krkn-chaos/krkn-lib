@@ -76,14 +76,23 @@ class KrknKubernetesTests(BaseTest):
     def test_list_all_namespaces(self):
         # test list all namespaces
         result = self.lib_k8s.list_all_namespaces()
-        self.assertTrue(len(result) > 1)
+        result_count = 0
+        for r in result:
+            for item in r.items:
+                result_count+=1
+        print('result type' + str((result_count)))
+        self.assertTrue(result_count > 1)
         # test filter by label
         result = self.lib_k8s.list_all_namespaces(
             "kubernetes.io/metadata.name=default"
         )
-        print('result type' + str(type(result)))
+       
         self.assertTrue(len(result) == 1)
-        self.assertIn("default", result)
+        namespace_names = []
+        for r in result:
+            for item in r.items:
+                namespace_names.append(item.metadata.name)
+        self.assertIn("default", namespace_names)
 
         # test unexisting filter
         result = self.lib_k8s.list_namespaces(
