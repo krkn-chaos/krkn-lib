@@ -248,7 +248,6 @@ class KrknKubernetes:
         :return: list of namespaces json data
         """
 
-        namespaces = []
         try:
             if label_selector:
                 ret = self.list_continue_helper(self.cli.list_namespace,
