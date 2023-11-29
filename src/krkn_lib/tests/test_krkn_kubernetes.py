@@ -72,6 +72,25 @@ class KrknKubernetesTests(BaseTest):
             test_kubeconfig = test.read()
             self.assertEqual(test_kubeconfig, kubeconfig_str)
 
+
+    def test_list_all_namespaces(self):
+        # test list all namespaces
+        result = self.lib_k8s.list_all_namespaces()
+        self.assertTrue(len(result) > 1)
+        # test filter by label
+        result = self.lib_k8s.list_all_namespaces(
+            "kubernetes.io/metadata.name=default"
+        )
+        print('result type' + str(type(result)))
+        self.assertTrue(len(result) == 1)
+        self.assertIn("default", result)
+
+        # test unexisting filter
+        result = self.lib_k8s.list_namespaces(
+            "k8s.io/metadata.name=donotexist"
+        )
+        self.assertTrue(len(result) == 0)
+
     def test_list_namespaces(self):
         # test all namespaces
         result = self.lib_k8s.list_namespaces()
