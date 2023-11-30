@@ -67,15 +67,16 @@ class KrknKubernetes:
         :param kubeconfig_path: kubeconfig path
         :param kubeconfig_string: (keyword argument)
             kubeconfig in string format
-
+        :param: request_chunk_size: int of chunk size to limit requests to
+        
         Initialization with kubeconfig path:
 
-        >>> KrknKubernetes(log_writer, "/home/test/.kube/config")
+        >>> KrknKubernetes(log_writer, "/home/test/.kube/config", )
 
         Initialization with kubeconfig string:
 
         >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
+        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string, r)
         """
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
@@ -85,17 +86,18 @@ class KrknKubernetes:
             )
 
         self.__kubeconfig_path = kubeconfig_path
+        self.request_chunk_size = request_chunk_size
         if kubeconfig_string is not None:
-            self.__initialize_clients_from_kconfig_string(kubeconfig_string, request_chunk_size)
+            self.__initialize_clients_from_kconfig_string(kubeconfig_string)
         else:
-            self.__initialize_clients(kubeconfig_path,request_chunk_size)
+            self.__initialize_clients(kubeconfig_path)
 
     def __del__(self):
         self.api_client.rest_client.pool_manager.clear()
         self.api_client.close()
 
     # Load kubeconfig and initialize k8s python client
-    def __initialize_clients(self, kubeconfig_path: str = None, request_chunk_size: int = 250):
+    def __initialize_clients(self, kubeconfig_path: str = None):
         """
         Initialize all clients from kubeconfig path
 
@@ -140,7 +142,7 @@ class KrknKubernetes:
             )
             self.dyn_client = DynamicClient(self.k8s_client)
             self.watch_resource = watch.Watch()
-            self.request_chunk_size = request_chunk_size
+            
         except OSError:
             raise Exception(
                 "Invalid kube-config file: {0}. "
@@ -149,8 +151,7 @@ class KrknKubernetes:
 
     def __initialize_clients_from_kconfig_string(
         self,
-        kubeconfig_str: str,
-        request_chunk_size: int
+        kubeconfig_str: str
     ):
         """
         Initialize all clients from kubeconfig yaml string
@@ -174,7 +175,6 @@ class KrknKubernetes:
                 self.api_client
             )
             self.dyn_client = DynamicClient(self.api_client)
-            self.request_chunk_size = request_chunk_size
         except ApiException as e:
             logging.error("Failed to initialize k8s client: %s\n", str(e))
             raise e
@@ -277,15 +277,11 @@ class KrknKubernetes:
 
         namespaces = []
         try:
-            if label_selector:
-                ret = self.list_continue_helper(self.cli.list_namespace,
-                    pretty=True, label_selector=label_selector,limit=self.request_chunk_size
-                )
-            else:
-                ret = self.list_continue_helper(self.cli.list_namespace,pretty=True, limit=self.request_chunk_size)
+            
+            ret = self.list_all_namespaces(label_selector)
         except ApiException as e:
             logging.error(
-                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
+                "Exception when calling list_namespaces: %s\n",
                 str(e),
             )
             raise e
@@ -483,15 +479,10 @@ class KrknKubernetes:
         """
         pods = []
         try:
-            if label_selector:
-                ret = self.list_continue_helper(self.cli.list_namespaced_pod,
-                    namespace, pretty=True, label_selector=label_selector, limit=self.request_chunk_size
-                )
-            else:
-                ret = self.list_continue_helper(self.cli.list_namespaced_pod,namespace, pretty=True, limit=self.request_chunk_size)
+            ret = self.get_all_pod_info(namespace, label_selector)
         except ApiException as e:
             logging.error(
-                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
+                "Exception when calling list_pods: %s\n",
                 str(e),
             )
             raise e
@@ -749,7 +740,7 @@ class KrknKubernetes:
     
 
     # Outputs a json blob with informataion about all pods in a given namespace
-    def get_all_pod_info(self, namespace: str = "default") -> list[str]:
+    def get_all_pod_info(self, namespace: str = "default",  label_selector: str = None) -> list[str]:
         """
         Get details of all pods in a namespace
 
@@ -757,7 +748,12 @@ class KrknKubernetes:
         :return list of pod details
         """
         try:
-            ret = self.list_continue_helper(self.cli.list_namespaced_pod,namespace, limit=self.request_chunk_size)
+            if label_selector:
+                ret = self.list_continue_helper(self.cli.list_namespaced_pod,
+                    namespace, pretty=True, label_selector=label_selector, limit=self.request_chunk_size
+                )
+            else:
+                ret = self.list_continue_helper(self.cli.list_namespaced_pod,namespace, limit=self.request_chunk_size)
         except ApiException as e:
             logging.error("Exception when calling CoreV1Api->list_namespaced_pod: %s\n" % e)
 
