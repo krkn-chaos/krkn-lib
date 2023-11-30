@@ -71,12 +71,12 @@ class KrknKubernetes:
 
         Initialization with kubeconfig path:
 
-        >>> KrknKubernetes(log_writer, "/home/test/.kube/config", )
+        >>> KrknKubernetes(log_writer, "/home/test/.kube/config")
 
         Initialization with kubeconfig string:
 
         >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string, r)
+        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
@@ -85,7 +85,6 @@ class KrknKubernetes:
                 "or a valid kubeconfig string"
             )
 
-        self.__kubeconfig_path = kubeconfig_path
         self.request_chunk_size = request_chunk_size
         if kubeconfig_string is not None:
             self.__kubeconfig_string = kubeconfig_string
@@ -93,6 +92,7 @@ class KrknKubernetes:
 
         else:
             self.__initialize_clients(kubeconfig_path)
+            self.__kubeconfig_path = kubeconfig_path
 
     def __del__(self):
         self.api_client.rest_client.pool_manager.clear()
