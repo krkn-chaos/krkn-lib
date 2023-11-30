@@ -57,7 +57,7 @@ class KrknKubernetes:
         kubeconfig_path: str = None,
         *,
         kubeconfig_string: str = None,
-        request_chunk_size: int = 250
+        request_chunk_size: int = 250,
     ):
         """
         KrknKubernetes Constructor. Can be invoked with kubeconfig_path
@@ -68,7 +68,7 @@ class KrknKubernetes:
         :param kubeconfig_string: (keyword argument)
             kubeconfig in string format
         :param: request_chunk_size: int of chunk size to limit requests to
-        
+
         Initialization with kubeconfig path:
 
         >>> KrknKubernetes(log_writer, "/home/test/.kube/config", )
@@ -88,7 +88,9 @@ class KrknKubernetes:
         self.__kubeconfig_path = kubeconfig_path
         self.request_chunk_size = request_chunk_size
         if kubeconfig_string is not None:
+            self.__kubeconfig_string = kubeconfig_string
             self.__initialize_clients_from_kconfig_string(kubeconfig_string)
+
         else:
             self.__initialize_clients(kubeconfig_path)
 
@@ -142,17 +144,14 @@ class KrknKubernetes:
             )
             self.dyn_client = DynamicClient(self.k8s_client)
             self.watch_resource = watch.Watch()
-            
+
         except OSError:
             raise Exception(
                 "Invalid kube-config file: {0}. "
                 "No configuration found.".format(kubeconfig_path)
             )
 
-    def __initialize_clients_from_kconfig_string(
-        self,
-        kubeconfig_str: str
-    ):
+    def __initialize_clients_from_kconfig_string(self, kubeconfig_str: str):
         """
         Initialize all clients from kubeconfig yaml string
 
@@ -210,8 +209,8 @@ class KrknKubernetes:
         """
 
         return self.cli.api_client.configuration.get_default_copy().host
-    
-    def list_continue_helper(self,func, *args, **keyword_args):
+
+    def list_continue_helper(self, func, *args, **keyword_args):
         """
         List continue helper, be able to get all objects past the request limit
 
@@ -229,14 +228,15 @@ class KrknKubernetes:
             while continue_string:
                 ret = func(*args, **keyword_args, _continue=continue_string)
                 ret_overall.append(ret)
-                
+
                 continue_string = ret.metadata._continue
 
         except ApiException as e:
-            logging.error("Exception when calling CoreV1Api->%s: %s\n" % (str(func), e))
+            logging.error(
+                "Exception when calling CoreV1Api->%s: %s\n" % (str(func), e)
+            )
 
         return ret_overall
-
 
     # Return of all data of namespaces
     def list_all_namespaces(self, label_selector: str = None) -> list[str]:
@@ -250,20 +250,26 @@ class KrknKubernetes:
 
         try:
             if label_selector:
-                ret = self.list_continue_helper(self.cli.list_namespace,
-                    pretty=True, label_selector=label_selector,limit=self.request_chunk_size
+                ret = self.list_continue_helper(
+                    self.cli.list_namespace,
+                    pretty=True,
+                    label_selector=label_selector,
+                    limit=self.request_chunk_size,
                 )
             else:
-                ret = self.list_continue_helper(self.cli.list_namespace,pretty=True, limit=self.request_chunk_size)
+                ret = self.list_continue_helper(
+                    self.cli.list_namespace,
+                    pretty=True,
+                    limit=self.request_chunk_size,
+                )
         except ApiException as e:
             logging.error(
                 "Exception when calling CoreV1Api->list_namespaced_pod: %s\n",
                 str(e),
             )
             raise e
-        
-        return ret
 
+        return ret
 
     #
     def list_namespaces(self, label_selector: str = None) -> list[str]:
@@ -277,7 +283,6 @@ class KrknKubernetes:
 
         namespaces = []
         try:
-            
             ret = self.list_all_namespaces(label_selector)
         except ApiException as e:
             logging.error(
@@ -285,7 +290,7 @@ class KrknKubernetes:
                 str(e),
             )
             raise e
-        for ret_list in ret: 
+        for ret_list in ret:
             for namespace in ret_list.items:
                 namespaces.append(namespace.metadata.name)
         return namespaces
@@ -380,17 +385,24 @@ class KrknKubernetes:
         nodes = []
         try:
             if label_selector:
-                ret = self.list_continue_helper(self.cli.list_node,
-                    pretty=True, label_selector=label_selector, limit=self.request_chunk_size
+                ret = self.list_continue_helper(
+                    self.cli.list_node,
+                    pretty=True,
+                    label_selector=label_selector,
+                    limit=self.request_chunk_size,
                 )
             else:
-                ret = self.list_continue_helper(self.cli.list_node,pretty=True, limit=self.request_chunk_size)
+                ret = self.list_continue_helper(
+                    self.cli.list_node,
+                    pretty=True,
+                    limit=self.request_chunk_size,
+                )
         except ApiException as e:
             logging.error(
                 "Exception when calling CoreV1Api->list_node: %s\n", str(e)
             )
             raise ApiRequestException(str(e))
-        for ret_list in ret: 
+        for ret_list in ret:
             for node in ret_list.items:
                 nodes.append(node.metadata.name)
         return nodes
@@ -486,7 +498,7 @@ class KrknKubernetes:
                 str(e),
             )
             raise e
-        for ret_list in ret: 
+        for ret_list in ret:
             for pod in ret_list.items:
                 pods.append(pod.metadata.name)
         return pods
@@ -661,12 +673,19 @@ class KrknKubernetes:
         """
         pods = []
         if label_selector:
-            ret = self.list_continue_helper(self.cli.list_pod_for_all_namespaces,
-                pretty=True, label_selector=label_selector, limit=self.request_chunk_size
+            ret = self.list_continue_helper(
+                self.cli.list_pod_for_all_namespaces,
+                pretty=True,
+                label_selector=label_selector,
+                limit=self.request_chunk_size,
             )
         else:
-            ret = self.list_continue_helper(self.cli.list_pod_for_all_namespaces,pretty=True, limit=self.request_chunk_size)
-        for ret_list in ret: 
+            ret = self.list_continue_helper(
+                self.cli.list_pod_for_all_namespaces,
+                pretty=True,
+                limit=self.request_chunk_size,
+            )
+        for ret_list in ret:
             for pod in ret_list.items:
                 pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
@@ -737,10 +756,11 @@ class KrknKubernetes:
         for serv in ret.items:
             services.append(serv.metadata.name)
         return services
-    
 
     # Outputs a json blob with informataion about all pods in a given namespace
-    def get_all_pod_info(self, namespace: str = "default",  label_selector: str = None) -> list[str]:
+    def get_all_pod_info(
+        self, namespace: str = "default", label_selector: str = None
+    ) -> list[str]:
         """
         Get details of all pods in a namespace
 
@@ -749,13 +769,24 @@ class KrknKubernetes:
         """
         try:
             if label_selector:
-                ret = self.list_continue_helper(self.cli.list_namespaced_pod,
-                    namespace, pretty=True, label_selector=label_selector, limit=self.request_chunk_size
+                ret = self.list_continue_helper(
+                    self.cli.list_namespaced_pod,
+                    namespace,
+                    pretty=True,
+                    label_selector=label_selector,
+                    limit=self.request_chunk_size,
                 )
             else:
-                ret = self.list_continue_helper(self.cli.list_namespaced_pod,namespace, limit=self.request_chunk_size)
+                ret = self.list_continue_helper(
+                    self.cli.list_namespaced_pod,
+                    namespace,
+                    limit=self.request_chunk_size,
+                )
         except ApiException as e:
-            logging.error("Exception when calling CoreV1Api->list_namespaced_pod: %s\n" % e)
+            logging.error(
+                "Exception when calling CoreV1Api->list_namespaced_pod: %s\n"
+                % e
+            )
 
         return ret
 
@@ -1778,8 +1809,10 @@ class KrknKubernetes:
         node_type_workload_label = "node-role.kubernetes.io/workload"
         node_type_application_label = "node-role.kubernetes.io/app"
         result = list[NodeInfo]()
-        resp = self.list_continue_helper(self.cli.list_node, limit=self.request_chunk_size)
-        for node_resp in resp: 
+        resp = self.list_continue_helper(
+            self.cli.list_node, limit=self.request_chunk_size
+        )
+        for node_resp in resp:
             for node in node_resp.items:
                 node_info = NodeInfo(taint=node.spec.taints)
                 if instance_type_label in node.metadata.labels.keys():
@@ -1797,17 +1830,20 @@ class KrknKubernetes:
                     node_info.node_type = "master"
                 elif node_type_workload_label in node.metadata.labels.keys():
                     node_info.node_type = "workload"
-                elif node_type_application_label in node.metadata.labels.keys():
+                elif (
+                    node_type_application_label in node.metadata.labels.keys()
+                ):
                     node_info.node_type = "application"
                 else:
                     node_info.node_type = "unknown"
-                
 
                 node_info.name = node.metadata.name
                 node_info.architecture = node.status.node_info.architecture
                 node_info.architecture = node.status.node_info.architecture
                 node_info.kernel_version = node.status.node_info.kernel_version
-                node_info.kubelet_version = node.status.node_info.kubelet_version
+                node_info.kubelet_version = (
+                    node.status.node_info.kubelet_version
+                )
                 node_info.os_version = node.status.node_info.os_image
                 result.append(node_info)
         return result
