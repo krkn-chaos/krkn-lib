@@ -76,6 +76,14 @@ class NodeInfo:
     """
     Cluster node telemetry informations
     """
+    taint: dict 
+    """
+    Taint on the node"""
+
+    name: str = ""
+    """
+    Name of the node
+    """
 
     architecture: str = ""
     """
