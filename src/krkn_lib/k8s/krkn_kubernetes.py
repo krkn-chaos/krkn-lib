@@ -91,7 +91,6 @@ class KrknKubernetes:
             self.__initialize_clients_from_kconfig_string(kubeconfig_string)
 
         if kubeconfig_path is not None:
-            self.__kubeconfig_path = kubeconfig_path
             self.__initialize_clients(kubeconfig_path)
             self.__kubeconfig_path = kubeconfig_path
 
