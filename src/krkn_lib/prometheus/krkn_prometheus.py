@@ -166,7 +166,7 @@ class KrknPrometheus:
 
     def parse_metric(
         self, description: str, record: dict[str:any]
-    ) -> list[str]:
+    ) -> set[str]:
         """
         Parses the expression contained in the Krkn alert description replacing
         them with the respective values contained in the record
@@ -204,4 +204,4 @@ class KrknPrometheus:
         if len(results) == 0:
             results.append(description)
 
-        return results
+        return set(results)
