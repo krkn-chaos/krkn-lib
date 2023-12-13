@@ -86,7 +86,15 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                             "scenario": "test",
                             "exitStatus": 0,
                             "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
-                        }]
+                        }],
+            "node_infos": [{
+                    "name": "test_node",
+                    "taints": [{
+                        "key": "key",
+                        "value": "value",
+                        "effect": "NoSchedule"
+                    }]
+                }]
         }
         """  # NOQA
 

@@ -72,13 +72,39 @@ class ScenarioTelemetry:
 
 
 @dataclass(order=False)
+class Taint:
+    """
+    Cluster Node Taint details
+    """
+
+    effect: str = ""
+    """
+    effect of the taint in the node
+    """
+    key: str = ""
+    """
+    Taint key
+    """
+    value: str = ""
+    """
+    Taint Value
+    """
+
+
+@dataclass(order=False)
 class NodeInfo:
     """
     Cluster node telemetry informations
     """
-    taint: dict 
+
+    def __init__(self):
+        self.taints = list[Taint]()
+
+    taints: list[Taint]
+
     """
-    Taint on the node"""
+    Taints on the node
+    """
 
     name: str = ""
     """
