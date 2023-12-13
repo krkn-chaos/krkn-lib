@@ -155,18 +155,18 @@ class KrknPrometheus:
             log_alert = getattr(logging, alert["severity"])
             if log_alert is None:
                 raise Exception()
-            for record in records:
-                results = self.parse_metric(alert["description"], record)
-                for result in results:
-                    log_alert(result)
+
+            # prints only one record per query result
+            if len(records) > 0:
+                result = self.parse_metric(alert["description"], records[0])
+                log_alert(result)
+
         except Exception as e:
             logging.error(
                 f"failed to execute query: {alert['expr']} with exception {e}"
             )
 
-    def parse_metric(
-        self, description: str, record: dict[str:any]
-    ) -> set[str]:
+    def parse_metric(self, description: str, record: dict[str:any]) -> str:
         """
         Parses the expression contained in the Krkn alert description replacing
         them with the respective values contained in the record
@@ -180,7 +180,6 @@ class KrknPrometheus:
         """
 
         values = []
-        results = []
 
         if "values" in record:
             if isinstance(record["values"], list):
@@ -197,11 +196,8 @@ class KrknPrometheus:
                 )
 
         if "{{$value}}" in description:
-            unique_values = set(values)
-            for value in unique_values:
-                results.append(description.replace("{{$value}}", value))
+            if len(values) > 0:
+                # returns the first value in the series
+                description = description.replace("{{$value}}", values[0])
 
-        if len(results) == 0:
-            results.append(description)
-
-        return set(results)
+        return description

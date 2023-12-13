@@ -153,30 +153,26 @@ class TestKrknPrometheus(BaseTest):
             "values": [],
         }
 
-        control = [
-            (
-                f"10 minutes avg. 99th etcd "
-                f"commit {metric['metric']['instance']} "
-                f"latency on {metric['metric']['pod']} higher "
-                f"than 30ms. {metric['values'][0][1]}"
-            )
-        ]
-        control_underscore = [
-            (
-                f"10 minutes avg. 99th etcd "
-                f"commit {metric['metric']['instance']} "
-                f"latency on {metric['metric']['pod']} higher "
-                f"than 30ms. {metric['metric']['no_value']}"
-            )
-        ]
-        control_no_value = [
-            (
-                f"10 minutes avg. 99th etcd "
-                f"commit {metric['metric']['instance']} "
-                f"latency on {metric['metric']['pod']} higher than "
-                f"30ms. {{{{$value}}}}"
-            )
-        ]
+        control = (
+            f"10 minutes avg. 99th etcd "
+            f"commit {metric['metric']['instance']} "
+            f"latency on {metric['metric']['pod']} higher "
+            f"than 30ms. {metric['values'][0][1]}"
+        )
+
+        control_underscore = (
+            f"10 minutes avg. 99th etcd "
+            f"commit {metric['metric']['instance']} "
+            f"latency on {metric['metric']['pod']} higher "
+            f"than 30ms. {metric['metric']['no_value']}"
+        )
+
+        control_no_value = (
+            f"10 minutes avg. 99th etcd "
+            f"commit {metric['metric']['instance']} "
+            f"latency on {metric['metric']['pod']} higher than "
+            f"30ms. {{{{$value}}}}"
+        )
 
         description = (
             "10 minutes avg. 99th etcd commit {{$labels.instance}} latency"
