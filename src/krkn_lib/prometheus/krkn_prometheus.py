@@ -164,7 +164,9 @@ class KrknPrometheus:
                 f"failed to execute query: {alert['expr']} with exception {e}"
             )
 
-    def parse_metric(self, description: str, record: dict[str:any]) -> str:
+    def parse_metric(
+        self, description: str, record: dict[str:any]
+    ) -> list[str]:
         """
         Parses the expression contained in the Krkn alert description replacing
         them with the respective values contained in the record
@@ -179,6 +181,7 @@ class KrknPrometheus:
 
         values = []
         results = []
+
         if "values" in record:
             if isinstance(record["values"], list):
                 for value in record["values"]:
@@ -194,7 +197,8 @@ class KrknPrometheus:
                 )
 
         if "{{$value}}" in description:
-            for value in values:
+            unique_values = set(values)
+            for value in unique_values:
                 results.append(description.replace("{{$value}}", value))
 
         if len(results) == 0:
