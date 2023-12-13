@@ -29,7 +29,7 @@ from krkn_lib.models.k8s import (
     Volume,
     VolumeMount,
 )
-from krkn_lib.models.telemetry import NodeInfo
+from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -1814,7 +1814,15 @@ class KrknKubernetes:
         )
         for node_resp in resp:
             for node in node_resp.items:
-                node_info = NodeInfo(taint=node.spec.taints)
+                node_info = NodeInfo()
+                if node.spec.taints is not None:
+                    for taint in node.spec.taints:
+                        taint = Taint(
+                            effect=taint.effect,
+                            key=taint.key,
+                            value=taint.value,
+                        )
+                        node_info.taints.append(taint)
                 if instance_type_label in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
                         instance_type_label

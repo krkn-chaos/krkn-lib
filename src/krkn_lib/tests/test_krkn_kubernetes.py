@@ -13,6 +13,7 @@ from kubernetes import config
 from kubernetes.client import ApiException
 from jinja2 import Environment, FileSystemLoader
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
+from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
 from tzlocal import get_localzone
 
@@ -72,21 +73,20 @@ class KrknKubernetesTests(BaseTest):
             test_kubeconfig = test.read()
             self.assertEqual(test_kubeconfig, kubeconfig_str)
 
-
     def test_list_all_namespaces(self):
         # test list all namespaces
         result = self.lib_k8s.list_all_namespaces()
         result_count = 0
         for r in result:
             for item in r.items:
-                result_count+=1
-        print('result type' + str((result_count)))
+                result_count += 1
+        print("result type" + str((result_count)))
         self.assertTrue(result_count > 1)
         # test filter by label
         result = self.lib_k8s.list_all_namespaces(
             "kubernetes.io/metadata.name=default"
         )
-       
+
         self.assertTrue(len(result) == 1)
         namespace_names = []
         for r in result:
@@ -672,6 +672,7 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue("Ingress" in objs.keys())
 
     def test_get_nodes_infos(self):
+        telemetry = ChaosRunTelemetry()
         nodes = self.lib_k8s.get_nodes_infos()
         for node in nodes:
             self.assertTrue(node.node_type)
@@ -680,6 +681,11 @@ class KrknKubernetesTests(BaseTest):
             self.assertTrue(node.os_version)
             self.assertTrue(node.kernel_version)
             self.assertTrue(node.kubelet_version)
+            telemetry.node_infos.append(node)
+        try:
+            _ = telemetry.to_json()
+        except Exception:
+            self.fail("failed to deserialize NodeInfo")
 
     def test_download_folder_from_pod_as_archive(self):
         workdir_basepath = os.getenv("TEST_WORKDIR")
