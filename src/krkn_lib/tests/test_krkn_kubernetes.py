@@ -51,6 +51,19 @@ class KrknKubernetesTests(BaseTest):
         except Exception as exc:
             assert False, f"command execution raised an exception {exc}"
 
+    def test_exec_command_on_node(self):
+        try:
+            response = self.lib_k8s.exec_command_on_node(
+                "kind-control-plane",
+                ["timedatectl", "status"],
+                f"test-pod-{time.time()}",
+            )
+            self.assertTrue(
+                "NTP service: active" or "Network time on: yes" in response
+            )
+        except Exception as e:
+            self.fail(f"exception on node command execution: {e}")
+
     def test_get_kubeconfig_path(self):
         kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
         if "~" in kubeconfig_path:

@@ -11,6 +11,8 @@ from queue import Queue
 from typing import Dict, List, Optional
 import arcaflow_lib_kubernetes
 import kubernetes
+import yaml
+from jinja2 import PackageLoader, Environment
 from kubeconfig import KubeConfig
 from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
@@ -852,9 +854,68 @@ class KrknKubernetes:
                     tty=False,
                 )
         except Exception as e:
-            logging.error("failed to exec command on pod %s", str(e))
             raise e
         return ret
+
+    def exec_command_on_node(
+        self,
+        node_name: str,
+        command: [str],
+        exec_pod_name: str,
+        exec_pod_namespace: str = "default",
+        exec_pod_container: str = None,
+    ) -> str:
+        """
+        Creates a privileged pod on a specific node and
+        executes a command on it to affect the node itself.
+        The pod mounts also the dbus socket /run/dbus/system_bus_socket
+        to exec kernel related commands like timedatectl.
+        To see the pod spec check the template on
+        src/krkn_lib/k8s/templates/
+
+        :param node_name: the name of the node where the command will be
+            executed
+        :param command: the command and the options to be executed
+            as a list of strings eg. ["ls", "-al"]
+        :param exec_pod_name: the name of the pod that will be created
+        :param exec_pod_namespace: the namespace where the pod will be created
+            (default "default")
+        :param exec_pod_container: the container of the pod on which
+            the pod will be executed (default None)
+        :return: the command output
+        """
+
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        pod_template = env.get_template("node_exec_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(nodename=node_name, podname=exec_pod_name)
+        )
+        logging.info(
+            f"Creating pod to exec command {command} on node {node_name}"
+        )
+        try:
+            self.create_pod(pod_body, exec_pod_namespace, 300)
+        except Exception as e:
+            logging.error(
+                f"failed to create pod {exec_pod_name} on node {node_name},"
+                f" namespace: {exec_pod_namespace}"
+            )
+            raise e
+
+        while not self.is_pod_running(exec_pod_name, exec_pod_namespace):
+            time.sleep(5)
+            continue
+        try:
+            response = self.exec_cmd_in_pod(
+                command,
+                exec_pod_name,
+                exec_pod_namespace,
+                exec_pod_container,
+            )
+            return response
+        except Exception as e:
+            raise e
 
     def delete_pod(self, name: str, namespace: str = "default"):
         """

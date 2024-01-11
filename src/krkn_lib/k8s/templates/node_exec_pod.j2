@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{podname}}
+spec:
+  hostNetwork: true
+  nodeName: {{nodename}}
+  containers:
+  - name: fedtools
+    image: docker.io/fedora/tools
+    command:
+    - /bin/sh
+    - -c
+    - |
+      sleep infinity
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /run/dbus/system_bus_socket
+      name: dbus
+      readOnly: true
+  volumes:
+  - name: dbus
+    hostPath:
+      path: /run/dbus/system_bus_socket
