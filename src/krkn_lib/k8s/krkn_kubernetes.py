@@ -634,10 +634,6 @@ class KrknKubernetes:
         """
         try:
             self.cli.delete_namespaced_service(name, namespace)
-            while self.cli.read_namespaced_service(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Service already deleted")
