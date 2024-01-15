@@ -3,6 +3,8 @@ import logging
 import os
 import sys
 import re
+import string
+import random
 from queue import Queue
 from typing import Optional
 
@@ -358,3 +360,14 @@ def find_executable_in_path(executable_name: str) -> Optional[str]:
             if os.access(test_path, os.X_OK):
                 return test_path
     return None
+
+
+def get_random_string(length: int) -> str:
+    """
+    Returns a random lowercase string of lenght `length`
+
+    :param length: the lenght of the string
+    :return: the random string
+    """
+    letters = string.ascii_lowercase
+    return "".join(random.choice(letters) for i in range(length))

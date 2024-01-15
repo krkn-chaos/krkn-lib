@@ -15,6 +15,7 @@ from krkn_lib.utils import (
     check_date_in_localized_interval,
     filter_dictionary,
     find_executable_in_path,
+    get_random_string,
 )
 
 
@@ -310,3 +311,8 @@ class UtilFunctionTests(BaseTest):
         self.assertIsNotNone(path)
         path = find_executable_in_path("do_not_exists")
         self.assertIsNone(path)
+
+    def test_get_random_string(self):
+        string_one = get_random_string(10)
+        string_two = get_random_string(10)
+        self.assertNotEquals(string_one, string_two)
