@@ -38,8 +38,8 @@ class KrknPrometheus:
     def process_prom_query_in_range(
         self,
         query: str,
-        start_time: datetime = datetime.now() - timedelta(days=1),
-        end_time: datetime = datetime.now(),
+        start_time: datetime = None,
+        end_time: datetime = None,
     ) -> list[dict[str:any]]:
         """
         Executes a query to the Prometheus API in PromQL language
@@ -50,6 +50,12 @@ class KrknPrometheus:
 
         :return: a list of records in dictionary format
         """
+        start_time = (
+            datetime.now() - timedelta(days=1)
+            if start_time is None
+            else start_time
+        )
+        end_time = datetime.now() if end_time is None else end_time
 
         granularity = math.ceil(
             (end_time - start_time).total_seconds() / 11000
