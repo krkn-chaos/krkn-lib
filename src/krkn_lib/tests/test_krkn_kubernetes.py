@@ -19,7 +19,7 @@ from tzlocal import get_localzone
 
 
 class KrknKubernetesTests(BaseTest):
-    def test_exec_command_unsafe(self):
+    def test_exec_command(self):
         namespace = "test-ns-" + self.get_random_string(10)
         alpine_name = "alpine-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
