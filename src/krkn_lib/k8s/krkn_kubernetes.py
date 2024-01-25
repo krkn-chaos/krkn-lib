@@ -789,6 +789,7 @@ class KrknKubernetes:
         return ret
 
     # to be tested, return value not sure
+
     def exec_cmd_in_pod(
         self,
         command: list[str],
@@ -799,7 +800,7 @@ class KrknKubernetes:
         std_err: bool = True,
     ) -> str:
         """
-        Execute a base command and its parameters
+        Executes a base command and its parameters
         in a pod or a container
 
         :param command: command parameters list or full command string
@@ -811,7 +812,66 @@ class KrknKubernetes:
         :param container: container where the command
             must be executed (optional default `None`)
         :param base_command: base command that must be executed
+            along the parameters (optional, default `bash -c` is tested and if
+            not present will fallback on `sh -c` )
+        :return: the command stdout
+        """
+        try:
+            return self.__exec_cmd_in_pod_unsafe(
+                command,
+                pod_name,
+                namespace,
+                container,
+                base_command,
+                std_err,
+                run_on_bash=True,
+            )
+        except Exception as e:
+            logging.warning(
+                f"tried to execute a command with bash and "
+                f"failed with exception: {e}, trying with sh..."
+            )
+            try:
+                return self.__exec_cmd_in_pod_unsafe(
+                    command,
+                    pod_name,
+                    namespace,
+                    container,
+                    base_command,
+                    std_err,
+                    run_on_bash=False,
+                )
+            except Exception as d:
+                raise d
+
+    def __exec_cmd_in_pod_unsafe(
+        self,
+        command: list[str],
+        pod_name: str,
+        namespace: str,
+        container: str = None,
+        base_command: str = None,
+        std_err: bool = True,
+        run_on_bash=True,
+    ) -> str:
+        """
+        PRIVATE
+        Executes a base command and its parameters
+        in a pod or a container
+
+
+        :param command: command parameters list or full command string
+            if the command must be piped to `bash -c`
+            (in that case `base_command` parameter
+            must is omitted`)
+        :param pod_name: pod where the command must be executed
+        :param namespace: namespace of the pod
+        :param container: container where the command
+            must be executed (optional default `None`)
+        :param base_command: base command that must be executed
             along the parameters (optional, default `bash -c`)
+        :param run_on_bash: if True and base_command is null
+         will execute `command` on `bash -c` otherwise on `sh -c`
         :return: the command stdout
         """
         exec_command = []
@@ -823,10 +883,13 @@ class KrknKubernetes:
             command = [command]
 
         if base_command is None:
-            exec_command = ["bash", "-c"]
+            if run_on_bash:
+                exec_command = ["bash", "-c"]
+            else:
+                exec_command = ["sh", "-c"]
             exec_command.extend(command)
         else:
-            exec_command.append(base_command)
+            exec_command = [base_command]
             exec_command.extend(command)
 
         try:
@@ -855,6 +918,12 @@ class KrknKubernetes:
                 )
         except Exception as e:
             raise e
+        # apparently stream API doesn't rise an Exception
+        # if the command fails to be executed
+
+        if "OCI runtime exec failed" in ret:
+            raise Exception(ret)
+
         return ret
 
     def exec_command_on_node(

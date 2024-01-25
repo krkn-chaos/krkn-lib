@@ -101,6 +101,12 @@ class BaseTest(unittest.TestCase):
         template = self.template_to_job(name, namespace)
         self.apply_template(template)
 
+    def depoy_alpine(self, name: str, namespace: str = "default"):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template("alpine.j2")
+        content = template.render(name=name, namespace=namespace)
+        self.apply_template(content)
+
     def deploy_persistent_volume(
         self, name: str, storage_class: str, namespace: str
     ):
