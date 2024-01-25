@@ -19,8 +19,9 @@ from tzlocal import get_localzone
 
 
 class KrknKubernetesTests(BaseTest):
-    def test_exec_command(self):
+    def test_exec_command_unsafe(self):
         namespace = "test-ns-" + self.get_random_string(10)
+        alpine_name = "alpine-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         count = 0
@@ -48,8 +49,27 @@ class KrknKubernetesTests(BaseTest):
             self.assertRegex(result, r"etc")
             self.assertRegex(result, r"root")
             self.assertRegex(result, r"bin")
+
         except Exception as exc:
             assert False, f"command execution raised an exception {exc}"
+
+        # deploys an alpine container that DOES NOT
+        # contain bash, so executing a command without
+        # a base command will make the method fallback
+        # on sh and NOT fail
+        self.depoy_alpine(alpine_name, namespace)
+
+        while not self.lib_k8s.is_pod_running(alpine_name, namespace):
+            if count > MAX_RETRIES:
+                self.assertFalse(True, "container failed to become ready")
+            count += 1
+            time.sleep(3)
+            continue
+
+        try:
+            self.lib_k8s.exec_cmd_in_pod(["ls", "-al"], alpine_name, namespace)
+        except Exception:
+            self.fail()
 
     def test_exec_command_on_node(self):
         try:
