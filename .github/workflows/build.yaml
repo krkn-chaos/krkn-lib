@@ -197,7 +197,7 @@ jobs:
     steps:
       - name: Rebuild krkn
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: krkn-chaos/actions/krkn@main
+        uses: redhat-chaos/actions/krkn@main
         with:
           QUAY_USER: ${{ secrets.QUAY_USERNAME }}
           QUAY_TOKEN: ${{ secrets.QUAY_PASSWORD }}
