@@ -20,7 +20,7 @@ class TestKrknElastic(BaseTest):
         
         self.assertEqual(time, 0)
     
-    def test_upload_no_index(self):
+    def test_upload_bad_es_url(self):
         elastic = KrknElastic(self.safe_logger,"https://localhost:8080")
         time = elastic.upload_data_to_elasticsearch( {"timestamp":datetime.datetime.now()}, "chaos_test")
         
