@@ -826,10 +826,9 @@ class KrknKubernetes:
                 std_err,
                 run_on_bash=True,
             )
-        except Exception as e:
+        except Exception:
             logging.warning(
-                f"tried to execute a command with bash and "
-                f"failed with exception: {e}, trying with sh..."
+                "impossible to execute command on bash, trying with sh..."
             )
             try:
                 return self.__exec_cmd_in_pod_unsafe(
@@ -841,8 +840,10 @@ class KrknKubernetes:
                     std_err,
                     run_on_bash=False,
                 )
-            except Exception as d:
-                raise d
+                logging.warning("command successfully executed on sh")
+            except Exception as e:
+                logging.error(f"failed to execute command on sh: {e}")
+                raise e
 
     def __exec_cmd_in_pod_unsafe(
         self,
@@ -2081,8 +2082,8 @@ class KrknKubernetes:
                 f"{file_number:02d}.tar.b64"
             )
             remote_file_name = (
-                f"{remote_archive_path}/{remote_archive_prefix}"
-                f"{file_number:02d}.tar"
+                f"{remote_archive_path}/{remote_archive_prefix}part."
+                f"{file_number:02d}"
             )
 
             try:
@@ -2218,14 +2219,12 @@ class KrknKubernetes:
             ):
                 raise Exception("remote target path does not exist")
 
+            # to support busybox (minimal) split naming options
+            # we first split with the default suffix (aa, ab, ac etc.)
             tar_command = (
-                f"printf 'n {remote_archive_path}/"
-                f"{remote_archive_prefix}%02d.tar\n' "
-                f"{{1..100000}} | "
-                f"tar --exclude={remote_archive_prefix}* "
-                f"--tape-length={archive_part_size} "
-                f"-cf {remote_archive_path}/{remote_archive_prefix}00.tar "
-                f"-C {target_path} ."
+                f"tar cpf >(split -a 2 -b {archive_part_size}k - "
+                f"{remote_archive_path}/{remote_archive_prefix}part.)"
+                f" -C {target_path} . --exclude {remote_archive_prefix}*"
             )
 
             safe_logger.info("creating data archive, please wait....")
@@ -2235,6 +2234,22 @@ class KrknKubernetes:
                 namespace,
                 container_name,
             )
+            # and then we rename the filenames replacing
+            # suffix letters with numbers
+            rename_command = (
+                f"COUNTER=0; for i in "
+                f"`ls {remote_archive_path}/{remote_archive_prefix}*`; "
+                f"do mv $i {remote_archive_path}/{remote_archive_prefix}part."
+                f"`printf '%02d' $COUNTER`; COUNTER=$((COUNTER+1)); done"
+            )
+
+            self.exec_cmd_in_pod(
+                [rename_command],
+                pod_name,
+                namespace,
+                container_name,
+            )
+
             # count how many tar files has been created
             count_files_command = (
                 f"ls {remote_archive_path}/{remote_archive_prefix}* | wc -l"
