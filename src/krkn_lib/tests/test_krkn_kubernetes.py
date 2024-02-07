@@ -71,6 +71,39 @@ class KrknKubernetesTests(BaseTest):
         except Exception:
             self.fail()
 
+    def test_pod_shell(self):
+        namespace = "test-ns-" + self.get_random_string(10)
+        alpine_name = "alpine-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+
+        # test against alpine that runs sh
+        self.depoy_alpine(alpine_name, namespace)
+        count = 0
+        while not self.lib_k8s.is_pod_running(alpine_name, namespace):
+            time.sleep(3)
+            if count > 20:
+                self.assertTrue(
+                    False, "container is not running after 20 retries"
+                )
+            count += 1
+            continue
+        shell = self.lib_k8s.get_pod_shell(alpine_name, namespace, "alpine")
+        self.assertEqual(shell, "sh")
+
+        # test against fedtools that runs bash
+        self.deploy_fedtools(namespace=namespace)
+        count = 0
+        while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            time.sleep(3)
+            if count > 20:
+                self.assertTrue(
+                    False, "container is not running after 20 retries"
+                )
+            count += 1
+            continue
+        shell = self.lib_k8s.get_pod_shell("fedtools", namespace)
+        self.assertEqual(shell, "bash")
+
     def test_exec_command_on_node(self):
         try:
             response = self.lib_k8s.exec_command_on_node(
