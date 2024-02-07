@@ -790,6 +790,51 @@ class KrknKubernetes:
 
     # to be tested, return value not sure
 
+    def get_pod_shell(
+        self, pod_name: str, namespace: str, container: str = None
+    ) -> Optional[str]:
+        """
+        Gets the shell running on a Pod. Currently checking against
+        /bin/bash and /bin/sh.
+
+        :param pod_name: pod where the command must be executed
+        :param namespace: namespace of the pod
+        :param container: container where the command
+            must be executed (optional default `None`)
+        """
+        try:
+            ret = self.__exec_cmd_in_pod_unsafe(
+                ['test -f /bin/bash && echo "True"'],
+                pod_name,
+                namespace,
+                container,
+                None,
+                True,
+                True,
+            )
+            if ret != "":
+                return "bash"
+        except Exception:
+            pass
+
+        try:
+            ret = self.__exec_cmd_in_pod_unsafe(
+                ['test -f /bin/sh && echo "True"'],
+                pod_name,
+                namespace,
+                container,
+                None,
+                True,
+                False,
+            )
+
+            if ret != "":
+                return "sh"
+        except Exception:
+            pass
+
+        return None
+
     def exec_cmd_in_pod(
         self,
         command: list[str],
@@ -817,20 +862,13 @@ class KrknKubernetes:
         :return: the command stdout
         """
         try:
-            return self.__exec_cmd_in_pod_unsafe(
-                command,
-                pod_name,
-                namespace,
-                container,
-                base_command,
-                std_err,
-                run_on_bash=True,
-            )
-        except Exception:
-            logging.warning(
-                "impossible to execute command on bash, trying with sh..."
-            )
-            try:
+            shell = self.get_pod_shell(pod_name, namespace, container)
+            if not shell:
+                raise Exception(
+                    "impossible to determine the shell to run command"
+                )
+
+            if shell == "bash":
                 return self.__exec_cmd_in_pod_unsafe(
                     command,
                     pod_name,
@@ -838,12 +876,21 @@ class KrknKubernetes:
                     container,
                     base_command,
                     std_err,
-                    run_on_bash=False,
+                    run_on_bash=True,
                 )
-                logging.warning("command successfully executed on sh")
-            except Exception as e:
-                logging.error(f"failed to execute command on sh: {e}")
-                raise e
+
+            return self.__exec_cmd_in_pod_unsafe(
+                command,
+                pod_name,
+                namespace,
+                container,
+                base_command,
+                std_err,
+                run_on_bash=False,
+            )
+        except Exception as e:
+            logging.error(f"failed to execute command: {e}")
+            raise e
 
     def __exec_cmd_in_pod_unsafe(
         self,
@@ -1797,11 +1844,12 @@ class KrknKubernetes:
         self, pod_name: str, container_name: str, namespace: str, path: str
     ) -> bool:
         exists = self.exec_cmd_in_pod(
-            [f'[ -d "{path}" ] && echo "True" || echo "False"'],
+            [f'test -d {path} && echo "True"'],
             pod_name,
             namespace,
             container_name,
         ).rstrip()
+        exists = exists if exists else "False"
         return exists == "True"
 
     def get_kubernetes_core_objects_count(
