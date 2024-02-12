@@ -11,7 +11,8 @@ class KrknElastic:
         self.safe_logger = safe_logger
         try: 
             # create Elasticsearch object
-            self.es = Elasticsearch(f'{elastic_url}:443')
+            if elastic_url: 
+                self.es = Elasticsearch(f'{elastic_url}:443')
         except Exception as e: 
             self.safe_logger.error("Failed to initalize elasticsearch: %s" % e)
             raise e
@@ -27,7 +28,7 @@ class KrknElastic:
                 will be 0 if index and es are blank
         """
 
-        if self.es != "" and index != "":
+        if self.es and index != "":
             # Attach to elastic search and attempt index creation
             start = time.time()
             self.safe_logger.info(f"Uploading item {item} to index {index} in Elasticsearch")
