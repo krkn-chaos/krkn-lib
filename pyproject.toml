@@ -19,8 +19,11 @@ base64io = "^1.0.3"
 sphinx-rtd-theme = "^1.2.2"
 tzlocal = "5.1"
 pytz = "^2023.3"
-PyYAML = "5.4.1"
+PyYAML = "6.0"
 prometheus-api-client = "^0.5.4"
+elasticsearch = "7.13.4"
+wheel = "^0.42.0"
+cython = "3.0"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"

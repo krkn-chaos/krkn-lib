@@ -1978,6 +1978,7 @@ class KrknKubernetes:
         :return: the list of NodeInfo objects
         """
         instance_type_label = "node.k8s.io/instance-type"
+        instance_type_label_2 = "node.kubernetes.io/instance-type"
         node_type_master_label = "node-role.kubernetes.io/master"
         node_type_worker_label = "node-role.kubernetes.io/worker"
         node_type_infra_label = "node-role.kubernetes.io/infra"
@@ -2001,6 +2002,10 @@ class KrknKubernetes:
                 if instance_type_label in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
                         instance_type_label
+                    ]
+                elif instance_type_label_2 in node.metadata.labels.keys():
+                    node_info.instance_type = node.metadata.labels[
+                        instance_type_label_2
                     ]
                 else:
                     node_info.instance_type = "unknown"

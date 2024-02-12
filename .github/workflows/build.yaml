@@ -78,6 +78,7 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          ES_SERVER: ${{ secrets.ES_SERVER }}
         run: |
           export TEST_WORKDIR=`pwd`/`date +%s`
           mkdir $TEST_WORKDIR
