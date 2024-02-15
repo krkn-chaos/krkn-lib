@@ -22,9 +22,21 @@ class TestKrknPrometheus(BaseTest):
         for value in res[0]["values"]:
             self.assertEqual(len(value), 2)
 
+    def process_query(self):
+        prom_cli = KrknPrometheus(self.url)
+        query = "node_boot_time_seconds"
+
+        res = prom_cli.process_query(query)
+
+        self.assertTrue(len(res) > 0)
+        self.assertTrue("metric" in res[0].keys())
+        self.assertTrue("values" in res[0].keys())
+        for value in res[0]["values"]:
+            self.assertEqual(len(value), 2)
+
     def test_process_alert(self):
         prom_cli = KrknPrometheus(self.url)
-        res = prom_cli.process_prom_query_in_range("node_boot_time_seconds")
+        res = prom_cli.process_prom_query_in_range("node_boot_time_seconds", end_time=datetime.datetime.now())
         logging.disable(logging.NOTSET)
         controls = []
         for result in res:

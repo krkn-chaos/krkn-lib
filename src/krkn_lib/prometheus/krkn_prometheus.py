@@ -34,7 +34,7 @@ class KrknPrometheus:
             logging.error("Not able to initialize the client %s" % e)
             sys.exit(1)
 
-    # Process custom prometheus query
+    # Process custom prometheus query with time range
     def process_prom_query_in_range(
         self,
         query: str,
@@ -42,7 +42,8 @@ class KrknPrometheus:
         end_time: datetime = None,
     ) -> list[dict[str:any]]:
         """
-        Executes a query to the Prometheus API in PromQL language
+        Executes a query to the Prometheus API in PromQL languag,
+        between a start and end time
 
         :param query: promQL query
         :param start_time: start time of the result set (default now - 1 day)
@@ -69,6 +70,32 @@ class KrknPrometheus:
                     end_time=end_time,
                     step=f"{granularity}s",
                 )
+            except Exception as e:
+                logging.error("Failed to get the metrics: %s" % e)
+                raise e
+        else:
+            logging.info(
+                "Skipping the prometheus query as the "
+                "prometheus client couldn't "
+                "be initialized\n"
+            )
+
+    # Process custom prometheus query
+    def process_query(
+        self,
+        query: str
+    ) -> list[dict[str:any]]:
+        """
+        Executes a query to the Prometheus API in PromQL language
+
+        :param query: promQL query
+
+        :return: a list of records in dictionary format
+        """
+        
+        if self.prom_cli:
+            try: 
+                return self.prom_cli.custom_query(query=query)
             except Exception as e:
                 logging.error("Failed to get the metrics: %s" % e)
                 raise e
