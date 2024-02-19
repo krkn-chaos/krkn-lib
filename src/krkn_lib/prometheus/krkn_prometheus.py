@@ -2,7 +2,10 @@ import logging
 import math
 import re
 import sys
+import time
 from datetime import datetime, timedelta
+from io import StringIO
+from typing import Optional
 
 from prometheus_api_client import PrometheusConnect
 
@@ -81,10 +84,7 @@ class KrknPrometheus:
             )
 
     # Process custom prometheus query
-    def process_query(
-        self,
-        query: str
-    ) -> list[dict[str:any]]:
+    def process_query(self, query: str) -> list[dict[str:any]]:
         """
         Executes a query to the Prometheus API in PromQL language
 
@@ -92,9 +92,9 @@ class KrknPrometheus:
 
         :return: a list of records in dictionary format
         """
-        
+
         if self.prom_cli:
-            try: 
+            try:
                 return self.prom_cli.custom_query(query=query)
             except Exception as e:
                 logging.error("Failed to get the metrics: %s" % e)
@@ -108,7 +108,7 @@ class KrknPrometheus:
 
     def process_alert(
         self, alert: dict[str, str], start_time: datetime, end_time: datetime
-    ):
+    ) -> (Optional[int], Optional[str]):
         """
         Processes Krkn alarm in the format
 
@@ -146,48 +146,60 @@ class KrknPrometheus:
             no time filter is applied to the query)
         :param end_time: end time of the result set (if None
             no time filter is applied to the query)
+        :return: returns the alert log line as a string to be uploaded
+            as telemetry metadata, None if no alert has been selected
 
 
 
         """
-        if "expr" not in alert.keys():
-            logging.error(
-                f"invalid alert: {alert} `expr` field is missing, skipping."
-            )
-            return
-        if "description" not in alert.keys():
-            logging.error(
-                f"invalid alert: {alert} `description` field "
-                f"is missing, skipping."
-            )
-            return
-        if "severity" not in alert.keys():
-            logging.error(
-                f"invalid alert: {alert} `severity` field "
-                f"is missing, skipping."
-            )
-            return
-
-        if alert["severity"] not in [
-            "debug",
-            "info",
-            "warning",
-            "error",
-            "critical",
-        ]:
-            logging.error(f"invalid severity level: {alert['severity']}")
-            return
-
+        # adds a stringIO handler with the same log level
+        # as the default logger to tee the logger output
+        # to a string and return it
+        string_stream = StringIO()
+        logger = logging.getLogger()
+        handler = logging.StreamHandler(string_stream)
+        handler.setFormatter(logger.handlers[0].formatter)
+        logger.addHandler(handler)
         try:
+            if "expr" not in alert.keys():
+                exception = (
+                    f"invalid alert: {alert} `expr` field is "
+                    f"missing, skipping."
+                )
+                raise Exception(exception)
+            if "description" not in alert.keys():
+                exception = (
+                    f"invalid alert: {alert} `description` "
+                    f"field is missing, skipping."
+                )
+                raise Exception(exception)
+            if "severity" not in alert.keys():
+                exception = (
+                    f"invalid alert: {alert} `severity` field "
+                    f"is missing, skipping."
+                )
+                raise Exception(exception)
+
+            if alert["severity"] not in [
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "critical",
+            ]:
+                exception = f"invalid severity level: {alert['severity']}"
+                raise Exception(exception)
+
+            log_alert = getattr(logging, alert["severity"])
+
             records = self.process_prom_query_in_range(
                 alert["expr"], start_time, end_time
             )
             if len(records) == 0:
-                return
+                return None, None
 
-            log_alert = getattr(logging, alert["severity"])
             if log_alert is None:
-                raise Exception()
+                raise Exception("no logger available")
 
             # prints only one record per query result
             if len(records) > 0:
@@ -195,9 +207,14 @@ class KrknPrometheus:
                 log_alert(result)
 
         except Exception as e:
-            logging.error(
-                f"failed to execute query: {alert['expr']} with exception {e}"
-            )
+            logging.error(str(e))
+
+        finally:
+            logger.removeHandler(handler)
+            handler.close()
+
+        handler.flush()
+        return int(time.time()), string_stream.getvalue().rstrip("\n")
 
     def parse_metric(self, description: str, record: dict[str:any]) -> str:
         """
