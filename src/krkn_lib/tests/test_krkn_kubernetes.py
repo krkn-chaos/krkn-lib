@@ -747,7 +747,7 @@ class KrknKubernetesTests(BaseTest):
             self.assertTrue(node.os_version)
             self.assertTrue(node.kernel_version)
             self.assertTrue(node.kubelet_version)
-            telemetry.node_infos.append(node)
+            telemetry.node_summary_infos.append(node)
         try:
             _ = telemetry.to_json()
         except Exception:

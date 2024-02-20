@@ -141,9 +141,12 @@ class ChaosRunTelemetry:
     """
     List of the scenarios performed during the chaos run
     """
-    node_infos: list[NodeInfo]
+    node_summary_infos: list[NodeInfo]
     """
-    List of node Infos collected from the target cluster
+    Summary of node Infos collected from the target cluster.
+    It will report all the master and infra nodes and only one
+    of the workers that usually are configured to have the same
+    resources.
     """
     kubernetes_objects_count: dict[str, int]
     """
@@ -154,9 +157,13 @@ class ChaosRunTelemetry:
     """
     Network plugins deployed in the target cluster
     """
-    node_count: int = 0
+    total_node_count: int = 0
     """
-    Number of nodes in the target cluster
+    Number of all kind of nodes in the target cluster
+    """
+    worker_count: int = 0
+    """
+    Number of workers in the node list
     """
     cloud_infrastructure: str = "Unknown"
     """
@@ -169,7 +176,7 @@ class ChaosRunTelemetry:
 
     def __init__(self, json_object: any = None):
         self.scenarios = list[ScenarioTelemetry]()
-        self.node_infos = list[NodeInfo]()
+        self.node_summary_infos = list[NodeInfo]()
         self.kubernetes_objects_count = dict[str, int]()
         self.network_plugins = ["Unknown"]
         if json_object is not None:
@@ -180,8 +187,9 @@ class ChaosRunTelemetry:
                 scenario_telemetry = ScenarioTelemetry(scenario)
                 self.scenarios.append(scenario_telemetry)
 
-            self.node_infos = json_object.get("node_infos")
-            self.node_count = json_object.get("node_count")
+            self.node_summary_infos = json_object.get("node_summary_infos")
+            self.total_node_count = json_object.get("total_node_count")
+            self.worker_count = json_object.get("worker_count")
             self.cloud_infrastructure = json_object.get("cloud_infrastructure")
             self.kubernetes_objects_count = json_object.get(
                 "kubernetes_objects_count"

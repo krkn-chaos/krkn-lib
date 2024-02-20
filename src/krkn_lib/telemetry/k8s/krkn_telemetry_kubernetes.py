@@ -1,4 +1,5 @@
 import base64
+import tempfile
 import threading
 import time
 import yaml
@@ -8,6 +9,7 @@ import krkn_lib.utils as utils
 
 from queue import Queue
 from krkn_lib.k8s import KrknKubernetes
+from krkn_lib.models.krkn import ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from typing import Optional
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -51,8 +53,20 @@ class KrknTelemetryKubernetes:
                 ]
             )
         )
-        chaos_telemetry.node_infos = self.kubecli.get_nodes_infos()
-        chaos_telemetry.node_count = len(chaos_telemetry.node_infos)
+        node_infos = self.kubecli.get_nodes_infos()
+        worker_counter = 0
+        other_node_count = 0
+        for info in node_infos:
+            if info.node_type != "worker":
+                other_node_count += 1
+                chaos_telemetry.node_summary_infos.append(info)
+            else:
+                if worker_counter == 0:
+                    chaos_telemetry.node_summary_infos.append(info)
+                worker_counter += 1
+
+        chaos_telemetry.total_node_count = other_node_count + worker_counter
+        chaos_telemetry.worker_count = worker_counter
 
     def send_telemetry(
         self,
@@ -582,3 +596,79 @@ class KrknTelemetryKubernetes:
         worker.start()
         queue.join()
         self.safe_logger.info("cluster events successfully uploaded")
+
+    def put_critical_alerts(
+        self,
+        request_id: str,
+        telemetry_config: dict,
+        alerts: ChaosRunAlertSummary,
+    ):
+        """
+        Puts collected critical alerts on the S3 bucket
+
+        :param request_id: uuid of the session that will represent the
+            S3 folder on which the prometheus files will be stored
+        :param telemetry_config: telemetry section of kraken config.yaml
+        :param alerts: list of strings representing the alert log lines
+            printed to stdout
+        """
+        if not alerts or (
+            len(alerts.chaos_alerts) == 0
+            and len(alerts.post_chaos_alerts) == 0
+        ):
+            self.safe_logger.info(
+                "no alerts collected during the run, skipping"
+            )
+            return
+
+        queue = Queue()
+        events_backup = telemetry_config.get("events_backup")
+        url = telemetry_config.get("api_url")
+        username = telemetry_config.get("username")
+        password = telemetry_config.get("password")
+        max_retries = telemetry_config.get("max_retries")
+        exceptions = []
+        if events_backup is None:
+            exceptions.append("telemetry -> logs_backup flag is missing")
+        if url is None:
+            exceptions.append("telemetry -> api_url is missing")
+        if username is None:
+            exceptions.append("telemetry -> username is missing")
+        if password is None:
+            exceptions.append("telemetry -> password is missing")
+        if max_retries is None:
+            exceptions.append("telemetry -> max_retries is missing")
+
+        if len(exceptions) > 0:
+            raise Exception(", ".join(exceptions))
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
+            tmp.writelines(alerts.to_json())
+            # this parameter has doesn't have an utility in this context
+            # used to match the method signature and reuse it (Poor design?)
+            tmp.flush()
+            uploaded_files = list[str]()
+            queue.put((0, tmp.name, 0))
+            queue_size = queue.qsize()
+            self.safe_logger.info("uploading cluster alerts...")
+
+            worker = threading.Thread(
+                target=self.generate_url_and_put_to_s3_worker,
+                args=(
+                    queue,
+                    queue_size,
+                    request_id,
+                    f"{url}/presigned-url",
+                    username,
+                    password,
+                    0,
+                    uploaded_files,
+                    max_retries,
+                    "critical-alerts-",
+                    ".log",
+                ),
+            )
+            worker.daemon = True
+            worker.start()
+            queue.join()
+            self.safe_logger.info("cluster alerts successfully uploaded")
