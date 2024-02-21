@@ -576,10 +576,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_daemon_set(name, namespace)
-            while self.apps_api.read_namespaced_daemon_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Daemon Set already deleted")
@@ -596,10 +592,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_stateful_set(name, namespace)
-            while self.apps_api.read_namespaced_stateful_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Statefulset already deleted")
@@ -616,10 +608,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_replica_set(name, namespace)
-            while self.apps_api.read_namespaced_replica_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Replica set already deleted")
