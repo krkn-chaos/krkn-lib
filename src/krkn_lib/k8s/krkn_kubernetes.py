@@ -35,7 +35,6 @@ from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary
 from krkn_lib.utils.safe_logger import SafeLogger
 
-
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/ca.crt"
 
