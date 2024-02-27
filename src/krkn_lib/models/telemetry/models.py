@@ -199,3 +199,35 @@ class ChaosRunTelemetry:
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
+
+
+@dataclass(order=False)
+class S3BucketObject:
+    """
+    Class that represents an S3 bucket object provided
+    by the telemetry webservice
+    """
+
+    type: str
+    """
+    can be "folder" or "file"
+    """
+    path: str
+    """
+    the path starting from the root path of the bucket
+    """
+    size: int
+    """
+    if it's a file represents the file size
+    """
+
+    modified: str
+    """
+    if it's a file represents the date when the file 
+    has been created/modified
+    """
+
+    def toJSON(self):
+        return json.dumps(
+            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
+        )
