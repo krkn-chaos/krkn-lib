@@ -35,7 +35,6 @@ from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary
 from krkn_lib.utils.safe_logger import SafeLogger
 
-
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/ca.crt"
 
@@ -576,10 +575,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_daemon_set(name, namespace)
-            while self.apps_api.read_namespaced_daemon_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Daemon Set already deleted")
@@ -596,10 +591,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_stateful_set(name, namespace)
-            while self.apps_api.read_namespaced_stateful_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Statefulset already deleted")
@@ -616,10 +607,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_replica_set(name, namespace)
-            while self.apps_api.read_namespaced_replica_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Replica set already deleted")
