@@ -19,6 +19,7 @@ from tzlocal import get_localzone
 class KrknTelemetryKubernetes:
     kubecli: KrknKubernetes = None
     safe_logger: SafeLogger = None
+    default_telemetry_group = "default"
 
     def __init__(
         self, safe_logger: SafeLogger, lib_kubernetes: KrknKubernetes
@@ -87,6 +88,7 @@ class KrknTelemetryKubernetes:
             url = telemetry_config.get("api_url")
             username = telemetry_config.get("username")
             password = telemetry_config.get("password")
+            group = telemetry_config.get("telemetry_group")
             exceptions = []
             is_exception = False
             if url is None:
@@ -98,6 +100,9 @@ class KrknTelemetryKubernetes:
             if password is None:
                 exceptions.append("telemetry -> password is missing")
                 is_exception = True
+            if not group:
+                group = self.default_telemetry_group
+
             if is_exception:
                 raise Exception(", ".join(exceptions))
 
@@ -111,7 +116,7 @@ class KrknTelemetryKubernetes:
                 url=f"{url}/telemetry",
                 auth=(username, password),
                 data=json_data,
-                params={"request_id": uuid},
+                params={"request_id": uuid, "telemetry_group": group},
                 headers=headers,
             )
 
@@ -265,6 +270,7 @@ class KrknTelemetryKubernetes:
         password = telemetry_config.get("password")
         backup_threads = telemetry_config.get("backup_threads")
         max_retries = telemetry_config.get("max_retries")
+        group = telemetry_config.get("telemetry_group")
         exceptions = []
         is_exception = False
         if prometheus_backup is None:
@@ -290,6 +296,8 @@ class KrknTelemetryKubernetes:
         if max_retries is None:
             exceptions.append("telemetry -> max_retries is missing")
             is_exception = True
+        if not group:
+            group = self.default_telemetry_group
         if is_exception:
             raise Exception(", ".join(exceptions))
 
@@ -319,6 +327,7 @@ class KrknTelemetryKubernetes:
                         queue,
                         queue_size,
                         request_id,
+                        group,
                         f"{url}/presigned-url",
                         username,
                         password,
@@ -341,6 +350,7 @@ class KrknTelemetryKubernetes:
         queue: Queue,
         queue_size: int,
         request_id: str,
+        telemetry_group: str,
         api_url: str,
         username: str,
         password: str,
@@ -362,7 +372,11 @@ class KrknTelemetryKubernetes:
             on upload exception and compared with max_retries.
         :param queue_size: total number of files
         :param request_id: uuid of the session that will represent the
-            S3 folder on which the prometheus files will be stored
+            folder on which the prometheus files will be stored within the
+            respective group
+        :param telemetry_group: the group of telemetry on which the file
+            will be stored. The group will be the folder starting from the
+            S3 bucket root
         :param api_url: API endpoint to generate the S3 temporary link
         :param username: API username
         :param password: API password
@@ -386,7 +400,7 @@ class KrknTelemetryKubernetes:
             try:
                 s3_url = self.get_bucket_url_for_filename(
                     api_url,
-                    request_id,
+                    f"{telemetry_group}/{request_id}",
                     f"{remote_file_prefix}"
                     f"{file_number:02d}"
                     f"{remote_file_extension}",
@@ -536,6 +550,7 @@ class KrknTelemetryKubernetes:
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         max_retries = telemetry_config.get("max_retries")
+        group = telemetry_config.get("telemetry_group")
         exceptions = []
         if events_backup is None:
             exceptions.append("telemetry -> logs_backup flag is missing")
@@ -547,6 +562,8 @@ class KrknTelemetryKubernetes:
             exceptions.append("telemetry -> password is missing")
         if max_retries is None:
             exceptions.append("telemetry -> max_retries is missing")
+        if not group:
+            group = "default"
 
         if not events_backup:
             self.safe_logger.info(
@@ -582,6 +599,7 @@ class KrknTelemetryKubernetes:
                 queue,
                 queue_size,
                 request_id,
+                group,
                 f"{url}/presigned-url",
                 username,
                 password,
@@ -627,6 +645,7 @@ class KrknTelemetryKubernetes:
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         max_retries = telemetry_config.get("max_retries")
+        group = telemetry_config.get("telemetry_group")
         exceptions = []
         if events_backup is None:
             exceptions.append("telemetry -> logs_backup flag is missing")
@@ -638,6 +657,8 @@ class KrknTelemetryKubernetes:
             exceptions.append("telemetry -> password is missing")
         if max_retries is None:
             exceptions.append("telemetry -> max_retries is missing")
+        if not group:
+            group = self.default_telemetry_group
 
         if len(exceptions) > 0:
             raise Exception(", ".join(exceptions))
@@ -658,6 +679,7 @@ class KrknTelemetryKubernetes:
                     queue,
                     queue_size,
                     request_id,
+                    group,
                     f"{url}/presigned-url",
                     username,
                     password,

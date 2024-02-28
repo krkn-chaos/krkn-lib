@@ -212,10 +212,12 @@ class S3BucketObject:
     """
     can be "folder" or "file"
     """
+
     path: str
     """
-    the path starting from the root path of the bucket
+    the path or the filename wit
     """
+
     size: int
     """
     if it's a file represents the file size
@@ -223,11 +225,6 @@ class S3BucketObject:
 
     modified: str
     """
-    if it's a file represents the date when the file 
+    if it's a file represents the date when the file
     has been created/modified
     """
-
-    def toJSON(self):
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
