@@ -82,6 +82,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         archive_path = telemetry_config.get("archive_path")
         logs_filter_patterns = telemetry_config.get("logs_filter_patterns")
         oc_cli_path = telemetry_config.get("oc_cli_path")
+        group = telemetry_config.get("telemetry_group")
         exceptions = []
         is_exception = False
         if logs_backup is None:
@@ -114,6 +115,8 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         if logs_filter_patterns is None:
             exceptions.append("telemetry -> logs_filter_pastterns is missing")
             is_exception = True
+        if not group:
+            group = self.default_telemetry_group
 
         # if oc_cli_path is set to empty will be set to
         # None to let the config flexible
@@ -171,6 +174,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 queue,
                 queue_size,
                 request_id,
+                group,
                 f"{url}/presigned-url",
                 username,
                 password,
