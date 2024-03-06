@@ -1862,10 +1862,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params[
-                            "Accept"
-                        ] = api_client.select_header_accept(
-                            ["application/json"]
+                        header_params["Accept"] = (
+                            api_client.select_header_accept(
+                                ["application/json"]
+                            )
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -1959,19 +1959,21 @@ class KrknKubernetes:
 
         return None
 
-    def get_nodes_infos(self) -> list[NodeInfo]:
+    def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
         Returns a list of NodeInfo objects
         :return: the list of NodeInfo objects
         """
         instance_type_label = "node.k8s.io/instance-type"
-        instance_type_label_2 = "node.kubernetes.io/instance-type"
+        instance_type_label_alt = "node.kubernetes.io/instance-type"
         node_type_master_label = "node-role.kubernetes.io/master"
         node_type_worker_label = "node-role.kubernetes.io/worker"
         node_type_infra_label = "node-role.kubernetes.io/infra"
         node_type_workload_label = "node-role.kubernetes.io/workload"
         node_type_application_label = "node-role.kubernetes.io/app"
         result = list[NodeInfo]()
+        node_index = set[NodeInfo]()
+        taints = list[Taint]()
         resp = self.list_continue_helper(
             self.cli.list_node, limit=self.request_chunk_size
         )
@@ -1981,18 +1983,19 @@ class KrknKubernetes:
                 if node.spec.taints is not None:
                     for taint in node.spec.taints:
                         taint = Taint(
+                            node_name=node.metadata.name,
                             effect=taint.effect,
                             key=taint.key,
                             value=taint.value,
                         )
-                        node_info.taints.append(taint)
+                        taints.append(taint)
                 if instance_type_label in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
                         instance_type_label
                     ]
-                elif instance_type_label_2 in node.metadata.labels.keys():
+                elif instance_type_label_alt in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
-                        instance_type_label_2
+                        instance_type_label_alt
                     ]
                 else:
                     node_info.instance_type = "unknown"
@@ -2012,7 +2015,6 @@ class KrknKubernetes:
                 else:
                     node_info.node_type = "unknown"
 
-                node_info.name = node.metadata.name
                 node_info.architecture = node.status.node_info.architecture
                 node_info.architecture = node.status.node_info.architecture
                 node_info.kernel_version = node.status.node_info.kernel_version
@@ -2020,8 +2022,12 @@ class KrknKubernetes:
                     node.status.node_info.kubelet_version
                 )
                 node_info.os_version = node.status.node_info.os_image
-                result.append(node_info)
-        return result
+                if node_info in node_index:
+                    result[result.index(node_info)].count += 1
+                else:
+                    node_index.add(node_info)
+                    result.append(node_info)
+        return result, taints
 
     def delete_file_from_pod(
         self, pod_name: str, container_name: str, namespace: str, filename: str

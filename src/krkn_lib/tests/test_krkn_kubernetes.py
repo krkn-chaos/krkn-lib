@@ -739,8 +739,9 @@ class KrknKubernetesTests(BaseTest):
 
     def test_get_nodes_infos(self):
         telemetry = ChaosRunTelemetry()
-        nodes = self.lib_k8s.get_nodes_infos()
+        nodes, _ = self.lib_k8s.get_nodes_infos()
         for node in nodes:
+            self.assertTrue(node.count > 0)
             self.assertTrue(node.node_type)
             self.assertTrue(node.architecture)
             self.assertTrue(node.instance_type)

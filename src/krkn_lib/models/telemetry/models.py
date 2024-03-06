@@ -77,6 +77,10 @@ class Taint:
     Cluster Node Taint details
     """
 
+    node_name: str = ""
+    """
+    node name
+    """
     effect: str = ""
     """
     effect of the taint in the node
@@ -97,18 +101,9 @@ class NodeInfo:
     Cluster node telemetry informations
     """
 
-    def __init__(self):
-        self.taints = list[Taint]()
-
-    taints: list[Taint]
-
+    count: int = 1
     """
-    Taints on the node
-    """
-
-    name: str = ""
-    """
-    Name of the node
+    number of nodes of this kind
     """
 
     architecture: str = ""
@@ -130,6 +125,29 @@ class NodeInfo:
     os_version: str = ""
     "Operating system version"
 
+    def __eq__(self, other):
+        if isinstance(other, NodeInfo):
+            return (
+                other.architecture == self.architecture
+                and other.instance_type == self.instance_type
+                and other.node_type == self.node_type
+                and other.kernel_version == self.kernel_version
+                and other.kubelet_version == self.kubelet_version
+                and other.os_version == self.os_version
+            )
+        else:
+            return False
+
+    def __repr__(self):
+        return (
+            f"{self.architecture} {self.instance_type} "
+            f"{self.node_type} {self.kernel_version} "
+            f"{self.kubelet_version} {self.os_version}"
+        )
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
 
 @dataclass(order=False)
 class ChaosRunTelemetry:
@@ -148,6 +166,11 @@ class ChaosRunTelemetry:
     of the workers that usually are configured to have the same
     resources.
     """
+    node_taints: list[Taint]
+    """
+    The list of node taints detected
+    """
+
     kubernetes_objects_count: dict[str, int]
     """
     Dictionary containing the number of objects deployed
@@ -161,10 +184,6 @@ class ChaosRunTelemetry:
     """
     Number of all kind of nodes in the target cluster
     """
-    worker_count: int = 0
-    """
-    Number of workers in the node list
-    """
     cloud_infrastructure: str = "Unknown"
     """
     Cloud infrastructure (if available) of the target cluster
@@ -177,6 +196,7 @@ class ChaosRunTelemetry:
     def __init__(self, json_object: any = None):
         self.scenarios = list[ScenarioTelemetry]()
         self.node_summary_infos = list[NodeInfo]()
+        self.node_taints = list[Taint]()
         self.kubernetes_objects_count = dict[str, int]()
         self.network_plugins = ["Unknown"]
         if json_object is not None:
@@ -188,8 +208,8 @@ class ChaosRunTelemetry:
                 self.scenarios.append(scenario_telemetry)
 
             self.node_summary_infos = json_object.get("node_summary_infos")
+            self.node_taints = json_object.get("node_taints")
             self.total_node_count = json_object.get("total_node_count")
-            self.worker_count = json_object.get("worker_count")
             self.cloud_infrastructure = json_object.get("cloud_infrastructure")
             self.kubernetes_objects_count = json_object.get(
                 "kubernetes_objects_count"

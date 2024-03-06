@@ -54,20 +54,11 @@ class KrknTelemetryKubernetes:
                 ]
             )
         )
-        node_infos = self.kubecli.get_nodes_infos()
-        worker_counter = 0
-        other_node_count = 0
+        node_infos, taints = self.kubecli.get_nodes_infos()
+        chaos_telemetry.node_summary_infos = node_infos
+        chaos_telemetry.node_taints = taints
         for info in node_infos:
-            if info.node_type != "worker":
-                other_node_count += 1
-                chaos_telemetry.node_summary_infos.append(info)
-            else:
-                if worker_counter == 0:
-                    chaos_telemetry.node_summary_infos.append(info)
-                worker_counter += 1
-
-        chaos_telemetry.total_node_count = other_node_count + worker_counter
-        chaos_telemetry.worker_count = worker_counter
+            chaos_telemetry.total_node_count += info.count
 
     def send_telemetry(
         self,
