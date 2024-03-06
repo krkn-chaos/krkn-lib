@@ -11,11 +11,11 @@ class ScenarioTelemetry:
     Scenario Telemetry collection
     """
 
-    startTimeStamp: float
+    start_timestamp: float
     """
     Timestamp when the Krkn run started
     """
-    endTimeStamp: float
+    end_timestamp: float
     """
     Timestamp when the Krkn run ended
     """
@@ -23,11 +23,11 @@ class ScenarioTelemetry:
     """
     Scenario filename
     """
-    exitStatus: int
+    exit_status: int
     """
     Exit Status of the Scenario Run
     """
-    parametersBase64: str
+    parameters_base64: str
     """
         Scenario configuration file base64 encoded
     """
@@ -35,19 +35,19 @@ class ScenarioTelemetry:
 
     def __init__(self, json_object: any = None):
         if json_object is not None:
-            self.startTimeStamp = int(json_object.get("startTimeStamp"))
-            self.endTimeStamp = json_object.get("endTimeStamp")
+            self.start_timestamp = int(json_object.get("start_timestamp"))
+            self.end_timestamp = int(json_object.get("end_timestamp"))
             self.scenario = json_object.get("scenario")
-            self.exitStatus = json_object.get("exitStatus")
-            self.parametersBase64 = json_object.get("parametersBase64")
+            self.exit_status = json_object.get("exit_status")
+            self.parameters_base64 = json_object.get("parameters_base64")
             self.parameters = json_object.get("parameters")
 
             if (
-                self.parametersBase64 is not None
-                and self.parametersBase64 != ""
+                self.parameters_base64 is not None
+                and self.parameters_base64 != ""
             ):
                 try:
-                    yaml_params = base64.b64decode(self.parametersBase64)
+                    yaml_params = base64.b64decode(self.parameters_base64)
                     yaml_object = yaml.safe_load(yaml_params)
                     json_string = json.dumps(yaml_object, indent=2)
                     self.parameters = json.loads(json_string)
@@ -55,7 +55,7 @@ class ScenarioTelemetry:
                         self.parameters, dict
                     ) and not isinstance(self.parameters, list):
                         raise Exception()
-                    self.parametersBase64 = ""
+                    self.parameters_base64 = ""
                 except Exception as e:
                     raise Exception(
                         "invalid parameters format: {0}".format(str(e))
@@ -63,11 +63,11 @@ class ScenarioTelemetry:
         else:
             # if constructor is called without params
             # property are initialized so are available
-            self.startTimeStamp = 0
-            self.endTimeStamp = 0
+            self.start_timestamp = 0
+            self.end_timestamp = 0
             self.scenario = ""
-            self.exitStatus = 0
-            self.parametersBase64 = ""
+            self.exit_status = 0
+            self.parameters_base64 = ""
             self.parameters = {}
 
 
@@ -77,6 +77,10 @@ class Taint:
     Cluster Node Taint details
     """
 
+    node_name: str = ""
+    """
+    node name
+    """
     effect: str = ""
     """
     effect of the taint in the node
@@ -97,18 +101,9 @@ class NodeInfo:
     Cluster node telemetry informations
     """
 
-    def __init__(self):
-        self.taints = list[Taint]()
-
-    taints: list[Taint]
-
+    count: int = 1
     """
-    Taints on the node
-    """
-
-    name: str = ""
-    """
-    Name of the node
+    number of nodes of this kind
     """
 
     architecture: str = ""
@@ -130,6 +125,29 @@ class NodeInfo:
     os_version: str = ""
     "Operating system version"
 
+    def __eq__(self, other):
+        if isinstance(other, NodeInfo):
+            return (
+                other.architecture == self.architecture
+                and other.instance_type == self.instance_type
+                and other.node_type == self.node_type
+                and other.kernel_version == self.kernel_version
+                and other.kubelet_version == self.kubelet_version
+                and other.os_version == self.os_version
+            )
+        else:
+            return False
+
+    def __repr__(self):
+        return (
+            f"{self.architecture} {self.instance_type} "
+            f"{self.node_type} {self.kernel_version} "
+            f"{self.kubelet_version} {self.os_version}"
+        )
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
 
 @dataclass(order=False)
 class ChaosRunTelemetry:
@@ -148,6 +166,11 @@ class ChaosRunTelemetry:
     of the workers that usually are configured to have the same
     resources.
     """
+    node_taints: list[Taint]
+    """
+    The list of node taints detected
+    """
+
     kubernetes_objects_count: dict[str, int]
     """
     Dictionary containing the number of objects deployed
@@ -161,10 +184,6 @@ class ChaosRunTelemetry:
     """
     Number of all kind of nodes in the target cluster
     """
-    worker_count: int = 0
-    """
-    Number of workers in the node list
-    """
     cloud_infrastructure: str = "Unknown"
     """
     Cloud infrastructure (if available) of the target cluster
@@ -177,6 +196,7 @@ class ChaosRunTelemetry:
     def __init__(self, json_object: any = None):
         self.scenarios = list[ScenarioTelemetry]()
         self.node_summary_infos = list[NodeInfo]()
+        self.node_taints = list[Taint]()
         self.kubernetes_objects_count = dict[str, int]()
         self.network_plugins = ["Unknown"]
         if json_object is not None:
@@ -188,8 +208,8 @@ class ChaosRunTelemetry:
                 self.scenarios.append(scenario_telemetry)
 
             self.node_summary_infos = json_object.get("node_summary_infos")
+            self.node_taints = json_object.get("node_taints")
             self.total_node_count = json_object.get("total_node_count")
-            self.worker_count = json_object.get("worker_count")
             self.cloud_infrastructure = json_object.get("cloud_infrastructure")
             self.kubernetes_objects_count = json_object.get(
                 "kubernetes_objects_count"

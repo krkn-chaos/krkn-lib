@@ -28,7 +28,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
         input_file_yaml_orig = yaml.safe_load(input_file_data_orig)
         input_file_yaml_processed = yaml.safe_load(
             base64.b64decode(
-                scenario_telemetry.parametersBase64.encode()
+                scenario_telemetry.parameters_base64.encode()
             ).decode()
         )
 
