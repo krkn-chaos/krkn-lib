@@ -512,7 +512,7 @@ class KrknTelemetryKubernetes:
             ).decode()
         except Exception as e:
             raise Exception("telemetry: {0}".format(str(e)))
-        scenario_telemetry.parametersBase64 = input_file_base64
+        scenario_telemetry.parameters_base64 = input_file_base64
 
     def put_cluster_events(
         self,

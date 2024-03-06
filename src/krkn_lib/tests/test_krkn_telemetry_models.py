@@ -8,43 +8,43 @@ class KrknTelemetryModelsTests(unittest.TestCase):
     def test_scenario_telemetry(self):
         test_valid_json = """
         {
-            "startTimeStamp": 1686141432,
-            "endTimeStamp": 1686141435,
+            "start_timestamp": 1686141432,
+            "end_timestamp": 1686141435,
             "scenario": "test",
-            "exitStatus": 0,
-            "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            "exit_status": 0,
+            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
         }
         """  # NOQA
         # wrong base64 format
         test_invalid_json_wrong_base64 = """
         {
-            "startTimeStamp": 1686141432,
-            "endTimeStamp": 1686141435,
+            "start_timestamp": 1686141432,
+            "end_timestamp": 1686141435,
             "scenario": "test",
-            "exitStatus": 0,
-            "parametersBase64": "I'm a wrong base64"
+            "exit_status": 0,
+            "parameters_base64": "I'm a wrong base64"
         }
         """
 
         test_invalid_base64_bad_format = """
         {
-            "startTimeStamp": 1686141432,
-            "endTimeStamp": 1686141435,
+            "start_timestamp": 1686141432,
+            "end_timestamp": 1686141435,
             "scenario": "test",
-            "exitStatus": 0,
-            "parametersBase64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
+            "exit_status": 0,
+            "parameters_base64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
         }
 
         """
         json_obj = json.loads(test_valid_json)
 
         telemetry = ScenarioTelemetry(json_obj)
-        self.assertEqual(telemetry.startTimeStamp, 1686141432)
-        self.assertEqual(telemetry.endTimeStamp, 1686141435)
+        self.assertEqual(telemetry.start_timestamp, 1686141432)
+        self.assertEqual(telemetry.end_timestamp, 1686141435)
         self.assertEqual(telemetry.scenario, "test")
-        self.assertEqual(telemetry.exitStatus, 0)
+        self.assertEqual(telemetry.exit_status, 0)
         self.assertIsNotNone(telemetry.parameters)
-        self.assertEqual(telemetry.parametersBase64, "")
+        self.assertEqual(telemetry.parameters_base64, "")
         self.assertEqual(telemetry.parameters["property"]["unit"], "unit")
         self.assertEqual(telemetry.parameters["property"]["test"], "test")
         with self.assertRaises(Exception):
@@ -56,15 +56,17 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             telemetry_empty_constructor = ScenarioTelemetry()
             self.assertIsNotNone(telemetry_empty_constructor)
             self.assertTrue(
-                hasattr(telemetry_empty_constructor, "startTimeStamp")
+                hasattr(telemetry_empty_constructor, "start_timestamp")
             )
             self.assertTrue(
-                hasattr(telemetry_empty_constructor, "endTimeStamp")
+                hasattr(telemetry_empty_constructor, "end_timestamp")
             )
             self.assertTrue(hasattr(telemetry_empty_constructor, "scenario"))
-            self.assertTrue(hasattr(telemetry_empty_constructor, "exitStatus"))
             self.assertTrue(
-                hasattr(telemetry_empty_constructor, "parametersBase64")
+                hasattr(telemetry_empty_constructor, "exit_status")
+            )
+            self.assertTrue(
+                hasattr(telemetry_empty_constructor, "parameters_base64")
             )
             self.assertTrue(hasattr(telemetry_empty_constructor, "parameters"))
         except Exception:
@@ -74,18 +76,18 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         test_valid_json = """
         {
             "scenarios": [{
-                            "startTimeStamp": 1686141432,
-                            "endTimeStamp": 1686141435,
+                            "start_timestamp": 1686141432,
+                            "end_timestamp": 1686141435,
                             "scenario": "test",
-                            "exitStatus": 0,
-                            "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+                            "exit_status": 0,
+                            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         },
                         {
-                            "startTimeStamp": 1686141432,
-                            "endTimeStamp": 1686141435,
+                            "start_timestamp": 1686141432,
+                            "end_timestamp": 1686141435,
                             "scenario": "test",
-                            "exitStatus": 0,
-                            "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+                            "exit_status": 0,
+                            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }],
             "node_summary_infos": [{
                     "name": "test_node"
@@ -103,11 +105,11 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         test_invalid_json_scenarios_format = """
         {
             "scenarios":{
-                        "startTimeStamp": 1686141432,
-                        "endTimeStamp": 1686141435,
+                        "start_timestamp": 1686141432,
+                        "end_timestamp": 1686141435,
                         "scenario": "test",
-                        "exitStatus": 0,
-                        "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+                        "exit_status": 0,
+                        "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }
         }
         """  # NOQA
@@ -115,18 +117,18 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         test_invalid_json_scenarios_element = """
         {
             "scenarios": [{
-                            "startTimeStamp": 1686141432,
-                            "endTimeStamp": 1686141435,
+                            "start_timestamp": 1686141432,
+                            "end_timestamp": 1686141435,
                             "scenario": "test",
-                            "exitStatus": 0,
-                            "parametersBase64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+                            "exit_status": 0,
+                            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         },
                         {
-                            "startTimeStamp": 1686141432,
-                            "endTimeStamp": 1686141435,
+                            "start_timestamp": 1686141432,
+                            "end_timestamp": 1686141435,
                             "scenario": "test",
-                            "exitStatus": 0,
-                            "parametersBase64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
+                            "exit_status": 0,
+                            "parameters_base64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
                         }
 
                        ]
@@ -139,7 +141,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(len(telemetry.scenarios), 2)
         # tests that all scenarios have base64 parameter set to empty string
         for scenario in telemetry.scenarios:
-            self.assertEqual(scenario.parametersBase64, "")
+            self.assertEqual(scenario.parameters_base64, "")
 
         # test deserialization
         try:

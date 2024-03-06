@@ -11,11 +11,11 @@ class ScenarioTelemetry:
     Scenario Telemetry collection
     """
 
-    startTimeStamp: float
+    start_timestamp: float
     """
     Timestamp when the Krkn run started
     """
-    endTimeStamp: float
+    end_timestamp: float
     """
     Timestamp when the Krkn run ended
     """
@@ -23,11 +23,11 @@ class ScenarioTelemetry:
     """
     Scenario filename
     """
-    exitStatus: int
+    exit_status: int
     """
     Exit Status of the Scenario Run
     """
-    parametersBase64: str
+    parameters_base64: str
     """
         Scenario configuration file base64 encoded
     """
@@ -35,19 +35,19 @@ class ScenarioTelemetry:
 
     def __init__(self, json_object: any = None):
         if json_object is not None:
-            self.startTimeStamp = int(json_object.get("startTimeStamp"))
-            self.endTimeStamp = int(json_object.get("endTimeStamp"))
+            self.start_timestamp = int(json_object.get("start_timestamp"))
+            self.end_timestamp = int(json_object.get("end_timestamp"))
             self.scenario = json_object.get("scenario")
-            self.exitStatus = json_object.get("exitStatus")
-            self.parametersBase64 = json_object.get("parametersBase64")
+            self.exit_status = json_object.get("exit_status")
+            self.parameters_base64 = json_object.get("parameters_base64")
             self.parameters = json_object.get("parameters")
 
             if (
-                self.parametersBase64 is not None
-                and self.parametersBase64 != ""
+                self.parameters_base64 is not None
+                and self.parameters_base64 != ""
             ):
                 try:
-                    yaml_params = base64.b64decode(self.parametersBase64)
+                    yaml_params = base64.b64decode(self.parameters_base64)
                     yaml_object = yaml.safe_load(yaml_params)
                     json_string = json.dumps(yaml_object, indent=2)
                     self.parameters = json.loads(json_string)
@@ -55,7 +55,7 @@ class ScenarioTelemetry:
                         self.parameters, dict
                     ) and not isinstance(self.parameters, list):
                         raise Exception()
-                    self.parametersBase64 = ""
+                    self.parameters_base64 = ""
                 except Exception as e:
                     raise Exception(
                         "invalid parameters format: {0}".format(str(e))
@@ -63,11 +63,11 @@ class ScenarioTelemetry:
         else:
             # if constructor is called without params
             # property are initialized so are available
-            self.startTimeStamp = 0
-            self.endTimeStamp = 0
+            self.start_timestamp = 0
+            self.end_timestamp = 0
             self.scenario = ""
-            self.exitStatus = 0
-            self.parametersBase64 = ""
+            self.exit_status = 0
+            self.parameters_base64 = ""
             self.parameters = {}
 
 
