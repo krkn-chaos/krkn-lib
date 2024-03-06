@@ -36,7 +36,7 @@ class ScenarioTelemetry:
     def __init__(self, json_object: any = None):
         if json_object is not None:
             self.startTimeStamp = int(json_object.get("startTimeStamp"))
-            self.endTimeStamp = json_object.get("endTimeStamp")
+            self.endTimeStamp = int(json_object.get("endTimeStamp"))
             self.scenario = json_object.get("scenario")
             self.exitStatus = json_object.get("exitStatus")
             self.parametersBase64 = json_object.get("parametersBase64")
