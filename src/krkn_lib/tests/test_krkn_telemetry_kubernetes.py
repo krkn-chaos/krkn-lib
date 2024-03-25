@@ -5,10 +5,11 @@ import tempfile
 import time
 import unittest
 import uuid
+
 import boto3
 import yaml
 
-from krkn_lib.models.krkn import ChaosRunAlertSummary, ChaosRunAlert
+from krkn_lib.models.krkn import ChaosRunAlert, ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from krkn_lib.tests import BaseTest
 

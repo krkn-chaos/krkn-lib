@@ -218,6 +218,20 @@ class BaseTest(unittest.TestCase):
         except Exception:
             return False
 
+    def create_networkpolicy(self, name: str, namespace: str = "default"):
+        """
+        Create a network policy in a namespace
+
+        :param name: network policy name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        content = self.file_to_template("net-policy.j2", name, namespace)
+
+        dep = yaml.safe_load(content)
+        self.lib_k8s.create_net_policy(dep, namespace)
+
     def create_deployment(self, name: str, namespace: str = "default"):
         """
         Create a deployment in a namespace
@@ -230,8 +244,8 @@ class BaseTest(unittest.TestCase):
         content = self.file_to_template("deployment.j2", name, namespace)
 
         dep = yaml.safe_load(content)
-        self.lib_k8s.apps_api.create_namespaced_deployment(
-            body=dep, namespace=namespace
+        self.lib_k8s.create_obj(
+            dep, namespace, self.lib_k8s.apps_api.create_namespaced_deployment
         )
 
     def create_daemonset(self, name: str, namespace: str = "default"):

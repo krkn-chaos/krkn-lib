@@ -9,10 +9,11 @@ import threading
 import time
 from queue import Queue
 from typing import Dict, List, Optional
+
 import arcaflow_lib_kubernetes
 import kubernetes
 import yaml
-from jinja2 import PackageLoader, Environment
+from jinja2 import Environment, PackageLoader
 from kubeconfig import KubeConfig
 from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
@@ -140,6 +141,7 @@ class KrknKubernetes:
             self.cli = client.CoreV1Api(self.k8s_client)
             self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.net_cli = client.NetworkingV1Api(self.api_client)
             self.custom_object_client = client.CustomObjectsApi(
                 self.k8s_client
             )
@@ -504,6 +506,27 @@ class KrknKubernetes:
                 pods.append(pod.metadata.name)
         return pods
 
+    def create_obj(self, obj_body: json, namespace: str, api_func):
+        try:
+            api_func(body=obj_body, namespace=namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->%s: %s\n"
+                % (str(api_func), e)
+            )
+            raise e
+
+    def create_net_policy(self, body: str, namespace: str):
+        """
+        Create a network policy
+
+        :param body: json body of network policy to create
+        :param namespace: namespace to find daemonsets in
+        """
+        self.create_obj(
+            body, namespace, self.net_cli.create_namespaced_network_policy
+        )
+
     def get_daemonset(self, namespace: str) -> list[str]:
         """
         Return a list of daemon set names
@@ -630,6 +653,22 @@ class KrknKubernetes:
                 logging.error("Failed to delete service %s", str(e))
                 raise e
 
+    def delete_net_policy(self, name: str, namespace: str):
+        """
+        Delete a network policy given a certain name and namespace
+
+        :param name: name of network policy
+        :param namespace: namespace network policy is in
+        """
+        try:
+            self.net_cli.delete_namespaced_network_policy(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Network policy already deleted")
+            else:
+                logging.error("Failed to delete network policy %s", str(e))
+                raise e
+
     def get_deployment_ready(self, name: str, namespace: str):
         """
         Return a deployments detailed information
@@ -674,6 +713,27 @@ class KrknKubernetes:
             for pod in ret_list.items:
                 pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
+
+    def get_namespaced_net_policy(self, namespace):
+        """
+        Return a list of network policy names
+
+        :param namespace: find only statefulset in given namespace
+        :return: list of network policy names
+        """
+        nps = []
+        try:
+            ret = self.net_cli.list_namespaced_network_policy(namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_stateful_set: %s\n",
+                str(e),
+            )
+            raise e
+        for np in ret.items:
+            nps.append(np.metadata.name)
+        return nps
 
     def get_all_statefulset(self, namespace) -> list[str]:
         """
@@ -1862,10 +1922,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            api_client.select_header_accept(
-                                ["application/json"]
-                            )
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
