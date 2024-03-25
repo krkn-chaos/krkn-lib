@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import os
 import random
 import re
@@ -7,15 +8,16 @@ import tempfile
 import time
 import unittest
 import uuid
+
 import yaml
-import logging
+from jinja2 import Environment, FileSystemLoader
 from kubernetes import config
 from kubernetes.client import ApiException
-from jinja2 import Environment, FileSystemLoader
+from tzlocal import get_localzone
+
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
-from tzlocal import get_localzone
 
 
 class KrknKubernetesTests(BaseTest):
@@ -368,6 +370,18 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
+
+    def test_net_policy(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.create_networkpolicy(name, namespace)
+        np = self.lib_k8s.get_namespaced_net_policy(namespace=namespace)
+        self.assertTrue(len(np) == 1)
+        self.lib_k8s.delete_net_policy(name, namespace)
+        np = self.lib_k8s.get_namespaced_net_policy(namespace=namespace)
+        self.assertTrue(len(np) == 0)
+        self.lib_k8s.delete_namespace(namespace)
 
     def test_delete_deployment(self):
         namespace = "test-" + self.get_random_string(10)
