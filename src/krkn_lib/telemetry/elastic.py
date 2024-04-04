@@ -1,9 +1,9 @@
 import time
 
 import urllib3
+from elasticsearch import Elasticsearch
 
 from krkn_lib.utils.safe_logger import SafeLogger
-from elasticsearch import Elasticsearch
 
 
 class KrknElastic:

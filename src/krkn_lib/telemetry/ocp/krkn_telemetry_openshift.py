@@ -47,6 +47,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         chaos_telemetry.cloud_infrastructure = (
             self.ocpcli.get_cloud_infrastructure()
         )
+        chaos_telemetry.cloud_type = self.ocpcli.get_cluster_type()
         chaos_telemetry.network_plugins = (
             self.ocpcli.get_cluster_network_plugins()
         )

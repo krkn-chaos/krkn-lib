@@ -16,6 +16,11 @@ class KrknOpenshiftTest(BaseTest):
         self.assertTrue(len(resp) > 0)
         self.assertEqual(resp[0], "Unknown")
 
+    def test_get_cluster_type(self):
+        resp = self.lib_ocp.get_cluster_type()
+        self.assertTrue(resp)
+        self.assertEqual(resp, "self-managed")
+
     def test_get_cloud_infrastructure(self):
         resp = self.lib_ocp.get_cloud_infrastructure()
         self.assertTrue(resp)

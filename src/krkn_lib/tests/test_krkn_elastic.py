@@ -1,5 +1,6 @@
-import os
 import datetime
+import os
+
 from krkn_lib.telemetry.elastic import KrknElastic
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils.safe_logger import SafeLogger

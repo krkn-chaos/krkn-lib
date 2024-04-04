@@ -1,4 +1,4 @@
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.k8s import AffectedPod, PodsStatus
 from krkn_lib.tests import BaseTest
 
 
