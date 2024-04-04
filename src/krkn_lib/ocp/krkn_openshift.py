@@ -6,14 +6,15 @@ import subprocess
 import tarfile
 import threading
 from collections import namedtuple
-
 from pathlib import Path
 from queue import Queue
 from typing import Optional
+
 from kubernetes import client
 from tzlocal import get_localzone
+
 from krkn_lib.k8s import KrknKubernetes
-from krkn_lib.utils import filter_log_file_worker, SafeLogger
+from krkn_lib.utils import SafeLogger, filter_log_file_worker
 
 
 class KrknOpenshift(KrknKubernetes):
@@ -52,6 +53,64 @@ class KrknOpenshift(KrknKubernetes):
                 return ""
             else:
                 raise e
+
+    def get_cluster_type(self) -> str:
+        """
+        Get the cluster Cloud infrastructure type when available
+        status:
+            platformStatus:
+                aws:
+                region: us-west-2
+                resourceTags:
+                - key: prowci
+                    value: ci-rosa-**
+                - key: red-hat-clustertype
+                    value: rosa
+                - key: red-hat-managed
+                    value: "true"
+                type: AWS
+
+        :return: the cluster type (ex. rosa) or `self-managed` when unavailable
+        """
+        api_client = self.api_client
+        if api_client:
+            try:
+                path_params: dict[str, str] = {}
+                query_params: list[str] = []
+                header_params: dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = "/apis/config.openshift.io/v1/infrastructures/cluster"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+                json_obj = ast.literal_eval(data[0])
+                platform = json_obj["status"]["platform"].lower()
+                if (
+                    "resourceTags"
+                    in json_obj["status"]["platformStatus"][platform]
+                ):
+                    resource_tags = json_obj["status"]["platformStatus"][
+                        platform
+                    ]["resourceTags"]
+                    for rt in resource_tags:
+                        if rt["key"] == "red-hat-clustertype":
+                            return rt["value"]
+                return "self-managed"
+            except Exception as e:
+                logging.warning("V1ApiException -> %s", str(e))
+                return "self-managed"
+
+        return None
 
     def get_cloud_infrastructure(self) -> str:
         """

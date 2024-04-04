@@ -8,8 +8,6 @@ import tempfile
 import threading
 import time
 import warnings
-
-import urllib3
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
@@ -17,6 +15,7 @@ from typing import Dict, List, Optional
 
 import arcaflow_lib_kubernetes
 import kubernetes
+import urllib3
 import yaml
 from jinja2 import Environment, PackageLoader
 from kubeconfig import KubeConfig
@@ -28,19 +27,18 @@ from urllib3 import HTTPResponse
 
 from krkn_lib.models.k8s import (
     PVC,
+    AffectedPod,
     ApiRequestException,
     ChaosEngine,
     ChaosResult,
     Container,
     LitmusChaosObject,
     Pod,
+    PodsMonitorThread,
+    PodsStatus,
     Volume,
     VolumeMount,
-    AffectedPod,
-    PodsStatus,
-    PodsMonitorThread,
 )
-
 from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -1936,10 +1934,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            api_client.select_header_accept(
-                                ["application/json"]
-                            )
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
                         )
 
                         path = f"/api/{api_version}/{resource.name}"

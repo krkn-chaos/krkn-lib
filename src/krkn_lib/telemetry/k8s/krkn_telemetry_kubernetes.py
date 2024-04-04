@@ -1,22 +1,22 @@
 import base64
+import os
 import tempfile
 import threading
 import time
 import warnings
+from queue import Queue
+from typing import Optional
 
+import requests
 import urllib3
 import yaml
-import requests
-import os
-import krkn_lib.utils as utils
+from tzlocal import get_localzone
 
-from queue import Queue
+import krkn_lib.utils as utils
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.krkn import ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
-from typing import Optional
 from krkn_lib.utils.safe_logger import SafeLogger
-from tzlocal import get_localzone
 
 
 class KrknTelemetryKubernetes:

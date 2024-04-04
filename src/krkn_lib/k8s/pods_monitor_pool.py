@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from multiprocessing import Event
 
 from krkn_lib.k8s import KrknKubernetes
-from krkn_lib.models.k8s import PodsStatus, PodsMonitorThread
+from krkn_lib.models.k8s import PodsMonitorThread, PodsStatus
 
 
 class PodsMonitorPool:

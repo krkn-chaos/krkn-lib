@@ -9,13 +9,13 @@ import yaml
 import krkn_lib.utils as utils
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import (
-    deep_set_attribute,
-    filter_log_line,
-    get_yaml_item_value,
     check_date_in_localized_interval,
+    deep_set_attribute,
     filter_dictionary,
+    filter_log_line,
     find_executable_in_path,
     get_random_string,
+    get_yaml_item_value,
 )
 
 

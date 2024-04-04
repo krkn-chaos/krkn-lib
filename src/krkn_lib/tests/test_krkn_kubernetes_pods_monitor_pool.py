@@ -5,7 +5,6 @@ from krkn_lib.tests import BaseTest
 
 
 class TestKrknKubernetesPodsMonitorPool(BaseTest):
-
     def test_pods_monitor_pool(self):
         namespace_1 = "test-pool-ns-0-" + self.get_random_string(10)
         label_1 = "readiness-1"

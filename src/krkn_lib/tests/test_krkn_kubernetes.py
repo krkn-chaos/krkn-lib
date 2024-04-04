@@ -15,10 +15,7 @@ from kubernetes import config
 from kubernetes.client import ApiException
 from tzlocal import get_localzone
 
-from krkn_lib.k8s import (
-    ApiRequestException,
-    KrknKubernetes,
-)
+from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
 
