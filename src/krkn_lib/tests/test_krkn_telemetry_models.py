@@ -12,7 +12,26 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "end_timestamp": 1686141435,
             "scenario": "test",
             "exit_status": 0,
-            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0",
+            "affected_pods":{
+                "recovered":[
+                    {
+                        "pod_name":"test-pod",
+                        "namespace":"test-namespace",
+                        "recovery_time":3.14
+                    }
+                ],
+                "unrecovered":[
+                    {
+                        "pod_name":"failed-pod-1",
+                        "namespace":"failed-namespace"
+                    },
+                    {
+                        "pod_name":"failed-pod-2",
+                        "namespace":"failed-namespace"
+                    }
+                ]
+             }
         }
         """  # NOQA
         # wrong base64 format
@@ -43,6 +62,17 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(telemetry.end_timestamp, 1686141435)
         self.assertEqual(telemetry.scenario, "test")
         self.assertEqual(telemetry.exit_status, 0)
+        self.assertIsNotNone(telemetry.affected_pods)
+        self.assertEqual(len(telemetry.affected_pods.recovered), 1)
+        self.assertEqual(len(telemetry.affected_pods.unrecovered), 2)
+        for recovered in telemetry.affected_pods.recovered:
+            self.assertIsNotNone(recovered.pod_name)
+            self.assertIsNotNone(recovered.namespace)
+            self.assertIsNotNone(recovered.recovery_time)
+        for unrecovered in telemetry.affected_pods.unrecovered:
+            self.assertIsNotNone(unrecovered.pod_name)
+            self.assertIsNotNone(unrecovered.namespace)
+            self.assertIsNone(unrecovered.recovery_time)
         self.assertIsNotNone(telemetry.parameters)
         self.assertEqual(telemetry.parameters_base64, "")
         self.assertEqual(telemetry.parameters["property"]["unit"], "unit")
