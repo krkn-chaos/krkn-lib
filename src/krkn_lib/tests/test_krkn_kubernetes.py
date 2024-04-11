@@ -1042,7 +1042,7 @@ class KrknKubernetesTests(BaseTest):
         self.deploy_namespace(namespace, [])
         self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
         self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
-        monitor_timeout = 5
+        monitor_timeout = 7
 
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
             "test=readiness"

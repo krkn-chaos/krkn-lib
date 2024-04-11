@@ -253,6 +253,10 @@ class PodsStatus:
                     )
                 )
 
+    def merge(self, pods_status: "PodsStatus"):
+        map(self.recovered.append, pods_status.recovered)
+        map(self.unrecovered.append, pods_status.unrecovered)
+
 
 class PodsMonitorThread:
     executor: ThreadPoolExecutor
