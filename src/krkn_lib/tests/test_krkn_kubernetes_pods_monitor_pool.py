@@ -89,3 +89,33 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         self.assertIsNone(status.error)
         self.assertEqual(len(status.recovered), 2)
         self.assertEqual(len(status.unrecovered), 1)
+
+    def test_cancel(self):
+        namespace_1 = "test-pool-ns-0-" + self.get_random_string(10)
+        label_1 = "readiness-1"
+        delayed_1 = "delayed-pool-0-1-" + self.get_random_string(10)
+        delayed_2 = "delayed-pool-0-2-" + self.get_random_string(10)
+
+        delayed_1_respawn = "delayed-pool-0-r-2-" + self.get_random_string(10)
+        self.deploy_namespace(namespace_1, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace_1, 0, label_1)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace_1, 0, label_1)
+        monitor_timeout = 60
+        pool = PodsMonitorPool(self.lib_k8s)
+
+        pool.select_and_monitor_by_label(
+            label_selector=f"test={label_1}",
+            max_timeout=monitor_timeout,
+        )
+        self.background_delete_pod(delayed_1, namespace_1)
+        self.deploy_delayed_readiness_pod(
+            delayed_1_respawn, namespace_1, monitor_timeout + 5, label_1
+        )
+        start_time = time.time()
+        pool.cancel()
+        _ = pool.join()
+        end_time = time.time() - start_time
+        self.background_delete_pod(delayed_1_respawn, namespace_1)
+        self.background_delete_pod(delayed_2, namespace_1)
+        # give the time to wrap up the threads and return
+        self.assertLess(end_time, 1)

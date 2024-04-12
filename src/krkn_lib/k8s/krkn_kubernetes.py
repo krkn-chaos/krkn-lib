@@ -2657,6 +2657,7 @@ class KrknKubernetes:
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
         max_timeout: int = 30,
+        event: threading.Event = None,
     ) -> PodsMonitorThread:
         """
         Starts monitoring a list of pods identified as tuples
@@ -2678,6 +2679,9 @@ class KrknKubernetes:
             unrecovered. If during the time frame the pods are not replaced
             at all the error field of the PodsStatus structure will be
             valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
         :return: a PodsMonitorThread structure that can be joined
             in any place of the code, to collect the PodsStatus structure
             returned, in order to make the process run in background
@@ -2689,6 +2693,7 @@ class KrknKubernetes:
             max_timeout=max_timeout,
             pods_status=PodsStatus(),
             label_selector=label_selector,
+            event=event,
         )
 
     def monitor_pods_by_name_pattern_and_namespace_pattern(
@@ -2697,6 +2702,7 @@ class KrknKubernetes:
         namespace_pattern: str,
         pods_and_namespaces: list[(str, str)],
         max_timeout=30,
+        event: threading.Event = None,
     ) -> PodsMonitorThread:
         """
         Starts monitoring a list of pods identified as tuples
@@ -2724,6 +2730,9 @@ class KrknKubernetes:
             unrecovered. If during the time frame the pods are not replaced
             at all the error field of the PodsStatus structure will be
             valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
         :return: a PodsMonitorThread structure that can be joined in any
             place of the code, to collect the PodsStatus structure returned,
             in order to make the process run in background while a chaos
@@ -2736,6 +2745,7 @@ class KrknKubernetes:
             pods_status=PodsStatus(),
             name_pattern=pod_name_pattern,
             namespace_pattern=namespace_pattern,
+            event=event,
         )
 
     def monitor_pods_by_namespace_pattern_and_label(
@@ -2744,6 +2754,7 @@ class KrknKubernetes:
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
         max_timeout=30,
+        event: threading.Event = None,
     ) -> PodsMonitorThread:
         """
         Starts monitoring a list of pods identified as tuples
@@ -2770,6 +2781,9 @@ class KrknKubernetes:
             If during the time frame the pods are not replaced
             at all the error field of the PodsStatus structure will be
             valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
         :return: a PodsMonitorThread structure that can be joined in
             any place of the code, to collect the PodsStatus structure
             returned, in order to make the process run in background while
@@ -2783,6 +2797,7 @@ class KrknKubernetes:
             pods_status=PodsStatus(),
             label_selector=label_selector,
             namespace_pattern=namespace_pattern,
+            event=event,
         )
 
     def __start_monitoring_pods(
@@ -2794,6 +2809,7 @@ class KrknKubernetes:
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
+        event: threading.Event = None,
     ) -> PodsMonitorThread:
         executor = ThreadPoolExecutor()
         future = executor.submit(
@@ -2805,6 +2821,7 @@ class KrknKubernetes:
             pod_name=pod_name,
             namespace_pattern=namespace_pattern,
             name_pattern=name_pattern,
+            event=event,
         )
 
         return PodsMonitorThread(executor, future)
@@ -2818,11 +2835,13 @@ class KrknKubernetes:
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
+        event: threading.Event = None,
     ) -> PodsStatus:
         missing_pods = set()
         pods_to_wait = set()
         pods_already_watching = set()
         start_time = time.time()
+        _event = threading.Event() if not event else event
         if (
             label_selector
             and not pod_name
@@ -2863,6 +2882,10 @@ class KrknKubernetes:
             return pods_status
 
         while time.time() - start_time <= max_timeout:
+            if event:
+                if event.is_set():
+                    return pods_status
+
             time_offset = time.time() - start_time
             remaining_time = max_timeout - time_offset
             current_pods_and_namespaces = select_method()
@@ -2905,7 +2928,7 @@ class KrknKubernetes:
                 continue
 
             futures = []
-            event = threading.Event()
+
             with ThreadPoolExecutor() as executor:
                 for pod_and_namespace in pods_to_wait:
                     if pod_and_namespace not in pods_already_watching:
@@ -2913,7 +2936,7 @@ class KrknKubernetes:
                             self.__wait_until_pod_is_ready_worker,
                             pod_name=pod_and_namespace[0],
                             namespace=pod_and_namespace[1],
-                            event=event,
+                            event=_event,
                         )
                         futures.append(future)
                         pods_already_watching.add(pod_and_namespace)
@@ -2921,7 +2944,7 @@ class KrknKubernetes:
                 # this will wait all the futures to
                 # finish within the remaining time
                 done, undone = wait(futures, timeout=remaining_time)
-                event.set()
+                _event.set()
                 for future in done:
                     result = future.result()
                     pods_status.recovered.append(result)
@@ -2936,9 +2959,11 @@ class KrknKubernetes:
         # structure that will be catched at the end of
         # the monitoring,
         if len(missing_pods) > 0:
-            pods_status.error = Exception(
-                f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
-            )
+            if not _event.is_set():
+                pods_status.error = Exception(
+                    f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
+                )
+
         return pods_status
 
     def __wait_until_pod_is_ready_worker(

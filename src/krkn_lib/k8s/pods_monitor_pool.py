@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, wait
+from multiprocessing import Event
 
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.k8s import PodsStatus, PodsMonitorThread
@@ -11,19 +12,27 @@ class PodsMonitorPool:
     having multiple killing sessions at the same time (eg. Plugin scenarios)
     """
 
+    events: list[Event]
+
     def __init__(self, krkn_lib: KrknKubernetes):
         self.krkn_lib = krkn_lib
         self.pods_monitor_threads: list[PodsMonitorThread] = []
         self.pods_statuses = []
+        self.events: list[Event] = []
 
     def select_and_monitor_by_label(
         self, label_selector: str, max_timeout: int
     ):
+        event = Event()
+        self.events.append(event)
         pods_and_namespaces = self.krkn_lib.select_pods_by_label(
-            label_selector
+            label_selector=label_selector
         )
         pod_monitor_thread = self.krkn_lib.monitor_pods_by_label(
-            label_selector, pods_and_namespaces, max_timeout
+            label_selector=label_selector,
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            event=event,
         )
         self.pods_monitor_threads.append(pod_monitor_thread)
 
@@ -31,18 +40,24 @@ class PodsMonitorPool:
         self, pod_name_pattern: str, namespace_pattern: str, max_timeout: int
     ):
         """ """
+
+        event = Event()
+        self.events.append(event)
+
         pods_and_namespaces = (
             self.krkn_lib.select_pods_by_name_pattern_and_namespace_pattern(
-                pod_name_pattern, namespace_pattern
+                pod_name_pattern=pod_name_pattern,
+                namespace_pattern=namespace_pattern,
             )
         )
 
         pods_monitor_thread = (
             self.krkn_lib.monitor_pods_by_name_pattern_and_namespace_pattern(
-                pod_name_pattern,
-                namespace_pattern,
-                pods_and_namespaces,
-                max_timeout,
+                pod_name_pattern=pod_name_pattern,
+                namespace_pattern=namespace_pattern,
+                pods_and_namespaces=pods_and_namespaces,
+                max_timeout=max_timeout,
+                event=event,
             )
         )
 
@@ -54,7 +69,8 @@ class PodsMonitorPool:
         label_selector: str,
         max_timeout=30,
     ):
-
+        event = Event()
+        self.events.append(event)
         pods_and_namespaces = (
             self.krkn_lib.select_pods_by_namespace_pattern_and_label(
                 namespace_pattern=namespace_pattern,
@@ -68,9 +84,14 @@ class PodsMonitorPool:
                 label_selector=label_selector,
                 pods_and_namespaces=pods_and_namespaces,
                 max_timeout=max_timeout,
+                event=event,
             )
         )
         self.pods_monitor_threads.append(pod_monitor_thread)
+
+    def cancel(self):
+        for event in self.events:
+            event.set()
 
     def join(self) -> PodsStatus:
         futures = []
