@@ -5,7 +5,6 @@ import os
 import random
 import re
 import tempfile
-import threading
 import time
 import unittest
 import uuid
@@ -890,17 +889,18 @@ class KrknKubernetesTests(BaseTest):
         namespace = "test-ns-0-" + self.get_random_string(10)
         delayed_1 = "delayed-0-" + self.get_random_string(10)
         delayed_2 = "delayed-0-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
 
         monitor_timeout = 2
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         start_time = time.time()
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness", pods_and_namespaces, monitor_timeout
+            f"test={label}", pods_and_namespaces, monitor_timeout
         )
 
         result = pods_thread.join()
@@ -922,11 +922,12 @@ class KrknKubernetesTests(BaseTest):
         delayed_1 = "delayed-1-" + self.get_random_string(10)
         delayed_2 = "delayed-1-" + self.get_random_string(10)
         delayed_respawn = "delayed-1-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         pod_delay = 1
         monitor_timeout = 10
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
 
         pods_and_namespaces = (
             self.lib_k8s.select_pods_by_name_pattern_and_namespace_pattern(
@@ -945,7 +946,7 @@ class KrknKubernetesTests(BaseTest):
 
         self.background_delete_pod(delayed_1, namespace)
         self.deploy_delayed_readiness_pod(
-            delayed_respawn, namespace, pod_delay
+            delayed_respawn, namespace, pod_delay, label
         )
 
         result = pods_thread.join()
@@ -966,26 +967,29 @@ class KrknKubernetesTests(BaseTest):
         namespace = "test-ns-2-" + self.get_random_string(10)
         delayed_1 = "delayed-2-" + self.get_random_string(10)
         delayed_2 = "delayed-2-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
 
         monitor_timeout = 45
         pod_delay = 1
         pods_and_namespaces = (
             self.lib_k8s.select_pods_by_namespace_pattern_and_label(
-                "^test-ns-2-.*", "test=readiness"
+                "^test-ns-2-.*", f"test={label}"
             )
         )
         pods_thread = self.lib_k8s.monitor_pods_by_namespace_pattern_and_label(
             "^test-ns-2-.*",
-            "test=readiness",
+            f"test={label}",
             pods_and_namespaces,
             monitor_timeout,
         )
 
         self.lib_k8s.delete_pod(delayed_1, namespace)
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, pod_delay)
+        self.deploy_delayed_readiness_pod(
+            delayed_1, namespace, pod_delay, label
+        )
 
         result = pods_thread.join()
         self.background_delete_pod(delayed_1, namespace)
@@ -1003,26 +1007,27 @@ class KrknKubernetesTests(BaseTest):
         delayed_1 = "delayed-3-" + self.get_random_string(10)
         delayed_2 = "delayed-3-" + self.get_random_string(10)
         delayed_respawn = "delayed-respawn-3-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
 
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
         monitor_timeout = 20
         pod_delay = 30
         # pod with same name recovered
 
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness",
+            f"test={label}",
             pods_and_namespaces,
             monitor_timeout,
         )
 
         self.background_delete_pod(delayed_1, namespace)
         self.deploy_delayed_readiness_pod(
-            delayed_respawn, namespace, pod_delay
+            delayed_respawn, namespace, pod_delay, label
         )
 
         result = pods_thread.join()
@@ -1039,16 +1044,17 @@ class KrknKubernetesTests(BaseTest):
         namespace = "test-ns-4-" + self.get_random_string(10)
         delayed_1 = "delayed-4-" + self.get_random_string(10)
         delayed_2 = "delayed-4-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
         monitor_timeout = 7
 
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness", pods_and_namespaces, monitor_timeout
+            f"test={label}", pods_and_namespaces, monitor_timeout
         )
 
         self.background_delete_pod(delayed_1, namespace)
@@ -1065,27 +1071,28 @@ class KrknKubernetesTests(BaseTest):
         delayed_3 = "delayed-4-" + self.get_random_string(10)
         delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
         delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
         monitor_timeout = 20
         pod_delay = 2
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness", pods_and_namespaces, monitor_timeout
+            f"test={label}", pods_and_namespaces, monitor_timeout
         )
 
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
 
         self.deploy_delayed_readiness_pod(
-            delayed_respawn_1, namespace, pod_delay
+            delayed_respawn_1, namespace, pod_delay, label
         )
         self.deploy_delayed_readiness_pod(
-            delayed_respawn_2, namespace, pod_delay
+            delayed_respawn_2, namespace, pod_delay, label
         )
 
         result = pods_thread.join()
@@ -1110,28 +1117,29 @@ class KrknKubernetesTests(BaseTest):
         delayed_3 = "delayed-4-" + self.get_random_string(10)
         delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
         delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
         monitor_timeout = 20
         pod_delay = 2
         pod_too_much_delay = 25
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness", pods_and_namespaces, monitor_timeout
+            f"test={label}", pods_and_namespaces, monitor_timeout
         )
 
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
 
         self.deploy_delayed_readiness_pod(
-            delayed_respawn_1, namespace, pod_delay
+            delayed_respawn_1, namespace, pod_delay, label
         )
         self.deploy_delayed_readiness_pod(
-            delayed_respawn_2, namespace, pod_too_much_delay
+            delayed_respawn_2, namespace, pod_too_much_delay, label
         )
 
         result = pods_thread.join()
@@ -1156,24 +1164,25 @@ class KrknKubernetesTests(BaseTest):
         delayed_3 = "delayed-4-" + self.get_random_string(10)
         delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
         delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
         self.deploy_namespace(namespace, [])
-        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0)
-        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0)
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
         monitor_timeout = 5
         pod_delay = 2
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
-            "test=readiness"
+            f"test={label}"
         )
         pods_thread = self.lib_k8s.monitor_pods_by_label(
-            "test=readiness", pods_and_namespaces, monitor_timeout
+            f"test={label}", pods_and_namespaces, monitor_timeout
         )
 
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
 
         self.deploy_delayed_readiness_pod(
-            delayed_respawn_1, namespace, pod_delay
+            delayed_respawn_1, namespace, pod_delay, label
         )
 
         result = pods_thread.join()
@@ -1183,13 +1192,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertIsNotNone(result.error)
         self.assertEqual(len(result.unrecovered), 0)
         self.assertEqual(len(result.recovered), 0)
-
-    def background_delete_pod(self, pod_name: str, namespace: str):
-        thread = threading.Thread(
-            target=self.lib_k8s.delete_pod, args=(pod_name, namespace)
-        )
-        thread.daemon = True
-        thread.start()
 
 
 if __name__ == "__main__":

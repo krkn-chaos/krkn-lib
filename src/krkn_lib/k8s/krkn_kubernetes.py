@@ -2938,7 +2938,6 @@ class KrknKubernetes:
         if len(missing_pods) > 0:
             pods_status.error = Exception(
                 f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
-                f" did not recover from chaos"
             )
         return pods_status
 

@@ -38,9 +38,13 @@ class TestKrknKubernetesModels(BaseTest):
         pods_status_merge.merge(pods_status_1)
         pods_status_merge.merge(pods_status_2)
 
-        for index, _ in enumerate(pods_status_merge.recovered):
-            self.assertTrue(f"test_{index+1}" in pods_status_merge.recovered)
-        for index, _ in enumerate(pods_status_merge.recovered):
+        for index in range(4):
             self.assertTrue(
-                f"test_{index+1}_unrecovered" in pods_status_merge.unrecovered
+                f"test_{index+1}"
+                in [p.pod_name for p in pods_status_merge.recovered]
+            )
+        for index in range(4):
+            self.assertTrue(
+                f"test_{index+1}_unrecovered"
+                in [p.pod_name for p in pods_status_merge.unrecovered]
             )

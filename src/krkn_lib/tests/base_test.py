@@ -4,6 +4,7 @@ import random
 import string
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from typing import Dict, List
@@ -123,11 +124,13 @@ class BaseTest(unittest.TestCase):
         self.apply_template(content)
 
     def deploy_delayed_readiness_pod(
-        self, name: str, namespace: str, delay: int
+        self, name: str, namespace: str, delay: int, label: str = "readiness"
     ):
         environment = Environment(loader=FileSystemLoader("src/testdata/"))
         template = environment.get_template("delayed_readiness_pod.j2")
-        content = template.render(name=name, namespace=namespace, delay=delay)
+        content = template.render(
+            name=name, namespace=namespace, delay=delay, label=label
+        )
         self.apply_template(content)
 
     def deploy_persistent_volume(
@@ -385,3 +388,10 @@ class BaseTest(unittest.TestCase):
                 str(e),
             )
             raise e
+
+    def background_delete_pod(self, pod_name: str, namespace: str):
+        thread = threading.Thread(
+            target=self.lib_k8s.delete_pod, args=(pod_name, namespace)
+        )
+        thread.daemon = True
+        thread.start()

@@ -254,8 +254,10 @@ class PodsStatus:
                 )
 
     def merge(self, pods_status: "PodsStatus"):
-        map(self.recovered.append, pods_status.recovered)
-        map(self.unrecovered.append, pods_status.unrecovered)
+        for recovered in pods_status.recovered:
+            self.recovered.append(recovered)
+        for unrecovered in pods_status.unrecovered:
+            self.unrecovered.append(unrecovered)
 
 
 class PodsMonitorThread:

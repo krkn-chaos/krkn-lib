@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   labels:
-    test: readiness
+    test: {{label}}
   name: {{name}}
   namespace: {{namespace}}
 spec:
