@@ -2875,7 +2875,7 @@ class KrknKubernetes:
                 label_selector=label_selector,
             )
         else:
-            pods_status.error = Exception(
+            pods_status.error = (
                 "invalid parameter combination, "
                 "check hasn't been performed, aborting."
             )
@@ -2947,6 +2947,12 @@ class KrknKubernetes:
                 _event.set()
                 for future in done:
                     result = future.result()
+                    # sum the time elapsed waiting before the pod
+                    # has been rescheduled
+                    # to the effective recovery time of the pod
+                    result.recovery_time = result.recovery_time + (
+                        time.time() - start_time
+                    )
                     pods_status.recovered.append(result)
                 for future in undone:
                     result = future.result()
@@ -2960,9 +2966,7 @@ class KrknKubernetes:
         # the monitoring,
         if len(missing_pods) > 0:
             if not _event.is_set():
-                pods_status.error = Exception(
-                    f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
-                )
+                pods_status.error = f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
 
         return pods_status
 

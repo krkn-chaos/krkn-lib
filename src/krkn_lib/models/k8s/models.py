@@ -229,7 +229,7 @@ class PodsStatus:
 
     recovered: list[AffectedPod]
     unrecovered: list[AffectedPod]
-    error: Optional[Exception]
+    error: Optional[str]
 
     def __init__(self, json_object: str = None):
         self.recovered = []

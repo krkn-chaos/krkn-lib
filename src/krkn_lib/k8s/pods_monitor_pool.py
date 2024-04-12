@@ -108,7 +108,7 @@ class PodsMonitorPool:
         exceptions = [status.error for status in pods_statuses if status.error]
         if len(exceptions) > 0:
             merged_exception_message = ", ".join([str(e) for e in exceptions])
-            final_status.error = Exception(merged_exception_message)
+            final_status.error = merged_exception_message
             return final_status
 
         for pod_status in pods_statuses:
