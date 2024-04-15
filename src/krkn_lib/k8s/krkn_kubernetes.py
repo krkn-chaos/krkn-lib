@@ -2688,10 +2688,11 @@ class KrknKubernetes:
             while a chaos scenario is performed.
 
         """
+        pods_status = PodsStatus()
         return self.__start_monitoring_pods(
             pods_and_namespaces=pods_and_namespaces,
             max_timeout=max_timeout,
-            pods_status=PodsStatus(),
+            pods_status=pods_status,
             label_selector=label_selector,
             event=event,
         )
@@ -2739,10 +2740,11 @@ class KrknKubernetes:
             scenario is performed.
 
         """
+        pods_status = PodsStatus()
         return self.__start_monitoring_pods(
             pods_and_namespaces=pods_and_namespaces,
             max_timeout=max_timeout,
-            pods_status=PodsStatus(),
+            pods_status=pods_status,
             name_pattern=pod_name_pattern,
             namespace_pattern=namespace_pattern,
             event=event,
@@ -2790,11 +2792,11 @@ class KrknKubernetes:
             a chaos scenario is performed.
 
         """
-
+        pods_status = PodsStatus()
         return self.__start_monitoring_pods(
             pods_and_namespaces=pods_and_namespaces,
             max_timeout=max_timeout,
-            pods_status=PodsStatus(),
+            pods_status=pods_status,
             label_selector=label_selector,
             namespace_pattern=namespace_pattern,
             event=event,

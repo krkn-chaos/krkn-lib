@@ -252,6 +252,8 @@ class PodsStatus:
                         unrecovered["namespace"],
                     )
                 )
+            if "error" in json_object:
+                self.error = json_object["error"]
 
     def merge(self, pods_status: "PodsStatus"):
         for recovered in pods_status.recovered:

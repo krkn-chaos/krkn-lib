@@ -78,6 +78,7 @@ class ScenarioTelemetry:
             self.exit_status = 0
             self.parameters_base64 = ""
             self.parameters = {}
+            self.affected_pods = PodsStatus()
 
 
 @dataclass(order=False)
