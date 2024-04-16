@@ -7,6 +7,8 @@ import re
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
+from functools import partial
 from queue import Queue
 from typing import Dict, List, Optional
 
@@ -31,7 +33,11 @@ from krkn_lib.models.k8s import (
     Pod,
     Volume,
     VolumeMount,
+    AffectedPod,
+    PodsStatus,
+    PodsMonitorThread,
 )
+
 from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -1922,10 +1928,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params[
-                            "Accept"
-                        ] = api_client.select_header_accept(
-                            ["application/json"]
+                        header_params["Accept"] = (
+                            api_client.select_header_accept(
+                                ["application/json"]
+                            )
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -2425,6 +2431,25 @@ class KrknKubernetes:
         except Exception:
             return False
 
+    def is_pod_terminating(self, pod_name: str, namespace: str) -> bool:
+        """
+        Checks if a pod is scheduled for deletion so it's terminating
+
+        :param pod_name:str: the name of the pod to check
+        :param namespace:str: the namespace of the pod to check
+        :return: True if is Terminating or False if not
+        """
+        try:
+            response = self.cli.read_namespaced_pod(
+                name=pod_name, namespace=namespace, pretty="true"
+            )
+            if response.metadata.deletion_timestamp:
+                return True
+
+            return False
+        except Exception:
+            return False
+
     def collect_cluster_events(
         self,
         start_timestamp: int,
@@ -2548,3 +2573,418 @@ class KrknKubernetes:
                 f"on namespace: {namespace} with error: {e}"
             )
             return None
+
+    def select_pods_by_label(self, label_selector: str) -> list[(str, str)]:
+        """
+        Selects the pods identified by a label_selector
+
+        :param label_selector: a label selector string
+            in the format "key=value"
+        :param max_timeout: the maximum time in seconds
+            to wait before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = [(pod[0], pod[1]) for pod in pods_and_namespaces]
+        # select only running pods
+        pods_and_namespaces = [
+            pod
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def select_pods_by_name_pattern_and_namespace_pattern(
+        self, pod_name_pattern: str, namespace_pattern: str
+    ) -> list[(str, str)]:
+        """
+        Selects the pods identified by a namespace_pattern
+        and a pod_name pattern.
+
+        :param pod_name_pattern: a pod_name pattern to match
+        :param namespace_pattern: a namespace pattern to match
+        :param max_timeout: the maximum time in seconds to wait
+            before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        namespace_re = re.compile(namespace_pattern)
+        podname_re = re.compile(pod_name_pattern)
+        namespaces = self.list_namespaces()
+        pods_and_namespaces = []
+        for namespace in namespaces:
+            if namespace_re.match(namespace):
+                pods = self.list_pods(namespace)
+                for pod in pods:
+                    if podname_re.match(pod):
+                        pods_and_namespaces.append((pod, namespace))
+        # select only running pods
+        pods_and_namespaces = [
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def select_pods_by_namespace_pattern_and_label(
+        self, namespace_pattern: str, label_selector: str
+    ) -> list[(str, str)]:
+        """
+        Selects the pods identified by a label_selector
+        and a namespace pattern
+
+        :param namespace_pattern: a namespace pattern to match
+        :param label_selector: a label selector string
+            in the format "key=value"
+        :param max_timeout: the maximum time in seconds
+            to wait before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        namespace_re = re.compile(namespace_pattern)
+        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = [
+            pod for pod in pods_and_namespaces if namespace_re.match(pod[1])
+        ]
+        # select only running pods
+        pods_and_namespaces = [
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def monitor_pods_by_label(
+        self,
+        label_selector: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout: int = 30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by label selector
+        and collects infos about the pods recovery after a kill scenario.
+        Returns a PodsMonitorThread that can be joined after the scenario
+        to retrieve the PodsStatus object containing all the information
+        collected in background during the chaos run.
+
+        :param label_selector: the label selector used
+            to filter the pods to monitor (must be the
+            same used in `select_pods_by_label`)
+        :param pods_and_namespaces: the list of pods collected
+            by `select_pods_by_label` against which the changes
+            in the pods state is monitored
+        :param max_timeout: the expected time the pods should take
+            to recover. If the killed pods are replaced in this time frame,
+            but they didn't reach the Ready State, they will be marked as
+            unrecovered. If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined
+            in any place of the code, to collect the PodsStatus structure
+            returned, in order to make the process run in background
+            while a chaos scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            label_selector=label_selector,
+            event=event,
+        )
+
+    def monitor_pods_by_name_pattern_and_namespace_pattern(
+        self,
+        pod_name_pattern: str,
+        namespace_pattern: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout=30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by a pod name regex pattern
+        and a namespace regex pattern, and collects infos about the
+        pods recovery after a kill scenario. Returns a PodsMonitorThread
+        that can be joined after the scenario to retrieve the PodsStatus
+        object containing all the information collected in background during
+        the chaos run.
+
+        :param pod_name_pattern: a regex representing the
+            pod name pattern used to filter the pods to be monitored
+            (must be the same used in
+            `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param namespace_pattern: a regex representing the namespace
+            pattern used to filter the pods to be monitored
+            (must be the same used in
+            `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param pods_and_namespaces: the list of pods collected by
+            `select_pods_by_name_pattern_and_namespace_pattern` against
+            which the changes in the pods state is monitored
+        :param max_timeout: the expected time the pods should take to
+            recover. If the killed pods are replaced in this time frame,
+            but they didn't reach the Ready State, they will be marked as
+            unrecovered. If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined in any
+            place of the code, to collect the PodsStatus structure returned,
+            in order to make the process run in background while a chaos
+            scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            name_pattern=pod_name_pattern,
+            namespace_pattern=namespace_pattern,
+            event=event,
+        )
+
+    def monitor_pods_by_namespace_pattern_and_label(
+        self,
+        namespace_pattern: str,
+        label_selector: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout=30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by a namespace regex pattern
+        and a pod label selector, and collects infos about the
+        pods recovery after a kill scenario. Returns a PodsMonitorThread
+        that can be joined after the scenario to retrieve the PodsStatus
+        object containing all the information collected in background during
+        the chaos run.
+
+        :param label_selector: the label selector used to filter
+            the pods to monitor (must be the same used in
+            `select_pods_by_label`)
+        :param namespace_pattern: a regex representing the namespace
+            pattern used to filter the pods to be monitored (must be
+            the same used
+            in `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param pods_and_namespaces: the list of pods collected by
+            `select_pods_by_name_pattern_and_namespace_pattern` against
+            which the changes in the pods state is monitored
+        :param max_timeout: the expected time the pods should take to recover.
+            If the killed pods are replaced in this time frame, but they
+            didn't reach the Ready State, they will be marked as unrecovered.
+            If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined in
+            any place of the code, to collect the PodsStatus structure
+            returned, in order to make the process run in background while
+            a chaos scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            label_selector=label_selector,
+            namespace_pattern=namespace_pattern,
+            event=event,
+        )
+
+    def __start_monitoring_pods(
+        self,
+        pods_and_namespaces: list[(str, str)],
+        pods_status: PodsStatus,
+        max_timeout: int,
+        label_selector: str = None,
+        pod_name: str = None,
+        namespace_pattern: str = None,
+        name_pattern: str = None,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        executor = ThreadPoolExecutor()
+        future = executor.submit(
+            self.__monitor_pods_worker,
+            pods_and_namespaces=pods_and_namespaces,
+            pods_status=pods_status,
+            max_timeout=max_timeout,
+            label_selector=label_selector,
+            pod_name=pod_name,
+            namespace_pattern=namespace_pattern,
+            name_pattern=name_pattern,
+            event=event,
+        )
+
+        return PodsMonitorThread(executor, future)
+
+    def __monitor_pods_worker(
+        self,
+        pods_and_namespaces: [(str, str)],
+        pods_status: PodsStatus,
+        max_timeout: int,
+        label_selector: str = None,
+        pod_name: str = None,
+        namespace_pattern: str = None,
+        name_pattern: str = None,
+        event: threading.Event = None,
+    ) -> PodsStatus:
+        missing_pods = set()
+        pods_to_wait = set()
+        pods_already_watching = set()
+        start_time = time.time()
+        _event = threading.Event() if not event else event
+        if (
+            label_selector
+            and not pod_name
+            and not name_pattern
+            and not namespace_pattern
+        ):
+            select_method = partial(
+                self.select_pods_by_label,
+                label_selector=label_selector,
+            )
+        elif (
+            name_pattern
+            and namespace_pattern
+            and not pod_name
+            and not label_selector
+        ):
+            select_method = partial(
+                self.select_pods_by_name_pattern_and_namespace_pattern,
+                pod_name_pattern=name_pattern,
+                namespace_pattern=namespace_pattern,
+            )
+        elif (
+            namespace_pattern
+            and label_selector
+            and not pod_name
+            and not name_pattern
+        ):
+            select_method = partial(
+                self.select_pods_by_namespace_pattern_and_label,
+                namespace_pattern=namespace_pattern,
+                label_selector=label_selector,
+            )
+        else:
+            pods_status.error = (
+                "invalid parameter combination, "
+                "check hasn't been performed, aborting."
+            )
+            return pods_status
+
+        while time.time() - start_time <= max_timeout:
+            if event:
+                if event.is_set():
+                    return pods_status
+
+            time_offset = time.time() - start_time
+            remaining_time = max_timeout - time_offset
+            current_pods_and_namespaces = select_method()
+
+            # no pods have been killed or pods have been killed and
+            # respawned with the same names
+            if set(pods_and_namespaces) == set(current_pods_and_namespaces):
+                if len(missing_pods) == 0:
+                    continue
+                # in this case the pods to wait have been respawn
+                # with the same name
+                pods_to_wait.update(missing_pods)
+
+            # pods have been killed but respawned with different names
+            elif set(pods_and_namespaces) != set(
+                current_pods_and_namespaces
+            ) and len(pods_and_namespaces) <= len(current_pods_and_namespaces):
+                # in this case the pods to wait have been respawn
+                # with different names
+                pods_to_wait.update(
+                    set(current_pods_and_namespaces) - set(pods_and_namespaces)
+                )
+
+            # pods have been killed and are not
+            # respawned yet (missing pods names
+            # are collected
+            elif set(pods_and_namespaces) != set(
+                current_pods_and_namespaces
+            ) and len(pods_and_namespaces) > len(current_pods_and_namespaces):
+                # update on missing_pods set is idempotent since the tuple
+                # pod_name,namespace is unique in the cluster
+                missing_pods.update(
+                    set(pods_and_namespaces) - set(current_pods_and_namespaces)
+                )
+                continue
+            # no change has been made in the pod set,
+            # maybe is taking some time to
+            # inject the chaos, let's see the next iteration.
+            if len(pods_to_wait) == 0:
+                continue
+
+            futures = []
+
+            with ThreadPoolExecutor() as executor:
+                for pod_and_namespace in pods_to_wait:
+                    if pod_and_namespace not in pods_already_watching:
+                        future = executor.submit(
+                            self.__wait_until_pod_is_ready_worker,
+                            pod_name=pod_and_namespace[0],
+                            namespace=pod_and_namespace[1],
+                            event=_event,
+                        )
+                        futures.append(future)
+                        pods_already_watching.add(pod_and_namespace)
+
+                # this will wait all the futures to
+                # finish within the remaining time
+                done, undone = wait(futures, timeout=remaining_time)
+                _event.set()
+                for future in done:
+                    result = future.result()
+                    # sum the time elapsed waiting before the pod
+                    # has been rescheduled
+                    # to the effective recovery time of the pod
+                    result.recovery_time = result.recovery_time + (
+                        time.time() - start_time
+                    )
+                    pods_status.recovered.append(result)
+                for future in undone:
+                    result = future.result()
+                    pods_status.unrecovered.append(result)
+
+                missing_pods.clear()
+        # if there are missing pods, pods affected
+        # by the chaos did not restart after the chaos
+        # an exception will be set in the PodsStatus
+        # structure that will be catched at the end of
+        # the monitoring,
+        if len(missing_pods) > 0:
+            if not _event.is_set():
+                pods_status.error = f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
+
+        return pods_status
+
+    def __wait_until_pod_is_ready_worker(
+        self, pod_name: str, namespace: str, event: threading.Event
+    ) -> AffectedPod:
+        start_time = time.time()
+        ready = False
+
+        while not ready and not event.is_set():
+            ready = self.is_pod_running(pod_name, namespace)
+        end_time = time.time()
+        pod = AffectedPod(
+            pod_name=pod_name,
+            namespace=namespace,
+        )
+        if not event.is_set():
+            pod.recovery_time = end_time - start_time
+        return pod

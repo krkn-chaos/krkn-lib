@@ -1,8 +1,10 @@
+import cProfile
 import logging
 import random
 import string
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from typing import Dict, List
@@ -26,6 +28,7 @@ class BaseTest(unittest.TestCase):
     lib_ocp: KrknOpenshift
     lib_telemetry_k8s: KrknTelemetryKubernetes
     lib_telemetry_ocp: KrknTelemetryOpenshift
+    pr: cProfile.Profile
 
     @classmethod
     def setUpClass(cls):
@@ -39,6 +42,11 @@ class BaseTest(unittest.TestCase):
         )
         host = cls.lib_k8s.api_client.configuration.host
         logging.disable(logging.CRITICAL)
+        # PROFILER
+        # """init each test"""
+        # cls.pr = cProfile.Profile()
+        # cls.pr.enable()
+        # print("\n<<<---")
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:
@@ -53,6 +61,14 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        # PROFILER
+        # """finish any test"""
+        # p = Stats(cls.pr)
+        # p.strip_dirs()
+        # p.sort_stats("cumtime")
+        # p.print_stats()
+        # print
+        # "\n--->>>"
         pass
 
     def wait_pod(
@@ -105,6 +121,16 @@ class BaseTest(unittest.TestCase):
         environment = Environment(loader=FileSystemLoader("src/testdata/"))
         template = environment.get_template("alpine.j2")
         content = template.render(name=name, namespace=namespace)
+        self.apply_template(content)
+
+    def deploy_delayed_readiness_pod(
+        self, name: str, namespace: str, delay: int, label: str = "readiness"
+    ):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template("delayed_readiness_pod.j2")
+        content = template.render(
+            name=name, namespace=namespace, delay=delay, label=label
+        )
         self.apply_template(content)
 
     def deploy_persistent_volume(
@@ -362,3 +388,10 @@ class BaseTest(unittest.TestCase):
                 str(e),
             )
             raise e
+
+    def background_delete_pod(self, pod_name: str, namespace: str):
+        thread = threading.Thread(
+            target=self.lib_k8s.delete_pod, args=(pod_name, namespace)
+        )
+        thread.daemon = True
+        thread.start()

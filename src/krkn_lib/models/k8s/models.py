@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True, order=False)
@@ -188,3 +190,95 @@ class ApiRequestException(Exception):
     """
 
     pass
+
+
+class AffectedPod:
+    """
+    A pod affected by a chaos scenario
+    """
+
+    pod_name: str
+    """
+    Name of the pod
+    """
+    namespace: str
+    """
+    Namespace of the pod
+    """
+    recovery_time: float
+    """
+    Time needed to return in "Ready" state
+    """
+
+    def __init__(
+        self, pod_name: str, namespace: str, recovery_time: float = None
+    ):
+        self.pod_name = pod_name
+        self.namespace = namespace
+        self.recovery_time = recovery_time
+
+
+class PodsStatus:
+    """
+    Return value of wait_for_pods_to_become_ready_by_label and
+    wait_for_pods_to_become_ready_by_name_pattern containing the list
+    of the pods that did recover (pod_name, namespace,
+    time needed to become ready) and the list of pods that did
+    not recover from the chaos
+    """
+
+    recovered: list[AffectedPod]
+    unrecovered: list[AffectedPod]
+    error: Optional[str]
+
+    def __init__(self, json_object: str = None):
+        self.recovered = []
+        self.unrecovered = []
+        self.error = None
+
+        if json_object:
+            for recovered in json_object["recovered"]:
+                self.recovered.append(
+                    AffectedPod(
+                        recovered["pod_name"],
+                        recovered["namespace"],
+                        float(recovered["recovery_time"]),
+                    )
+                )
+            for unrecovered in json_object["unrecovered"]:
+                self.unrecovered.append(
+                    AffectedPod(
+                        unrecovered["pod_name"],
+                        unrecovered["namespace"],
+                    )
+                )
+            if "error" in json_object:
+                self.error = json_object["error"]
+
+    def merge(self, pods_status: "PodsStatus"):
+        for recovered in pods_status.recovered:
+            self.recovered.append(recovered)
+        for unrecovered in pods_status.unrecovered:
+            self.unrecovered.append(unrecovered)
+
+
+class PodsMonitorThread:
+    executor: ThreadPoolExecutor
+    future: Future
+
+    def __init__(self, executor: ThreadPoolExecutor, future: Future):
+        self.future = future
+        self.executor = executor
+
+    def join(self, timeout: int = 120) -> PodsStatus:
+        try:
+            result = self.future.result(timeout=timeout)
+            self.executor.shutdown(wait=False, cancel_futures=True)
+            return result
+        except Exception as e:
+            pods_status = PodsStatus()
+            pods_status.error = Exception(
+                f"Thread pool did not shutdown correctly,"
+                f"aborting.\nException: {e}"
+            )
+            return pods_status
