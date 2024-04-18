@@ -959,7 +959,9 @@ class KrknKubernetesTests(BaseTest):
         self.assertEqual(len(result.recovered), 1)
         self.assertEqual(result.recovered[0].pod_name, delayed_respawn)
         self.assertEqual(result.recovered[0].namespace, namespace)
-        self.assertTrue(result.recovered[0].recovery_time >= pod_delay)
+        self.assertTrue(result.recovered[0].pod_readiness_time > 0)
+        self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
+        self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
         self.assertEqual(len(result.unrecovered), 0)
 
     def test_pods_by_namespace_pattern_and_label_same_name_respawn(
@@ -1001,7 +1003,9 @@ class KrknKubernetesTests(BaseTest):
         self.assertEqual(len(result.recovered), 1)
         self.assertEqual(result.recovered[0].pod_name, delayed_1)
         self.assertEqual(result.recovered[0].namespace, namespace)
-        self.assertTrue(result.recovered[0].recovery_time >= pod_delay)
+        self.assertTrue(result.recovered[0].pod_readiness_time > 0)
+        self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
+        self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
         self.assertEqual(len(result.unrecovered), 0)
 
     def test_pods_by_label_respawn_timeout(self):

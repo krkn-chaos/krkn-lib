@@ -1,4 +1,7 @@
 import time
+
+import urllib3
+
 from krkn_lib.utils.safe_logger import SafeLogger
 from elasticsearch import Elasticsearch
 
@@ -7,6 +10,8 @@ class KrknElastic:
     es = None
 
     def __init__(self, safe_logger: SafeLogger, elastic_url: str):
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        urllib3.disable_warnings(DeprecationWarning)
         self.safe_logger = safe_logger
         try:
             # create Elasticsearch object

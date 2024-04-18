@@ -18,7 +18,9 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                     {
                         "pod_name":"test-pod",
                         "namespace":"test-namespace",
-                        "recovery_time":3.14
+                        "pod_rescheduling_time":9.8,
+                        "pod_readiness_time":2.71,
+                        "total_recovery_time":3.14
                     }
                 ],
                 "unrecovered":[
@@ -68,11 +70,15 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         for recovered in telemetry.affected_pods.recovered:
             self.assertIsNotNone(recovered.pod_name)
             self.assertIsNotNone(recovered.namespace)
-            self.assertIsNotNone(recovered.recovery_time)
+            self.assertIsNotNone(recovered.pod_readiness_time)
+            self.assertIsNotNone(recovered.pod_rescheduling_time)
+            self.assertIsNotNone(recovered.total_recovery_time)
         for unrecovered in telemetry.affected_pods.unrecovered:
             self.assertIsNotNone(unrecovered.pod_name)
             self.assertIsNotNone(unrecovered.namespace)
-            self.assertIsNone(unrecovered.recovery_time)
+            self.assertIsNone(unrecovered.pod_readiness_time)
+            self.assertIsNone(unrecovered.pod_rescheduling_time)
+            self.assertIsNone(unrecovered.total_recovery_time)
         self.assertIsNotNone(telemetry.parameters)
         self.assertEqual(telemetry.parameters_base64, "")
         self.assertEqual(telemetry.parameters["property"]["unit"], "unit")

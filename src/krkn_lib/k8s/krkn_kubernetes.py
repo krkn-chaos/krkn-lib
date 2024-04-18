@@ -7,6 +7,9 @@ import re
 import tempfile
 import threading
 import time
+import warnings
+
+import urllib3
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
@@ -86,6 +89,11 @@ class KrknKubernetes:
         >>> kubeconfig_string="apiVersion: v1 ....."
         >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        urllib3.disable_warnings(DeprecationWarning)
+        warnings.filterwarnings(
+            action="ignore", message="unclosed", category=ResourceWarning
+        )
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
             raise Exception(
@@ -2950,11 +2958,14 @@ class KrknKubernetes:
                 for future in done:
                     result = future.result()
                     # sum the time elapsed waiting before the pod
-                    # has been rescheduled
+                    # has been rescheduled (rescheduling time)
                     # to the effective recovery time of the pod
-                    result.recovery_time = result.recovery_time + (
-                        time.time() - start_time
+                    result.pod_rescheduling_time = time.time() - start_time
+                    result.total_recovery_time = (
+                        result.pod_readiness_time
+                        + result.pod_rescheduling_time
                     )
+
                     pods_status.recovered.append(result)
                 for future in undone:
                     result = future.result()
@@ -2986,5 +2997,5 @@ class KrknKubernetes:
             namespace=namespace,
         )
         if not event.is_set():
-            pod.recovery_time = end_time - start_time
+            pod.pod_readiness_time = end_time - start_time
         return pod

@@ -205,17 +205,33 @@ class AffectedPod:
     """
     Namespace of the pod
     """
-    recovery_time: float
+    pod_rescheduling_time: float
     """
-    Time needed to return in "Ready" state
+    The time that the cluster took to reschedule
+    the pod after the kill scenario
+    """
+    pod_readiness_time: float
+    """
+    The time the pod took to become ready after being scheduled
+    """
+    total_recovery_time: float
+    """
+    Total amount of time the pod took to become ready
     """
 
     def __init__(
-        self, pod_name: str, namespace: str, recovery_time: float = None
+        self,
+        pod_name: str,
+        namespace: str,
+        total_recovery_time: float = None,
+        pod_readiness_time: float = None,
+        pod_rescheduling_time: float = None,
     ):
         self.pod_name = pod_name
         self.namespace = namespace
-        self.recovery_time = recovery_time
+        self.total_recovery_time = total_recovery_time
+        self.pod_readiness_time = pod_readiness_time
+        self.pod_rescheduling_time = pod_rescheduling_time
 
 
 class PodsStatus:
@@ -242,7 +258,9 @@ class PodsStatus:
                     AffectedPod(
                         recovered["pod_name"],
                         recovered["namespace"],
-                        float(recovered["recovery_time"]),
+                        float(recovered["total_recovery_time"]),
+                        float(recovered["pod_readiness_time"]),
+                        float(recovered["pod_rescheduling_time"]),
                     )
                 )
             for unrecovered in json_object["unrecovered"]:

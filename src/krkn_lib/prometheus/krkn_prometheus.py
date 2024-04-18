@@ -1,4 +1,6 @@
 import logging
+import warnings
+
 import math
 import re
 import sys
@@ -7,6 +9,7 @@ from datetime import datetime, timedelta
 from io import StringIO
 from typing import Optional
 
+import urllib3
 from prometheus_api_client import PrometheusConnect
 
 
@@ -25,6 +28,12 @@ class KrknPrometheus:
         :param prometheus_bearer_token: the bearer token to authenticate
             the query (optional).
         """
+
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        urllib3.disable_warnings(DeprecationWarning)
+        warnings.filterwarnings(
+            action="ignore", message="unclosed", category=ResourceWarning
+        )
         headers = {}
         if prometheus_bearer_token is not None:
             bearer = "Bearer " + prometheus_bearer_token

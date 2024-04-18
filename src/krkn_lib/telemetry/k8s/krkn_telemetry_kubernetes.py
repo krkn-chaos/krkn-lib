@@ -2,6 +2,9 @@ import base64
 import tempfile
 import threading
 import time
+import warnings
+
+import urllib3
 import yaml
 import requests
 import os
@@ -24,6 +27,11 @@ class KrknTelemetryKubernetes:
     def __init__(
         self, safe_logger: SafeLogger, lib_kubernetes: KrknKubernetes
     ):
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        urllib3.disable_warnings(DeprecationWarning)
+        warnings.filterwarnings(
+            action="ignore", message="unclosed", category=ResourceWarning
+        )
         self.kubecli = lib_kubernetes
         self.safe_logger = safe_logger
 
