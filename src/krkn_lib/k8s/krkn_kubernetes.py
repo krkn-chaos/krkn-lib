@@ -11,7 +11,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -36,9 +36,9 @@ from krkn_lib.models.k8s import (
     Pod,
     PodsMonitorThread,
     PodsStatus,
+    ServiceHijacking,
     Volume,
     VolumeMount,
-    ServiceHijacking,
 )
 from krkn_lib.models.telemetry import NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary, get_random_string
@@ -1935,10 +1935,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            api_client.select_header_accept(
-                                ["application/json"]
-                            )
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -3051,10 +3051,10 @@ class KrknKubernetes:
                 header_params["Accept"] = self.api_client.select_header_accept(
                     ["application/json"]
                 )
-                header_params["Content-Type"] = (
-                    self.api_client.select_header_accept(
-                        ["application/json-patch+json"]
-                    )
+                header_params[
+                    "Content-Type"
+                ] = self.api_client.select_header_accept(
+                    ["application/json-patch+json"]
                 )
 
                 path = (
