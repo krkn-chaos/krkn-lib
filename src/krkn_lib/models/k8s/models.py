@@ -300,3 +300,22 @@ class PodsMonitorThread:
                 f"aborting.\nException: {e}"
             )
             return pods_status
+
+
+class ServiceHijacking:
+    pod_name: str
+    namespace: str
+    selector: str
+    config_map_name: str
+
+    def __init__(
+        self,
+        pod_name: str,
+        namespace: str,
+        selector: str,
+        config_map_name: str,
+    ):
+        self.pod_name = pod_name
+        self.namespace = namespace
+        self.selector = selector
+        self.config_map_name = config_map_name

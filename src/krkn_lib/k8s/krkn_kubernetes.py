@@ -11,7 +11,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -38,9 +38,10 @@ from krkn_lib.models.k8s import (
     PodsStatus,
     Volume,
     VolumeMount,
+    ServiceHijacking,
 )
 from krkn_lib.models.telemetry import NodeInfo, Taint
-from krkn_lib.utils import filter_dictionary
+from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/token"
@@ -1934,10 +1935,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params[
-                            "Accept"
-                        ] = api_client.select_header_accept(
-                            ["application/json"]
+                        header_params["Accept"] = (
+                            api_client.select_header_accept(
+                                ["application/json"]
+                            )
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -2997,3 +2998,197 @@ class KrknKubernetes:
         if not event.is_set():
             pod.pod_readiness_time = end_time - start_time
         return pod
+
+    def replace_service_selector(
+        self, new_selectors: list[str], service_name: str, namespace: str
+    ) -> Optional[dict[Any]]:
+        """
+        Replaces a service selector with one or more new selectors
+        Patching the target service
+
+        :param new_selectors: a list of selectors in the format "key=value"
+        :param service_name: the service name that needs to be patched
+        :param namespace: the namespace of the service
+
+        :return: the original service spec
+            (useful to restore it after the scenario)
+            returns None if self.api_client hasn't been initialized
+        """
+
+        if self.api_client:
+            try:
+                service = self.cli.read_namespaced_service(
+                    service_name, namespace
+                )
+            except ApiException:
+                logging.error(f"{service_name} not found in {namespace}")
+                return None
+            original_service = self.api_client.sanitize_for_serialization(
+                service
+            )
+
+            splitted_selectors = [
+                s.split("=") for s in new_selectors if len(s.split("=")) == 2
+            ]
+            selectors = {}
+            for selector in splitted_selectors:
+                selectors[selector[0]] = selector[1]
+
+            if len(splitted_selectors) == 0:
+                return None
+            try:
+                body = [
+                    {
+                        "op": "replace",
+                        "path": "/spec/selector",
+                        "value": selectors,
+                    }
+                ]
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = self.api_client.select_header_accept(
+                    ["application/json"]
+                )
+                header_params["Content-Type"] = (
+                    self.api_client.select_header_accept(
+                        ["application/json-patch+json"]
+                    )
+                )
+
+                path = (
+                    f"/api/v1/namespaces/{namespace}/services/"
+                    f"{service_name}"
+                )
+                self.api_client.call_api(
+                    path,
+                    "PATCH",
+                    path_params,
+                    query_params,
+                    header_params,
+                    body=body,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+
+            except ApiException as e:
+                logging.error(
+                    f"Failed to patch service, "
+                    f"Kubernetes Api Exception: {str(e)}"
+                )
+                raise e
+            if "status" in original_service:
+                original_service.pop("status")
+            if "managedFields" in original_service["metadata"]:
+                original_service["metadata"].pop("managedFields")
+            if "annotations" in original_service["metadata"]:
+                original_service["metadata"].pop("annotations")
+            if "creationTimestamp" in original_service["metadata"]:
+                original_service["metadata"].pop("creationTimestamp")
+            if "resourceVersion" in original_service["metadata"]:
+                original_service["metadata"].pop("resourceVersion")
+            if "uid" in original_service["metadata"]:
+                original_service["metadata"].pop("uid")
+            return original_service
+
+        else:
+            return None
+
+    def deploy_service_hijacking(
+        self,
+        namespace: str,
+        plan: dict[any],
+        image: str,
+        port_number: int = 5000,
+        port_name: str = "flask",
+        stats_route: str = "/stats",
+    ) -> ServiceHijacking:
+        """
+        Deploys a pod running the service-hijacking webservice
+        along with the test plan deployed in krkn stored in a
+        ConfigMap and bound as a file to the container
+
+        :param namespace: The namespace where the Pod and the
+            ConfigMap will be deployed
+        :param plan: the dictionary converted test plan to be
+            executed in the service
+        :param image: the image container image of the service
+        :param port_number: the port where the pod will be listening
+            default 5000
+        :param port_name: the port name if the Service is pointing to
+            a string name instead of a port number
+        :param stats_route: overrides the defautl route where the stats
+            action will be mapped, change it only if you have a /stats
+            route in your test_plan
+        :return: a structure containing all the infos of the
+            Pod and the ConfigMap deployment
+        """
+        pod_name = f"service-hijacking-pod-{get_random_string(5)}"
+        config_map_name = f"service-hijacking-cm-{get_random_string(5)}"
+        selector_key = "service-hijacking"
+        selector_value = f"sh-{get_random_string(5)}"
+
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        config_map_template = env.get_template(
+            "service_hijacking_config_map.j2"
+        )
+        plan_dump = yaml.dump(plan)
+        cm_body = yaml.safe_load(
+            config_map_template.render(
+                name=config_map_name, namespace=namespace, plan=plan_dump
+            )
+        )
+        self.cli.create_namespaced_config_map(
+            namespace=namespace, body=cm_body
+        )
+
+        pod_template = env.get_template("service_hijacking_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                selector_key=selector_key,
+                selector_value=selector_value,
+                image=image,
+                port_name=port_name,
+                config_map_name=config_map_name,
+                port_number=port_number,
+                stats_route=stats_route,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)
+
+        return ServiceHijacking(
+            pod_name=pod_name,
+            namespace=namespace,
+            selector="=".join([selector_key, selector_value]),
+            config_map_name=config_map_name,
+        )
+
+    def undeploy_service_hijacking(self, service_infos: ServiceHijacking):
+        """
+        Undeploys the resource created for the ServiceHijacking Scenario
+
+        :param service_infos: the structure returned by the
+            deploy_service_hijacking method
+        """
+        self.delete_pod(service_infos.pod_name, service_infos.namespace)
+        self.cli.delete_namespaced_config_map(
+            service_infos.config_map_name, service_infos.namespace
+        )
+
+    def service_exists(self, service_name: str, namespace: str) -> bool:
+        """
+        Checks wheter a kubernetes Service exist or not
+        :param service_name: the name of the service to check
+        :param namespace: the namespace where the service should exist
+        :return: True if the service exists, False if not
+        """
+        try:
+            _ = self.cli.read_namespaced_service(service_name, namespace)
+            return True
+        except ApiException:
+            return False
