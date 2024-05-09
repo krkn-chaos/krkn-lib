@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{name}}
+  namespace: {{namespace}}
+  labels:
+    {{selector_key}}: {{selector_value}}
+spec:
+  containers:
+  - name: service-hijacking
+    image: {{image}}
+    env:
+        - name: TEST_PLAN_PATH
+          value: /service-hijacking/plan.yaml
+        - name: STATS_ROUTE
+          value: {{stats_route}}
+        - name: FLASK_RUN_PORT
+          value: '{{port_number}}'
+    ports:
+    - name: {{port_name}}
+      containerPort: {{port_number}}
+    volumeMounts:
+    - name: config-volume
+      mountPath: /service-hijacking
+  volumes:
+  - name: config-volume
+    configMap:
+      name: {{config_map_name}}
+      items:
+      - key: plan.yaml
+        path: plan.yaml

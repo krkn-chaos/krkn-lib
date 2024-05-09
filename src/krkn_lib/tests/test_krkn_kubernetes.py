@@ -1197,6 +1197,107 @@ class KrknKubernetesTests(BaseTest):
         self.assertEqual(len(result.unrecovered), 0)
         self.assertEqual(len(result.recovered), 0)
 
+    def test_replace_service_selector(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_service(name, namespace)
+        self.lib_k8s.replace_service_selector(
+            ["app=selector", "test=replace"], name, namespace
+        )
+
+        service = self.lib_k8s.cli.read_namespaced_service(name, namespace)
+        sanitized_service = self.lib_k8s.api_client.sanitize_for_serialization(
+            service
+        )
+        self.assertEqual(len(sanitized_service["spec"]["selector"].keys()), 2)
+        self.assertTrue("app" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["app"], "selector"
+        )
+        self.assertTrue("test" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["test"], "replace"
+        )
+
+        # test None result with non-existent service
+
+        none_result = self.lib_k8s.replace_service_selector(
+            ["app=selector"], "doesnotexist", "doesnotexist"
+        )
+        self.assertIsNone(none_result)
+
+        # test None result with empty selector list
+        none_result = self.lib_k8s.replace_service_selector(
+            [], name, namespace
+        )
+        self.assertIsNone(none_result)
+
+        # test selector validation (bad_selector will be ignored)
+        self.lib_k8s.replace_service_selector(
+            ["bad_selector", "good=selector"], name, namespace
+        )
+        service = self.lib_k8s.cli.read_namespaced_service(name, namespace)
+        sanitized_service = self.lib_k8s.api_client.sanitize_for_serialization(
+            service
+        )
+        self.assertEqual(len(sanitized_service["spec"]["selector"].keys()), 1)
+        self.assertTrue("good" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["good"], "selector"
+        )
+
+    def test_deploy_undeploy_service_hijacking(self):
+        # test deploy
+        namespace = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        with open("src/testdata/service_hijacking_test_plan.yaml") as stream:
+            plan = yaml.safe_load(stream)
+
+        service_infos = self.lib_k8s.deploy_service_hijacking(
+            namespace,
+            plan,
+            "quay.io/redhat-chaos/krkn-service-hijacking:v0.1.0",
+        )
+
+        self.assertIsNotNone(service_infos)
+        self.assertIsNotNone(service_infos.config_map_name)
+        self.assertIsNotNone(service_infos.selector)
+        self.assertIsNotNone(service_infos.pod_name)
+        self.assertIsNotNone(service_infos.namespace)
+
+        pod_infos = self.lib_k8s.get_pod_info(
+            service_infos.pod_name, service_infos.namespace
+        )
+        config_map_infos = self.lib_k8s.cli.read_namespaced_config_map(
+            service_infos.config_map_name, service_infos.namespace
+        )
+        self.assertIsNotNone(pod_infos)
+        self.assertIsNotNone(config_map_infos)
+
+        # test undeploy
+        self.lib_k8s.undeploy_service_hijacking(service_infos)
+
+        pod_infos = self.lib_k8s.get_pod_info(
+            service_infos.pod_name, service_infos.namespace
+        )
+
+        self.assertIsNone(pod_infos)
+        with self.assertRaises(ApiException):
+            self.lib_k8s.cli.read_namespaced_config_map(
+                service_infos.config_map_name, service_infos.namespace
+            )
+
+    def test_service_exists(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_service(name, namespace)
+        self.assertTrue(self.lib_k8s.service_exists(name, namespace))
+        self.assertFalse(
+            self.lib_k8s.service_exists("doesnotexist", "doesnotexist")
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
