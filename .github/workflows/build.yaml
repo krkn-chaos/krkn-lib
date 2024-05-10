@@ -122,9 +122,9 @@ jobs:
         - name: Check out doc repo
           uses: actions/checkout@master
           with:
-            repository: redhat-chaos/krkn-lib-docs
+            repository: krkn-chaos/krkn-lib-docs
             path: krkn-lib-docs
-            ssh-key: ${{ secrets.LIB_REPO_DOC_KEY }}
+            ssh-key: ${{ secrets.KRKN_LIB_DOCS_PRIV_KEY }}
         - name: Download json coverage
           uses: actions/download-artifact@v3
           with:
@@ -165,7 +165,7 @@ jobs:
           run: |
             cd krkn-lib-docs
             git add .
-            git config user.name "redhat-chaos"
+            git config user.name "krkn-chaos"
             git config user.email "<>"
             git commit -m "[KRKN LIB] API documentation ${GITHUB_REF##*/}"
             git push
