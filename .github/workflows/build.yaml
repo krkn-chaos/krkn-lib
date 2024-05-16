@@ -52,6 +52,19 @@ jobs:
           POD_NAME=`kubectl -n monitoring get pods --selector="$SELECTOR" --no-headers=true | awk '{ print $1 }'`
           kubectl -n monitoring port-forward $POD_NAME 9090:9090 &
           sleep 5
+      - name: Deploy Elasticsearch
+        run: |
+          helm install \
+          --wait --timeout 360s \
+          elasticsearch \
+          oci://registry-1.docker.io/bitnamicharts/elasticsearch \
+          --set master.masterOnly=false \
+          --set master.replicaCount=1 \
+          --set data.replicaCount=0 \
+          --set coordinating.replicaCount=0 \
+          --set ingest.replicaCount=0 \
+          --set service.type=NodePort \
+          --set service.nodePorts.restAPI=32766
       - name: Check out code
         uses: actions/checkout@v3
       - name: Update version number
