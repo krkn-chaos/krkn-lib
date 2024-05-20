@@ -1,5 +1,6 @@
 import cProfile
 import logging
+import os
 import random
 import string
 import sys
@@ -16,6 +17,7 @@ from kubernetes import config
 from kubernetes.client.rest import ApiException
 from requests import ConnectTimeout
 
+from krkn_lib.elastic.krkn_elastic import KrknElastic
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.k8s import KrknTelemetryKubernetes
@@ -28,10 +30,24 @@ class BaseTest(unittest.TestCase):
     lib_ocp: KrknOpenshift
     lib_telemetry_k8s: KrknTelemetryKubernetes
     lib_telemetry_ocp: KrknTelemetryOpenshift
+    lib_elastic: KrknElastic
     pr: cProfile.Profile
 
     @classmethod
     def setUpClass(cls):
+        cls.lib_elastic = KrknElastic(
+            SafeLogger(),
+            os.getenv("ELASTIC_URL"),
+            int(os.getenv("ELASTIC_PORT")),
+            username=os.getenv("ELASTIC_USER"),
+            password=os.getenv("ELASTIC_PASSWORD"),
+        )
+        print(
+            f"URL: {os.getenv('ELASTIC_URL')} "
+            f"USER:{os.getenv('ELASTIC_USER')} "
+            f"PASSWORD:{os.getenv('ELASTIC_PASSWORD')},"
+            f" PORT:{os.getenv('ELASTIC_PORT')}"
+        )
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
