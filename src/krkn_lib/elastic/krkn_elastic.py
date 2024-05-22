@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import datetime
 import time
 
 import math
@@ -5,7 +8,11 @@ import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch_dsl import Search
 
-from krkn_lib.models.elastic.models import ElasticAlert
+from krkn_lib.models.elastic.models import (
+    ElasticAlert,
+    ElasticMetric,
+    ElasticMetricValue,
+)
 from krkn_lib.utils.safe_logger import SafeLogger
 
 
@@ -74,18 +81,79 @@ class KrknElastic:
             return math.ceil(elapsed_time)
         return 0
 
+    def upload_metric_to_elasticsearch(
+        self,
+        run_id: str,
+        raw_data: list[dict[str, list[(int, float)] | str]],
+        index: str,
+    ) -> int:
+        """
+        Saves raw data returned from the Krkn prometheus
+        client to elastic search as a ElasticMetric object
+        raw data will be a mixed types dictionary in the format
+        {"name":"str", "values":[(10, 3.14), (11,3.15).....]
+
+        :param run_id: the krkn run id
+        :param raw_data: the mixed type dictionary (will be validated
+            checking the attributes types )
+        :param index: the elasticsearch index where
+            the object will be stored
+        :return: the time needed to save if succeeded -1 if failed
+        """
+        time_start = time.time()
+        try:
+            for metric in raw_data:
+                if (
+                    "name" in metric
+                    and "values" in metric
+                    and isinstance(metric["name"], str)
+                    and isinstance(metric["values"], list)
+                ):
+                    values = [
+                        ElasticMetricValue(timestamp=v[0], value=v[1])
+                        for v in metric["values"]
+                        if isinstance(v[0], int) and isinstance(v[1], float)
+                    ]
+                    metric = ElasticMetric(
+                        run_id=run_id,
+                        name=metric["name"],
+                        values=values,
+                        created_at=datetime.datetime.now(),
+                    )
+                    self.push_metric(metric, index)
+            return int(time.time() - time_start)
+        except Exception:
+            return -1
+
     def push_alert(self, alert: ElasticAlert, index: str) -> int:
         """
         Pushes an ElasticAlert object to elastic
 
         :param alert: the populated ElasticAlert object
-        :param index: the index where the Elastic AlertObject
+        :param index: the index where the ElasticAlert Object
             is pushed
-        :return: 0 if succeeded -1 if failed
+        :return: the time needed to save if succeeded -1 if failed
         """
         try:
+            time_start = time.time()
             alert.save(using=self.es, index=index)
-            return 0
+            return int(time.time() - time_start)
+        except Exception:
+            return -1
+
+    def push_metric(self, metric: ElasticMetric, index: str) -> int:
+        """
+        Pushes an ElasticMetric object to elastic
+
+        :param metric: the populated ElasticMetric object
+        :param index: the index where the ElasticMetric Object
+            is pushed
+        :return: the time needed to save if succeeded -1 if failed
+        """
+        try:
+            time_start = time.time()
+            metric.save(using=self.es, index=index)
+            return int(time.time() - time_start)
         except Exception:
             return -1
 
@@ -93,7 +161,7 @@ class KrknElastic:
         """
         Searches ElasticAlerts by run_id
         :param run_id: the Krkn run id to search
-        :param index: the index where the KrknAlerts
+        :param index: the index where the ElasticAlert
             should have been saved
         :return: the list of objects retrieved (Empty if nothing
             has been found)
@@ -104,6 +172,25 @@ class KrknElastic:
             )
             result = search.execute()
             documents = [ElasticAlert(**hit.to_dict()) for hit in result]
+        except NotFoundError:
+            return []
+        return documents
+
+    def search_metric(self, run_id: str, index: str) -> list[ElasticMetric]:
+        """
+        Searches ElasticMetric by run_id
+        :param run_id: the Krkn run id to search
+        :param index: the index where the ElasticAlert
+            should have been saved
+        :return: the list of objects retrieved (Empty if nothing
+            has been found)
+        """
+        try:
+            search = Search(using=self.es, index=index).filter(
+                "match", run_id=run_id
+            )
+            result = search.execute()
+            documents = [ElasticMetric(**hit.to_dict()) for hit in result]
         except NotFoundError:
             return []
         return documents

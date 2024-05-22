@@ -42,12 +42,6 @@ class BaseTest(unittest.TestCase):
             username=os.getenv("ELASTIC_USER"),
             password=os.getenv("ELASTIC_PASSWORD"),
         )
-        print(
-            f"URL: {os.getenv('ELASTIC_URL')} "
-            f"USER:{os.getenv('ELASTIC_USER')} "
-            f"PASSWORD:{os.getenv('ELASTIC_PASSWORD')},"
-            f" PORT:{os.getenv('ELASTIC_PORT')}"
-        )
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
