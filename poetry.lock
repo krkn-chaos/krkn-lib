@@ -13,27 +13,23 @@ files = [
 
 [[package]]
 name = "arcaflow-lib-kubernetes"
-version = "0.0.0"
+version = "0.2.1"
 description = "Kubernetes connection handling library for Arcaflow"
 optional = false
-python-versions = "^3.9"
-files = []
-develop = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "arcaflow_lib_kubernetes-0.2.1-py3-none-any.whl", hash = "sha256:e49118b4021ecc6941e20b4fbb87ba24e8a8058a734b04337166f837cc71ebeb"},
+    {file = "arcaflow_lib_kubernetes-0.2.1.tar.gz", hash = "sha256:c9c155f0ccacafae95c39c1c66533178b7ae37f2d4e56b53ab581b491a4d8633"},
+]
 
 [package.dependencies]
-arcaflow-plugin-sdk = "0.14.0"
-coverage = "^7.2.1"
-html2text = "^2020.1.16"
+arcaflow-plugin-sdk = ">=0.14.0,<0.15.0"
+coverage = ">=7.2.1,<8.0.0"
+html2text = ">=2024.0.0,<2025.0.0"
 kubernetes = ">=25.3.0"
-pylint = "^3.0.0"
+pylint = ">=3.0.0,<4.0.0"
 PyYAML = ">=5.4"
-sphinxcontrib-apidoc = "^0.5.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/tsebastiani/arcaflow-lib-kubernetes-python.git"
-reference = "kill-pod-update"
-resolved_reference = "14c9c919ba1159c00aac42b6261fab61363ff3ef"
+sphinxcontrib-apidoc = ">=0.5.0,<0.6.0"
 
 [[package]]
 name = "arcaflow-plugin-sdk"
@@ -683,13 +679,12 @@ requests = ["requests (>=2.20.0,<3.0.0.dev0)"]
 
 [[package]]
 name = "html2text"
-version = "2020.1.16"
+version = "2024.2.26"
 description = "Turn HTML into equivalent Markdown-structured text."
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.8"
 files = [
-    {file = "html2text-2020.1.16-py3-none-any.whl", hash = "sha256:c7c629882da0cf377d66f073329ccf34a12ed2adf0169b9285ae4e63ef54c82b"},
-    {file = "html2text-2020.1.16.tar.gz", hash = "sha256:e296318e16b059ddb97f7a8a1d6a5c1d7af4544049a01e261731d2d5cc277bbb"},
+    {file = "html2text-2024.2.26.tar.gz", hash = "sha256:05f8e367d15aaabc96415376776cdd11afd5127a77fce6e36afc60c563ca2c32"},
 ]
 
 [[package]]
@@ -1451,8 +1446,8 @@ astroid = ">=3.2.2,<=3.3.0-dev0"
 colorama = {version = ">=0.4.5", markers = "sys_platform == \"win32\""}
 dill = [
     {version = ">=0.2", markers = "python_version < \"3.11\""},
-    {version = ">=0.3.6", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
     {version = ">=0.3.7", markers = "python_version >= \"3.12\""},
+    {version = ">=0.3.6", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
 ]
 isort = ">=4.2.5,<5.13.0 || >5.13.0,<6"
 mccabe = ">=0.6,<0.8"
@@ -2127,4 +2122,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b59fe9d8d352f9775fc9f43f80caceda535153101fc0773b32beefdea6a0d248"
+content-hash = "87cc63e9e72fdf701adf53c27bcd8cbd3b4380dcd5b3dc4ad7e7b4458d5a94af"
