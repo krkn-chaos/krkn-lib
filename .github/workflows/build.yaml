@@ -167,7 +167,7 @@ jobs:
             git add .
             git config user.name "krkn-chaos"
             git config user.email "<>"
-            git commit -m "[KRKN LIB] API documentation ${GITHUB_REF##*/}"
+            git commit -m "[KRKN LIB] API documentation ${GITHUB_REF##*/}" || true
             git push
 
   publish:
