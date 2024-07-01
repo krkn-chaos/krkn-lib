@@ -11,7 +11,7 @@ homepage = "https://github.com/redhat-chaos/krkn"
 [tool.poetry.dependencies]
 python = "^3.9"
 kubernetes ="28.1.0"
-arcaflow-lib-kubernetes={"git"="https://github.com/tsebastiani/arcaflow-lib-kubernetes-python.git", "branch"="kill-pod-update"}
+arcaflow-lib-kubernetes="^0.2.1"
 sphinxnotes-markdown-builder="^0.5.6"
 requests="^2.29.0"
 kubeconfig = "^1.1.1"
