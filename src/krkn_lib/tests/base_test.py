@@ -432,3 +432,61 @@ class BaseTest(unittest.TestCase):
         )
         thread.daemon = True
         thread.start()
+
+    def get_ChaosRunTelemetry_json(self, run_uuid: str) -> dict:
+        example_data = {
+            "scenarios": [
+                {
+                    "start_timestamp": 1628493021.0,
+                    "end_timestamp": 1628496621.0,
+                    "scenario": "example_scenario.yaml",
+                    "exit_status": 0,
+                    "parameters_base64": "",
+                    "parameters": {
+                        "parameter_1": "test",
+                        "parameter_2": "test",
+                        "parameter_3": {"sub_parameter_1": "test"},
+                    },
+                    "affected_pods": {
+                        "recovered": [
+                            {
+                                "pod_name": "pod1",
+                                "namespace": "default",
+                                "total_recovery_time": 10.0,
+                                "pod_readiness_time": 5.0,
+                                "pod_rescheduling_time": 2.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"pod_name": "pod2", "namespace": "default"}
+                        ],
+                        "error": "some error",
+                    },
+                }
+            ],
+            "node_summary_infos": [
+                {
+                    "count": 5,
+                    "architecture": "aarch64",
+                    "instance_type": "m2i.xlarge",
+                    "kernel_version": "5.4.0-66-generic",
+                    "kubelet_version": "v2.1.2",
+                    "os_version": "Linux",
+                }
+            ],
+            "node_taints": [
+                {
+                    "key": "node.kubernetes.io/unreachable",
+                    "value": "NoExecute",
+                    "effect": "NoExecute",
+                }
+            ],
+            "kubernetes_objects_count": {"Pod": 5, "Service": 2},
+            "network_plugins": ["Calico"],
+            "timestamp": "2023-05-22T14:55:02Z",
+            "total_node_count": 3,
+            "cloud_infrastructure": "AWS",
+            "cloud_type": "EC2",
+            "run_uuid": run_uuid,
+        }
+        return example_data

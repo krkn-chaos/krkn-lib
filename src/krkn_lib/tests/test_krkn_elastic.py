@@ -9,6 +9,7 @@ from krkn_lib.models.elastic.models import (
     ElasticMetric,
     ElasticMetricValue,
 )
+from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
 
@@ -16,24 +17,26 @@ from krkn_lib.utils import SafeLogger
 class TestKrknElastic(BaseTest):
 
     def test_push_search_alert(self):
-        run_id = str(uuid.uuid4())
+        run_uuid = str(uuid.uuid4())
         index = "test-push-alert"
         alert_1 = ElasticAlert(
             alert="alert_1",
             severity="WARNING",
             created_at=datetime.datetime.now(),
-            run_id=run_id,
+            run_uuid=run_uuid,
         )
         alert_2 = ElasticAlert(
             alert="alert_2",
             severity="ERROR",
             created_at=datetime.datetime.now(),
-            run_id=run_id,
+            run_uuid=run_uuid,
         )
-        self.lib_elastic.push_alert(alert_1, index)
-        self.lib_elastic.push_alert(alert_2, index)
+        result = self.lib_elastic.push_alert(alert_1, index)
+        self.assertNotEqual(result, -1)
+        result = self.lib_elastic.push_alert(alert_2, index)
+        self.assertNotEqual(result, -1)
         time.sleep(1)
-        alerts = self.lib_elastic.search_alert(run_id, index)
+        alerts = self.lib_elastic.search_alert(run_uuid, index)
         self.assertEqual(len(alerts), 2)
 
         alert = next(alert for alert in alerts if alert.alert == "alert_1")
@@ -45,10 +48,10 @@ class TestKrknElastic(BaseTest):
         self.assertEqual(alert.severity, "ERROR")
 
     def test_push_search_metric(self):
-        run_id = str(uuid.uuid4())
+        run_uuid = str(uuid.uuid4())
         index = "test-push-metric"
         metric_1 = ElasticMetric(
-            run_id=run_id,
+            run_uuid=run_uuid,
             name="metric_1",
             values=[
                 ElasticMetricValue(100, 1.0),
@@ -58,7 +61,7 @@ class TestKrknElastic(BaseTest):
             created_at=datetime.datetime.now(),
         )
         metric_2 = ElasticMetric(
-            run_id=run_id,
+            run_uuid=run_uuid,
             name="metric_2",
             values=[
                 ElasticMetricValue(103, 4.0),
@@ -67,10 +70,12 @@ class TestKrknElastic(BaseTest):
             ],
             created_at=datetime.datetime.now(),
         )
-        self.lib_elastic.push_metric(metric_1, index)
-        self.lib_elastic.push_metric(metric_2, index)
+        result = self.lib_elastic.push_metric(metric_1, index)
+        self.assertNotEqual(result, -1)
+        result = self.lib_elastic.push_metric(metric_2, index)
+        self.assertNotEqual(result, -1)
         time.sleep(1)
-        metrics = self.lib_elastic.search_metric(run_id, index)
+        metrics = self.lib_elastic.search_metric(run_uuid, index)
         self.assertEqual(len(metrics), 2)
         metric = next(
             metric for metric in metrics if metric.name == "metric_1"
@@ -101,14 +106,28 @@ class TestKrknElastic(BaseTest):
             },
         )
 
+    def test_push_search_telemetry(self):
+        run_uuid = str(uuid.uuid4())
+        index = "test-push-telemetry"
+        example_data = self.get_ChaosRunTelemetry_json(run_uuid)
+        telemetry = ChaosRunTelemetry(json_dict=example_data)
+        res = self.lib_elastic.push_telemetry(telemetry, index)
+        self.assertNotEqual(res, -1)
+        time.sleep(3)
+        result = self.lib_elastic.search_telemetry(
+            run_uuid=run_uuid, index=index
+        )
+
+        self.assertEqual(len(result), 1)
+
     def test_upload_metric_to_elasticsearch(self):
         bad_metric_uuid = str(uuid.uuid4())
         good_metric_uuid = str(uuid.uuid4())
         name = f"metric-{self.get_random_string(5)}"
         index = "test-upload-metric"
         # testing bad metric
-        self.lib_elastic.upload_metric_to_elasticsearch(
-            run_id=bad_metric_uuid,
+        self.lib_elastic.upload_metrics_to_elasticsearch(
+            run_uuid=bad_metric_uuid,
             raw_data={"name": 1, "values": [("bad", "bad")]},
             index=index,
         )
@@ -117,8 +136,8 @@ class TestKrknElastic(BaseTest):
             len(self.lib_elastic.search_metric(bad_metric_uuid, index)), 0
         )
 
-        self.lib_elastic.upload_metric_to_elasticsearch(
-            run_id=good_metric_uuid,
+        self.lib_elastic.upload_metrics_to_elasticsearch(
+            run_uuid=good_metric_uuid,
             raw_data=[{"name": name, "values": [(10, 3.14)]}],
             index=index,
         )
@@ -140,12 +159,20 @@ class TestKrknElastic(BaseTest):
             0,
         )
 
+    def test_search_telemetry_not_existing(self):
+        self.assertEqual(
+            len(
+                self.lib_elastic.search_telemetry("notexisting", "notexisting")
+            ),
+            0,
+        )
+
     def test_upload_correct(self):
         timestamp = datetime.datetime.now()
-        run_id = str(uuid.uuid4())
+        run_uuid = str(uuid.uuid4())
         index = "chaos_test"
         time = self.lib_elastic.upload_data_to_elasticsearch(
-            {"timestamp": timestamp, "run_id": run_id}, index
+            {"timestamp": timestamp, "run_uuid": run_uuid}, index
         )
         self.assertGreater(time, 0)
 
@@ -169,12 +196,8 @@ class TestKrknElastic(BaseTest):
 
     def _testupload_blank_es_url(self):
         es_url = ""
-        elastic = KrknElastic(
-            SafeLogger(),
-            es_url,
-        )
-        time = elastic.upload_data_to_elasticsearch(
-            {"timestamp": datetime.datetime.now()}, "chaos_test"
-        )
-
-        self.assertEqual(time, 0)
+        with self.assertRaises(Exception):
+            _ = KrknElastic(
+                SafeLogger(),
+                es_url,
+            )
