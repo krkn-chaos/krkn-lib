@@ -3197,3 +3197,35 @@ class KrknKubernetes:
             return True
         except ApiException:
             return False
+
+    def deploy_syn_flood(
+        self,
+        pod_name: str,
+        namespace: str,
+        image: str,
+        target: str,
+        target_port: int,
+        packet_size: int,
+        window_size: int,
+        duration: int,
+        node_selectors: dict[str, list[str]],
+    ):
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        pod_template = env.get_template("syn_flood_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                has_node_selectors=len(node_selectors.keys()) > 0,
+                node_selectors=node_selectors,
+                image=image,
+                target=target,
+                duration=duration,
+                target_port=target_port,
+                packet_size=packet_size,
+                window_size=window_size,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)
