@@ -1352,6 +1352,22 @@ class KrknKubernetesTests(BaseTest):
             delta=1.5,
         )
 
+    def test_select_services_by_label(self):
+        namespace = "test-" + self.get_random_string(10)
+        service_name_1 = "krkn-syn-flood-" + self.get_random_string(10)
+        service_name_2 = "krkn-syn-flood-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_service(service_name_1, namespace)
+        self.deploy_service(service_name_2, namespace)
+        service = self.lib_k8s.select_service_by_label(
+            namespace, "test=service"
+        )
+        self.assertEqual(len(service), 2)
+        self.assertEqual(service[0], service_name_1)
+        self.assertEqual(service[1], service_name_2)
+        service = self.lib_k8s.select_service_by_label(namespace, "not=found")
+        self.assertEqual(len(service), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
