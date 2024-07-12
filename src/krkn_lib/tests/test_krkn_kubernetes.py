@@ -1363,8 +1363,10 @@ class KrknKubernetesTests(BaseTest):
             namespace, "test=service"
         )
         self.assertEqual(len(service), 2)
-        self.assertEqual(service[0], service_name_1)
-        self.assertEqual(service[1], service_name_2)
+
+        self.assertTrue(service_name_1 in service)
+        self.assertTrue(service_name_2 in service)
+
         service = self.lib_k8s.select_service_by_label(namespace, "not=found")
         self.assertEqual(len(service), 0)
 
