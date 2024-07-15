@@ -2902,6 +2902,9 @@ class KrknKubernetes:
             # no pods have been killed or pods have been killed and
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
+                for pod in current_pods_and_namespaces:
+                    if not self.is_pod_running(pod[0], pod[1]):
+                        missing_pods.add(pod)
                 if len(missing_pods) == 0:
                     continue
                 # in this case the pods to wait have been respawn
@@ -2959,7 +2962,7 @@ class KrknKubernetes:
                     # sum the time elapsed waiting before the pod
                     # has been rescheduled (rescheduling time)
                     # to the effective recovery time of the pod
-                    result.pod_rescheduling_time = time.time() - start_time
+                    result.pod_rescheduling_time = time.time() - start_time - result.pod_readiness_time
                     result.total_recovery_time = (
                         result.pod_readiness_time
                         + result.pod_rescheduling_time
