@@ -894,6 +894,12 @@ class KrknKubernetesTests(BaseTest):
         self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
         self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
 
+        while not self.lib_k8s.is_pod_running(delayed_1, namespace) or (
+            not self.lib_k8s.is_pod_running(delayed_2, namespace)
+        ):
+            time.sleep(1)
+            continue
+
         monitor_timeout = 2
         pods_and_namespaces = self.lib_k8s.select_pods_by_label(
             f"test={label}"
