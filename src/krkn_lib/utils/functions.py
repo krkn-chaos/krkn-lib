@@ -5,6 +5,7 @@ import random
 import re
 import string
 import sys
+import socket
 from queue import Queue
 from typing import Optional
 
@@ -371,3 +372,11 @@ def get_random_string(length: int) -> str:
     """
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(length))
+
+
+def is_host_reachable(host: str, port: int, timeout: int = 2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout):
+            return True
+    except OSError:
+        return False
