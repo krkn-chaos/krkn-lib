@@ -19,14 +19,15 @@ spec:
         {% endfor %}
     {% endfor %}
 {%endif%}
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
     restartPolicy: Never
+    imagePullPolicy: IfNotPresent
     containers:
       - name: syn-flood
         image: {{image}}
         securityContext:
-            allowPrivilegeEscalation: true
-            capabilities:
-              add: ["NET_RAW"]
+            privileged: true
         env:
             - name: TARGET
               value: {{target}}
