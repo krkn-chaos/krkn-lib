@@ -1304,6 +1304,72 @@ class KrknKubernetesTests(BaseTest):
             self.lib_k8s.service_exists("doesnotexist", "doesnotexist")
         )
 
+    def test_deploy_syn_flood(self):
+        namespace = "test-" + self.get_random_string(10)
+        syn_flood_pod_name = "krkn-syn-flood-" + self.get_random_string(10)
+        nginx_pod_name = "nginx-test-pod-" + self.get_random_string(10)
+        service_name = "nginx-test-service" + self.get_random_string(10)
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_nginx(
+            namespace=namespace,
+            pod_name=nginx_pod_name,
+            service_name=service_name,
+        )
+        count = 0
+        while not self.lib_k8s.is_pod_running(nginx_pod_name, namespace):
+            time.sleep(3)
+            if count > 20:
+                self.assertTrue(
+                    False, "container is not running after 20 retries"
+                )
+            count += 1
+            continue
+        test_duration = 10
+        self.lib_k8s.deploy_syn_flood(
+            pod_name=syn_flood_pod_name,
+            namespace=namespace,
+            image="quay.io/krkn-chaos/krkn-syn-flood",
+            target=service_name,
+            target_port=80,
+            packet_size=120,
+            window_size=64,
+            duration=test_duration,
+            node_selectors={},
+        )
+
+        start = time.time()
+        end = 0
+        while self.lib_k8s.is_pod_running(syn_flood_pod_name, namespace):
+            end = time.time()
+            continue
+        # using assertAlmostEqual with delta because the is_pod_running check
+        # introduces some latency due to the api calls that makes difficult
+        # to record the test duration with sufficient accuracy
+        self.assertAlmostEqual(
+            first=end - start,
+            second=test_duration,
+            places=None,
+            delta=1.7,
+        )
+
+    def test_select_services_by_label(self):
+        namespace = "test-" + self.get_random_string(10)
+        service_name_1 = "krkn-syn-flood-" + self.get_random_string(10)
+        service_name_2 = "krkn-syn-flood-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_service(service_name_1, namespace)
+        self.deploy_service(service_name_2, namespace)
+        service = self.lib_k8s.select_service_by_label(
+            namespace, "test=service"
+        )
+        self.assertEqual(len(service), 2)
+
+        self.assertTrue(service_name_1 in service)
+        self.assertTrue(service_name_2 in service)
+
+        service = self.lib_k8s.select_service_by_label(namespace, "not=found")
+        self.assertEqual(len(service), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

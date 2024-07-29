@@ -123,6 +123,33 @@ class BaseTest(unittest.TestCase):
         content = template.render(name=name, namespace=namespace)
         self.apply_template(content)
 
+    def deploy_nginx(
+        self,
+        namespace: str,
+        pod_name: str = "nginx",
+        service_name: str = "nginx",
+    ):
+        env = Environment(loader=FileSystemLoader("src/testdata/"))
+        pod_template = env.get_template("nginx-test-pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                pod_name=pod_name,
+                service_name=service_name,
+                namespace=namespace,
+            )
+        )
+        service_template = env.get_template("nginx-test-service.j2")
+        service_body = yaml.safe_load(
+            service_template.render(
+                service_name=service_name,
+                namespace=namespace,
+            )
+        )
+        self.lib_k8s.create_pod(namespace=namespace, body=pod_body)
+        self.lib_k8s.cli.create_namespaced_service(
+            body=service_body, namespace=namespace
+        )
+
     def deploy_delayed_readiness_pod(
         self, name: str, namespace: str, delay: int, label: str = "readiness"
     ):

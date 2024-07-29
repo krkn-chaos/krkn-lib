@@ -2601,6 +2601,34 @@ class KrknKubernetes:
         ]
         return pods_and_namespaces
 
+    def select_service_by_label(
+        self, namespace: str, label_selector: str
+    ) -> list[str]:
+        """
+        Selects all the services marked by a label in the
+        format key=value deployed on a namespace
+
+        :param namespace: namespace where the service are searched
+        :param label_selector: label selector in the format key=value
+        :return: the list of services matching the criteria
+        """
+        splitted_selector = label_selector.split("=")
+        if len(splitted_selector) != 2:
+            raise Exception(
+                f"{label_selector} not valid, selector must "
+                f"be in key=value format"
+            )
+        services = self.cli.list_namespaced_service(namespace, pretty=True)
+        selected_services = []
+        for service in services.items:
+            for key, value in service.metadata.labels.items():
+                if (
+                    key == splitted_selector[0]
+                    and value == splitted_selector[1]
+                ):
+                    selected_services.append(service.metadata.name)
+        return selected_services
+
     def select_pods_by_name_pattern_and_namespace_pattern(
         self, pod_name_pattern: str, namespace_pattern: str
     ) -> list[(str, str)]:
@@ -3197,3 +3225,49 @@ class KrknKubernetes:
             return True
         except ApiException:
             return False
+
+    def deploy_syn_flood(
+        self,
+        pod_name: str,
+        namespace: str,
+        image: str,
+        target: str,
+        target_port: int,
+        packet_size: int,
+        window_size: int,
+        duration: int,
+        node_selectors: dict[str, list[str]],
+    ):
+        """
+        Deploys a Pod to run the Syn Flood scenario
+
+        :param pod_name: The name of the pod that will be deployed
+        :param namespace: The namespace where the pod will be deployed
+        :param image: the syn flood scenario container image
+        :param target: the target hostname or ip address
+        :param target_port: the target TCP port
+        :param packet_size: the SYN packet size in bytes
+        :param window_size: the TCP window size in bytes
+        :param duration: the duration of the flood in seconds
+        :param node_selectors: the node selectors of the node(s) where
+            the pod will be scheduled by kubernetes
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        pod_template = env.get_template("syn_flood_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                has_node_selectors=len(node_selectors.keys()) > 0,
+                node_selectors=node_selectors,
+                image=image,
+                target=target,
+                duration=duration,
+                target_port=target_port,
+                packet_size=packet_size,
+                window_size=window_size,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)
