@@ -22,6 +22,7 @@ pytz = "^2023.3"
 PyYAML = "6.0.1"
 prometheus-api-client = "^0.5.4"
 elasticsearch = "8.14.0"
+elasticsearch-dsl = "8.14.0"
 wheel = "^0.42.0"
 cython = "3.0"
 
