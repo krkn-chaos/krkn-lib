@@ -2054,13 +2054,12 @@ class KrknKubernetes:
             for node in node_resp.items:
                 node_info = NodeInfo()
                 if node.spec.taints is not None:
-                    for taint in node.spec.taints:
-                        taint = Taint(
-                            node_name=node.metadata.name,
-                            effect=taint.effect,
-                            key=taint.key,
-                            value=taint.value,
-                        )
+                    for node_taint in node.spec.taints:
+                        taint = Taint()
+                        taint.node_name = node.metadata.name
+                        taint.effect = node_taint.effect
+                        taint.key = node_taint.key
+                        taint.value = node_taint.value
                         taints.append(taint)
                 if instance_type_label in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
