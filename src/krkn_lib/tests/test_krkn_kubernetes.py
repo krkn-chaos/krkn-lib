@@ -612,6 +612,18 @@ class KrknKubernetesTests(BaseTest):
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
 
+
+    def test_check_rbac_access(self):
+        try:
+            namespace = "test-ns-" + self.get_random_string(10)
+            self.deploy_namespace(namespace, [])
+            self.assertTrue(self.lib_k8s.check_rbac_access('pod', 'get', namespace))
+            self.assertTrue(self.lib_k8s.check_rbac_access('services', 'create', 'default'))
+            self.assertTrue(self.lib_k8s.check_rbac_access('secretes', 'delete', namespace))
+        except Exception as e:
+            logging.error("test raised exception {0}".format(str(e)))
+            self.assertTrue(False)
+
     def test_check_if_namespace_exists(self):
         try:
             namespace = "test-ns-" + self.get_random_string(10)

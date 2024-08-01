@@ -157,6 +157,7 @@ class KrknKubernetes:
             self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
             self.net_cli = client.NetworkingV1Api(self.api_client)
+            self.auth_cli = client.AuthorizationV1Api(self.k8s_client)
             self.custom_object_client = client.CustomObjectsApi(
                 self.k8s_client
             )
@@ -1650,6 +1651,50 @@ class KrknKubernetes:
         else:
             logging.error("Namespace '%s' doesn't exist", str(namespace))
         return False
+
+    def check_rbac_access(self, resource: str, verb: str,
+                          namespace: str = None) -> bool:
+        """
+        Check if the current user can perform an action in the given namespace.
+        If namespace is not passed, check would be performed against all
+        namespace.
+
+        :param resource: One of the existing resource types
+        :param verb: Verb is a kubernetes resource API verb.
+        :param namespace: Namespace is the namespace of the action being
+            requested.
+        :return: boolean value indicating whether
+            the user is allowed to do the requested action.
+        """
+        if namespace:
+            body = client.V1SelfSubjectAccessReview(
+                spec=client.V1SelfSubjectAccessReviewSpec(
+                    resource_attributes=client.V1ResourceAttributes(
+                        namespace=namespace,
+                        resource=resource,
+                        verb=verb
+                    )
+                )
+            )
+        else:
+            body = client.V1SelfSubjectAccessReview(
+                spec=client.V1SelfSubjectAccessReviewSpec(
+                    resource_attributes=client.V1ResourceAttributes(
+                        resource=resource,
+                        verb=verb
+                    )
+                )
+            )
+        try:
+            api_response = self.auth_cli.create_self_subject_access_review(
+                body=body)
+            allowed = api_response.status.allowed
+        except ApiException as e:
+            logging.error(
+                "Exception when calling"
+                "AuthorizationV1Api->create_self_subject_access_review: %s\n",
+                str(e))
+        return allowed
 
     def get_pvc_info(self, name: str, namespace: str) -> PVC:
         """
