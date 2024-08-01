@@ -7,7 +7,6 @@ from krkn_lib.elastic.krkn_elastic import KrknElastic
 from krkn_lib.models.elastic.models import (
     ElasticAlert,
     ElasticMetric,
-    ElasticMetricValue,
 )
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
@@ -53,58 +52,23 @@ class TestKrknElastic(BaseTest):
         metric_1 = ElasticMetric(
             run_uuid=run_uuid,
             name="metric_1",
-            values=[
-                ElasticMetricValue(100, 1.0),
-                ElasticMetricValue(101, 2.0),
-                ElasticMetricValue(102, 3.0),
-            ],
-            created_at=datetime.datetime.now(),
-        )
-        metric_2 = ElasticMetric(
-            run_uuid=run_uuid,
-            name="metric_2",
-            values=[
-                ElasticMetricValue(103, 4.0),
-                ElasticMetricValue(104, 5.0),
-                ElasticMetricValue(105, 6.0),
-            ],
+            timestamp=100,
+            value=1.0,
             created_at=datetime.datetime.now(),
         )
         result = self.lib_elastic.push_metric(metric_1, index)
         self.assertNotEqual(result, -1)
-        result = self.lib_elastic.push_metric(metric_2, index)
-        self.assertNotEqual(result, -1)
         time.sleep(1)
         metrics = self.lib_elastic.search_metric(run_uuid, index)
-        self.assertEqual(len(metrics), 2)
+        self.assertEqual(len(metrics), 1)
         metric = next(
             metric for metric in metrics if metric.name == "metric_1"
         )
         self.assertIsNotNone(metric)
-        self.assertEqual(len(metric.values), 3)
-        self.assertEqual(
-            set([(v.timestamp, v.value) for v in metric.values]),
-            {
-                (100, 1.0),
-                (101, 2.0),
-                (102, 3.0),
-            },
-        )
-
-        metric = next(
-            metric for metric in metrics if metric.name == "metric_2"
-        )
-        self.assertIsNotNone(metric)
-
-        self.assertEqual(len(metric.values), 3)
-        self.assertEqual(
-            set([(v.timestamp, v.value) for v in metric.values]),
-            {
-                (103, 4.0),
-                (104, 5.0),
-                (105, 6.0),
-            },
-        )
+        self.assertEqual(metric.value, 1.0)
+        self.assertEqual(metric.timestamp, 100)
+        self.assertEqual(metric.run_uuid, run_uuid)
+        self.assertEqual(metric.name, "metric_1")
 
     def test_push_search_telemetry(self):
         run_uuid = str(uuid.uuid4())
@@ -128,7 +92,11 @@ class TestKrknElastic(BaseTest):
         # testing bad metric
         self.lib_elastic.upload_metrics_to_elasticsearch(
             run_uuid=bad_metric_uuid,
-            raw_data={"name": 1, "values": [("bad", "bad")]},
+            raw_data={
+                "name": 1,
+                "timestamp": "bad",
+                "value": "bad",
+            },
             index=index,
         )
 
@@ -138,15 +106,15 @@ class TestKrknElastic(BaseTest):
 
         self.lib_elastic.upload_metrics_to_elasticsearch(
             run_uuid=good_metric_uuid,
-            raw_data=[{"name": name, "values": [(10, 3.14)]}],
+            raw_data=[{"name": name, "timestamp": 10, "value": 3.14}],
             index=index,
         )
         time.sleep(1)
         metric = self.lib_elastic.search_metric(good_metric_uuid, index)
         self.assertEqual(len(metric), 1)
         self.assertEqual(metric[0].name, name)
-        self.assertEqual(metric[0].values[0].timestamp, 10)
-        self.assertEqual(metric[0].values[0].value, 3.14)
+        self.assertEqual(metric[0].timestamp, 10)
+        self.assertEqual(metric[0].value, 3.14)
 
     def test_search_alert_not_existing(self):
         self.assertEqual(

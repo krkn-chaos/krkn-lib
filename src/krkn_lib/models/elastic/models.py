@@ -48,22 +48,25 @@ class ElasticMetricValue(InnerDoc):
 class ElasticMetric(Document):
     run_uuid = Keyword()
     name = Text()
-    values = Nested(ElasticMetricValue, multi=True)
     created_at = Date()
+    timestamp = Long()
+    value = Float()
 
     def __init__(
         self,
         run_uuid: str,
         name: str,
-        values: list[ElasticMetricValue],
         created_at: datetime,
+        timestamp: int,
+        value: float,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.run_uuid = run_uuid
         self.name = name
         self.created_at = created_at
-        self.values = values
+        self.timestamp = timestamp
+        self.value = value
 
 
 # Telemetry models

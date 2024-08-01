@@ -12,7 +12,6 @@ from elasticsearch_dsl import Search
 from krkn_lib.models.elastic.models import (
     ElasticAlert,
     ElasticMetric,
-    ElasticMetricValue,
     ElasticChaosRunTelemetry,
 )
 from krkn_lib.models.telemetry import ChaosRunTelemetry
@@ -94,7 +93,7 @@ class KrknElastic:
     def upload_metrics_to_elasticsearch(
         self,
         run_uuid: str,
-        raw_data: list[dict[str, list[(int, float)] | str]],
+        raw_data: list[dict[str, str | int | float]],
         index: str,
     ) -> int:
         """
@@ -118,28 +117,26 @@ class KrknElastic:
         try:
             for metric in raw_data:
                 if (
-                    "name" in metric
-                    and "values" in metric
+                    isinstance(metric["timestamp"], int)
+                    and isinstance(metric["value"], float)
                     and isinstance(metric["name"], str)
-                    and isinstance(metric["values"], list)
                 ):
-                    values = [
-                        ElasticMetricValue(timestamp=v[0], value=v[1])
-                        for v in metric["values"]
-                        if isinstance(v[0], int) and isinstance(v[1], float)
-                    ]
-                    metric = ElasticMetric(
-                        run_uuid=run_uuid,
-                        name=metric["name"],
-                        values=values,
-                        created_at=datetime.datetime.now(),
+                    result = self.push_metric(
+                        ElasticMetric(
+                            run_uuid=run_uuid,
+                            name=metric["name"],
+                            created_at=datetime.datetime.now(),
+                            timestamp=int(metric["timestamp"]),
+                            value=float(metric["value"]),
+                        ),
+                        index,
                     )
-                    result = self.push_metric(metric, index)
                     if result == -1:
                         self.safe_logger.error(
                             f"failed to save metric "
                             f"to elasticsearch : {metric}"
                         )
+
             return int(time.time() - time_start)
         except Exception:
             return -1
