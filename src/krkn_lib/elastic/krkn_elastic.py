@@ -34,6 +34,8 @@ class KrknElastic:
         es_logger.setLevel(logging.WARNING)
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         urllib3.disable_warnings(DeprecationWarning)
+        es_transport_logger = logging.getLogger("elastic_transport.transport")
+        es_transport_logger.setLevel(logging.CRITICAL)
         self.safe_logger = safe_logger
         try:
             if not elastic_url:
