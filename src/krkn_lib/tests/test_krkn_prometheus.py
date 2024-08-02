@@ -22,9 +22,23 @@ class TestKrknPrometheus(BaseTest):
         for value in res[0]["values"]:
             self.assertEqual(len(value), 2)
 
+    def process_query(self):
+        prom_cli = KrknPrometheus(self.url)
+        query = "node_boot_time_seconds"
+
+        res = prom_cli.process_query(query)
+
+        self.assertTrue(len(res) > 0)
+        self.assertTrue("metric" in res[0].keys())
+        self.assertTrue("values" in res[0].keys())
+        for value in res[0]["values"]:
+            self.assertEqual(len(value), 2)
+
     def test_process_alert(self):
         prom_cli = KrknPrometheus(self.url)
-        res = prom_cli.process_prom_query_in_range("node_boot_time_seconds")
+        res = prom_cli.process_prom_query_in_range(
+            "node_boot_time_seconds", end_time=datetime.datetime.now()
+        )
         logging.disable(logging.NOTSET)
         controls = []
         for result in res:
@@ -81,49 +95,62 @@ class TestKrknPrometheus(BaseTest):
             "value: {{$value}}",
             "severity": "not_exists",
         }
+        # tests that the logger contains at least a record
+        # on the selected log level and that the returned string from
+        # the log is contained on the log printed
 
         with self.assertLogs(level="INFO") as lc:
-            prom_cli.process_alert(
+            string_value = prom_cli.process_alert(
                 alert_info,
                 datetime.datetime.now() - datetime.timedelta(days=1),
                 datetime.datetime.now(),
             )
             self.assertTrue(len(lc.records) > 0)
-
+            logger_output = str(lc.output[0])
+            self.assertTrue(string_value[1] in logger_output)
             with self.assertLogs(level="DEBUG") as lc:
-                prom_cli.process_alert(
+                string_value = prom_cli.process_alert(
                     alert_debug,
                     datetime.datetime.now() - datetime.timedelta(days=1),
                     datetime.datetime.now(),
                 )
                 self.assertTrue(len(lc.records) > 0)
+                logger_output = str(lc.output[0])
+                self.assertTrue(string_value[1] in logger_output)
 
                 with self.assertLogs(level="WARNING") as lc:
-                    prom_cli.process_alert(
+                    string_value = prom_cli.process_alert(
                         alert_warning,
                         datetime.datetime.now() - datetime.timedelta(days=1),
                         datetime.datetime.now(),
                     )
                     self.assertTrue(len(lc.records) > 0)
+                    logger_output = str(lc.output[0])
+                    self.assertTrue(string_value[1] in logger_output)
 
                 with self.assertLogs(level="ERROR") as lc:
-                    prom_cli.process_alert(
+                    string_value = prom_cli.process_alert(
                         alert_error,
                         datetime.datetime.now() - datetime.timedelta(days=1),
                         datetime.datetime.now(),
                     )
                     self.assertTrue(len(lc.records) > 0)
+                    logger_output = str(lc.output[0])
+
+                    self.assertTrue(string_value[1] in logger_output)
 
                 with self.assertLogs(level="CRITICAL") as lc:
-                    prom_cli.process_alert(
+                    string_value = prom_cli.process_alert(
                         alert_critical,
                         datetime.datetime.now() - datetime.timedelta(days=1),
                         datetime.datetime.now(),
                     )
                     self.assertTrue(len(lc.records) > 0)
+                    logger_output = str(lc.output[0])
+                    self.assertTrue(string_value[1] in logger_output)
 
                 with self.assertLogs(level="ERROR") as lc:
-                    prom_cli.process_alert(
+                    string_value = prom_cli.process_alert(
                         alert_not_exists,
                         datetime.datetime.now() - datetime.timedelta(days=1),
                         datetime.datetime.now(),
@@ -133,6 +160,8 @@ class TestKrknPrometheus(BaseTest):
                     self.assertEqual(
                         lc.records[0].msg, "invalid severity level: not_exists"
                     )
+                    logger_output = str(lc.output[0])
+                    self.assertTrue(string_value[1] in logger_output)
 
     def test_parse_metric(self):
         prom_cli = KrknPrometheus(self.url)

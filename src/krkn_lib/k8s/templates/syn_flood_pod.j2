@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{name}}
+  namespace: {{namespace}}
+spec:
+{% if has_node_selectors %}
+    affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+    {% for key, values in node_selectors.items() %}
+                - matchExpressions:
+                    - key: {{key}}
+                      operator: In
+                      values:
+        {% for value in values %}
+                        - {{value}}
+        {% endfor %}
+    {% endfor %}
+{%endif%}
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
+    restartPolicy: Never
+    imagePullPolicy: IfNotPresent
+    containers:
+      - name: syn-flood
+        image: {{image}}
+        securityContext:
+            privileged: true
+        env:
+            - name: TARGET
+              value: {{target}}
+            - name: DURATION
+              value: '{{duration}}'
+            - name: TARGET_PORT
+              value: '{{target_port}}'
+            - name: PACKET_SIZE
+              value: '{{packet_size}}'
+            - name: WINDOW_SIZE
+              value: '{{window_size}}'

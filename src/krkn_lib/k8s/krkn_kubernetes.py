@@ -7,12 +7,17 @@ import re
 import tempfile
 import threading
 import time
+import warnings
+from concurrent.futures import ThreadPoolExecutor, wait
+from functools import partial
 from queue import Queue
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
 import arcaflow_lib_kubernetes
 import kubernetes
+import urllib3
 import yaml
-from jinja2 import PackageLoader, Environment
+from jinja2 import Environment, PackageLoader
 from kubeconfig import KubeConfig
 from kubernetes import client, config, utils, watch
 from kubernetes.client.rest import ApiException
@@ -22,19 +27,22 @@ from urllib3 import HTTPResponse
 
 from krkn_lib.models.k8s import (
     PVC,
+    AffectedPod,
     ApiRequestException,
     ChaosEngine,
     ChaosResult,
     Container,
     LitmusChaosObject,
     Pod,
+    PodsMonitorThread,
+    PodsStatus,
+    ServiceHijacking,
     Volume,
     VolumeMount,
 )
 from krkn_lib.models.telemetry import NodeInfo, Taint
-from krkn_lib.utils import filter_dictionary
+from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
-
 
 SERVICE_TOKEN_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/token"
 SERVICE_CERT_FILENAME = "/var/run/secrets/k8s.io/serviceaccount/ca.crt"
@@ -80,6 +88,11 @@ class KrknKubernetes:
         >>> kubeconfig_string="apiVersion: v1 ....."
         >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        urllib3.disable_warnings(DeprecationWarning)
+        warnings.filterwarnings(
+            action="ignore", message="unclosed", category=ResourceWarning
+        )
 
         if kubeconfig_string is not None and kubeconfig_path is not None:
             raise Exception(
@@ -141,6 +154,7 @@ class KrknKubernetes:
             self.cli = client.CoreV1Api(self.k8s_client)
             self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.net_cli = client.NetworkingV1Api(self.api_client)
             self.custom_object_client = client.CustomObjectsApi(
                 self.k8s_client
             )
@@ -505,6 +519,27 @@ class KrknKubernetes:
                 pods.append(pod.metadata.name)
         return pods
 
+    def create_obj(self, obj_body: json, namespace: str, api_func):
+        try:
+            api_func(body=obj_body, namespace=namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->%s: %s\n"
+                % (str(api_func), e)
+            )
+            raise e
+
+    def create_net_policy(self, body: str, namespace: str):
+        """
+        Create a network policy
+
+        :param body: json body of network policy to create
+        :param namespace: namespace to find daemonsets in
+        """
+        self.create_obj(
+            body, namespace, self.net_cli.create_namespaced_network_policy
+        )
+
     def get_daemonset(self, namespace: str) -> list[str]:
         """
         Return a list of daemon set names
@@ -576,10 +611,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_daemon_set(name, namespace)
-            while self.apps_api.read_namespaced_daemon_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Daemon Set already deleted")
@@ -596,10 +627,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_stateful_set(name, namespace)
-            while self.apps_api.read_namespaced_stateful_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Statefulset already deleted")
@@ -616,10 +643,6 @@ class KrknKubernetes:
         """
         try:
             self.apps_api.delete_namespaced_replica_set(name, namespace)
-            while self.apps_api.read_namespaced_replica_set(
-                name=name, namespace=namespace
-            ):
-                time.sleep(1)
         except ApiException as e:
             if e.status == 404:
                 logging.info("Replica set already deleted")
@@ -641,6 +664,22 @@ class KrknKubernetes:
                 logging.info("Service already deleted")
             else:
                 logging.error("Failed to delete service %s", str(e))
+                raise e
+
+    def delete_net_policy(self, name: str, namespace: str):
+        """
+        Delete a network policy given a certain name and namespace
+
+        :param name: name of network policy
+        :param namespace: namespace network policy is in
+        """
+        try:
+            self.net_cli.delete_namespaced_network_policy(name, namespace)
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("Network policy already deleted")
+            else:
+                logging.error("Failed to delete network policy %s", str(e))
                 raise e
 
     def get_deployment_ready(self, name: str, namespace: str):
@@ -687,6 +726,27 @@ class KrknKubernetes:
             for pod in ret_list.items:
                 pods.append([pod.metadata.name, pod.metadata.namespace])
         return pods
+
+    def get_namespaced_net_policy(self, namespace):
+        """
+        Return a list of network policy names
+
+        :param namespace: find only statefulset in given namespace
+        :return: list of network policy names
+        """
+        nps = []
+        try:
+            ret = self.net_cli.list_namespaced_network_policy(namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "AppsV1Api->list_namespaced_stateful_set: %s\n",
+                str(e),
+            )
+            raise e
+        for np in ret.items:
+            nps.append(np.metadata.name)
+        return nps
 
     def get_all_statefulset(self, namespace) -> list[str]:
         """
@@ -1875,10 +1935,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params[
-                            "Accept"
-                        ] = api_client.select_header_accept(
-                            ["application/json"]
+                        header_params["Accept"] = (
+                            api_client.select_header_accept(
+                                ["application/json"]
+                            )
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -1972,19 +2032,21 @@ class KrknKubernetes:
 
         return None
 
-    def get_nodes_infos(self) -> list[NodeInfo]:
+    def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
         Returns a list of NodeInfo objects
         :return: the list of NodeInfo objects
         """
         instance_type_label = "node.k8s.io/instance-type"
-        instance_type_label_2 = "node.kubernetes.io/instance-type"
+        instance_type_label_alt = "node.kubernetes.io/instance-type"
         node_type_master_label = "node-role.kubernetes.io/master"
         node_type_worker_label = "node-role.kubernetes.io/worker"
         node_type_infra_label = "node-role.kubernetes.io/infra"
         node_type_workload_label = "node-role.kubernetes.io/workload"
         node_type_application_label = "node-role.kubernetes.io/app"
         result = list[NodeInfo]()
+        node_index = set[NodeInfo]()
+        taints = list[Taint]()
         resp = self.list_continue_helper(
             self.cli.list_node, limit=self.request_chunk_size
         )
@@ -1992,20 +2054,20 @@ class KrknKubernetes:
             for node in node_resp.items:
                 node_info = NodeInfo()
                 if node.spec.taints is not None:
-                    for taint in node.spec.taints:
-                        taint = Taint(
-                            effect=taint.effect,
-                            key=taint.key,
-                            value=taint.value,
-                        )
-                        node_info.taints.append(taint)
+                    for node_taint in node.spec.taints:
+                        taint = Taint()
+                        taint.node_name = node.metadata.name
+                        taint.effect = node_taint.effect
+                        taint.key = node_taint.key
+                        taint.value = node_taint.value
+                        taints.append(taint)
                 if instance_type_label in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
                         instance_type_label
                     ]
-                elif instance_type_label_2 in node.metadata.labels.keys():
+                elif instance_type_label_alt in node.metadata.labels.keys():
                     node_info.instance_type = node.metadata.labels[
-                        instance_type_label_2
+                        instance_type_label_alt
                     ]
                 else:
                     node_info.instance_type = "unknown"
@@ -2025,7 +2087,6 @@ class KrknKubernetes:
                 else:
                     node_info.node_type = "unknown"
 
-                node_info.name = node.metadata.name
                 node_info.architecture = node.status.node_info.architecture
                 node_info.architecture = node.status.node_info.architecture
                 node_info.kernel_version = node.status.node_info.kernel_version
@@ -2033,8 +2094,12 @@ class KrknKubernetes:
                     node.status.node_info.kubelet_version
                 )
                 node_info.os_version = node.status.node_info.os_image
-                result.append(node_info)
-        return result
+                if node_info in node_index:
+                    result[result.index(node_info)].count += 1
+                else:
+                    node_index.add(node_info)
+                    result.append(node_info)
+        return result, taints
 
     def delete_file_from_pod(
         self, pod_name: str, container_name: str, namespace: str, filename: str
@@ -2372,6 +2437,25 @@ class KrknKubernetes:
         except Exception:
             return False
 
+    def is_pod_terminating(self, pod_name: str, namespace: str) -> bool:
+        """
+        Checks if a pod is scheduled for deletion so it's terminating
+
+        :param pod_name:str: the name of the pod to check
+        :param namespace:str: the namespace of the pod to check
+        :return: True if is Terminating or False if not
+        """
+        try:
+            response = self.cli.read_namespaced_pod(
+                name=pod_name, namespace=namespace, pretty="true"
+            )
+            if response.metadata.deletion_timestamp:
+                return True
+
+            return False
+        except Exception:
+            return False
+
     def collect_cluster_events(
         self,
         start_timestamp: int,
@@ -2495,3 +2579,694 @@ class KrknKubernetes:
                 f"on namespace: {namespace} with error: {e}"
             )
             return None
+
+    def select_pods_by_label(self, label_selector: str) -> list[(str, str)]:
+        """
+        Selects the pods identified by a label_selector
+
+        :param label_selector: a label selector string
+            in the format "key=value"
+        :param max_timeout: the maximum time in seconds
+            to wait before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = [(pod[0], pod[1]) for pod in pods_and_namespaces]
+        # select only running pods
+        pods_and_namespaces = [
+            pod
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def select_service_by_label(
+        self, namespace: str, label_selector: str
+    ) -> list[str]:
+        """
+        Selects all the services marked by a label in the
+        format key=value deployed on a namespace
+
+        :param namespace: namespace where the service are searched
+        :param label_selector: label selector in the format key=value
+        :return: the list of services matching the criteria
+        """
+        splitted_selector = label_selector.split("=")
+        if len(splitted_selector) != 2:
+            raise Exception(
+                f"{label_selector} not valid, selector must "
+                f"be in key=value format"
+            )
+        services = self.cli.list_namespaced_service(namespace, pretty=True)
+        selected_services = []
+        for service in services.items:
+            for key, value in service.metadata.labels.items():
+                if (
+                    key == splitted_selector[0]
+                    and value == splitted_selector[1]
+                ):
+                    selected_services.append(service.metadata.name)
+        return selected_services
+
+    def select_pods_by_name_pattern_and_namespace_pattern(
+        self, pod_name_pattern: str, namespace_pattern: str
+    ) -> list[(str, str)]:
+        """
+        Selects the pods identified by a namespace_pattern
+        and a pod_name pattern.
+
+        :param pod_name_pattern: a pod_name pattern to match
+        :param namespace_pattern: a namespace pattern to match
+        :param max_timeout: the maximum time in seconds to wait
+            before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        namespace_re = re.compile(namespace_pattern)
+        podname_re = re.compile(pod_name_pattern)
+        namespaces = self.list_namespaces()
+        pods_and_namespaces = []
+        for namespace in namespaces:
+            if namespace_re.match(namespace):
+                pods = self.list_pods(namespace)
+                for pod in pods:
+                    if podname_re.match(pod):
+                        pods_and_namespaces.append((pod, namespace))
+        # select only running pods
+        pods_and_namespaces = [
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def select_pods_by_namespace_pattern_and_label(
+        self, namespace_pattern: str, label_selector: str
+    ) -> list[(str, str)]:
+        """
+        Selects the pods identified by a label_selector
+        and a namespace pattern
+
+        :param namespace_pattern: a namespace pattern to match
+        :param label_selector: a label selector string
+            in the format "key=value"
+        :param max_timeout: the maximum time in seconds
+            to wait before considering the pod "not recovered" after the Chaos
+        :return: a list of pod_name and namespace tuples
+        """
+        namespace_re = re.compile(namespace_pattern)
+        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = [
+            pod for pod in pods_and_namespaces if namespace_re.match(pod[1])
+        ]
+        # select only running pods
+        pods_and_namespaces = [
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if not self.is_pod_terminating(pod[0], pod[1])
+        ]
+        return pods_and_namespaces
+
+    def monitor_pods_by_label(
+        self,
+        label_selector: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout: int = 30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by label selector
+        and collects infos about the pods recovery after a kill scenario.
+        Returns a PodsMonitorThread that can be joined after the scenario
+        to retrieve the PodsStatus object containing all the information
+        collected in background during the chaos run.
+
+        :param label_selector: the label selector used
+            to filter the pods to monitor (must be the
+            same used in `select_pods_by_label`)
+        :param pods_and_namespaces: the list of pods collected
+            by `select_pods_by_label` against which the changes
+            in the pods state is monitored
+        :param max_timeout: the expected time the pods should take
+            to recover. If the killed pods are replaced in this time frame,
+            but they didn't reach the Ready State, they will be marked as
+            unrecovered. If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined
+            in any place of the code, to collect the PodsStatus structure
+            returned, in order to make the process run in background
+            while a chaos scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            label_selector=label_selector,
+            event=event,
+        )
+
+    def monitor_pods_by_name_pattern_and_namespace_pattern(
+        self,
+        pod_name_pattern: str,
+        namespace_pattern: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout=30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by a pod name regex pattern
+        and a namespace regex pattern, and collects infos about the
+        pods recovery after a kill scenario. Returns a PodsMonitorThread
+        that can be joined after the scenario to retrieve the PodsStatus
+        object containing all the information collected in background during
+        the chaos run.
+
+        :param pod_name_pattern: a regex representing the
+            pod name pattern used to filter the pods to be monitored
+            (must be the same used in
+            `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param namespace_pattern: a regex representing the namespace
+            pattern used to filter the pods to be monitored
+            (must be the same used in
+            `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param pods_and_namespaces: the list of pods collected by
+            `select_pods_by_name_pattern_and_namespace_pattern` against
+            which the changes in the pods state is monitored
+        :param max_timeout: the expected time the pods should take to
+            recover. If the killed pods are replaced in this time frame,
+            but they didn't reach the Ready State, they will be marked as
+            unrecovered. If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined in any
+            place of the code, to collect the PodsStatus structure returned,
+            in order to make the process run in background while a chaos
+            scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            name_pattern=pod_name_pattern,
+            namespace_pattern=namespace_pattern,
+            event=event,
+        )
+
+    def monitor_pods_by_namespace_pattern_and_label(
+        self,
+        namespace_pattern: str,
+        label_selector: str,
+        pods_and_namespaces: list[(str, str)],
+        max_timeout=30,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        """
+        Starts monitoring a list of pods identified as tuples
+        (pod_name, namespace) filtered by a namespace regex pattern
+        and a pod label selector, and collects infos about the
+        pods recovery after a kill scenario. Returns a PodsMonitorThread
+        that can be joined after the scenario to retrieve the PodsStatus
+        object containing all the information collected in background during
+        the chaos run.
+
+        :param label_selector: the label selector used to filter
+            the pods to monitor (must be the same used in
+            `select_pods_by_label`)
+        :param namespace_pattern: a regex representing the namespace
+            pattern used to filter the pods to be monitored (must be
+            the same used
+            in `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param pods_and_namespaces: the list of pods collected by
+            `select_pods_by_name_pattern_and_namespace_pattern` against
+            which the changes in the pods state is monitored
+        :param max_timeout: the expected time the pods should take to recover.
+            If the killed pods are replaced in this time frame, but they
+            didn't reach the Ready State, they will be marked as unrecovered.
+            If during the time frame the pods are not replaced
+            at all the error field of the PodsStatus structure will be
+            valorized with an exception.
+        :param event: a threading event can be passed to interrupt the process
+            before the timeout. Simply call set() method on the event passed
+            to make the thread return immediately
+        :return: a PodsMonitorThread structure that can be joined in
+            any place of the code, to collect the PodsStatus structure
+            returned, in order to make the process run in background while
+            a chaos scenario is performed.
+
+        """
+        pods_status = PodsStatus()
+        return self.__start_monitoring_pods(
+            pods_and_namespaces=pods_and_namespaces,
+            max_timeout=max_timeout,
+            pods_status=pods_status,
+            label_selector=label_selector,
+            namespace_pattern=namespace_pattern,
+            event=event,
+        )
+
+    def __start_monitoring_pods(
+        self,
+        pods_and_namespaces: list[(str, str)],
+        pods_status: PodsStatus,
+        max_timeout: int,
+        label_selector: str = None,
+        pod_name: str = None,
+        namespace_pattern: str = None,
+        name_pattern: str = None,
+        event: threading.Event = None,
+    ) -> PodsMonitorThread:
+        executor = ThreadPoolExecutor()
+        future = executor.submit(
+            self.__monitor_pods_worker,
+            pods_and_namespaces=pods_and_namespaces,
+            pods_status=pods_status,
+            max_timeout=max_timeout,
+            label_selector=label_selector,
+            pod_name=pod_name,
+            namespace_pattern=namespace_pattern,
+            name_pattern=name_pattern,
+            event=event,
+        )
+
+        return PodsMonitorThread(executor, future)
+
+    def __monitor_pods_worker(
+        self,
+        pods_and_namespaces: [(str, str)],
+        pods_status: PodsStatus,
+        max_timeout: int,
+        label_selector: str = None,
+        pod_name: str = None,
+        namespace_pattern: str = None,
+        name_pattern: str = None,
+        event: threading.Event = None,
+    ) -> PodsStatus:
+        missing_pods = set()
+        pods_to_wait = set()
+        pods_already_watching = set()
+        start_time = time.time()
+        _event = threading.Event() if not event else event
+        if (
+            label_selector
+            and not pod_name
+            and not name_pattern
+            and not namespace_pattern
+        ):
+            select_method = partial(
+                self.select_pods_by_label,
+                label_selector=label_selector,
+            )
+        elif (
+            name_pattern
+            and namespace_pattern
+            and not pod_name
+            and not label_selector
+        ):
+            select_method = partial(
+                self.select_pods_by_name_pattern_and_namespace_pattern,
+                pod_name_pattern=name_pattern,
+                namespace_pattern=namespace_pattern,
+            )
+        elif (
+            namespace_pattern
+            and label_selector
+            and not pod_name
+            and not name_pattern
+        ):
+            select_method = partial(
+                self.select_pods_by_namespace_pattern_and_label,
+                namespace_pattern=namespace_pattern,
+                label_selector=label_selector,
+            )
+        else:
+            pods_status.error = (
+                "invalid parameter combination, "
+                "check hasn't been performed, aborting."
+            )
+            return pods_status
+
+        while time.time() - start_time <= max_timeout:
+            if event:
+                if event.is_set():
+                    return pods_status
+
+            time_offset = time.time() - start_time
+            remaining_time = max_timeout - time_offset
+            current_pods_and_namespaces = select_method()
+
+            # no pods have been killed or pods have been killed and
+            # respawned with the same names
+            if set(pods_and_namespaces) == set(current_pods_and_namespaces):
+                for pod in current_pods_and_namespaces:
+                    if not self.is_pod_running(pod[0], pod[1]):
+                        missing_pods.add(pod)
+                if len(missing_pods) == 0:
+                    continue
+                # in this case the pods to wait have been respawn
+                # with the same name
+                pods_to_wait.update(missing_pods)
+
+            # pods have been killed but respawned with different names
+            elif set(pods_and_namespaces) != set(
+                current_pods_and_namespaces
+            ) and len(pods_and_namespaces) <= len(current_pods_and_namespaces):
+                # in this case the pods to wait have been respawn
+                # with different names
+                pods_to_wait.update(
+                    set(current_pods_and_namespaces) - set(pods_and_namespaces)
+                )
+
+            # pods have been killed and are not
+            # respawned yet (missing pods names
+            # are collected
+            elif set(pods_and_namespaces) != set(
+                current_pods_and_namespaces
+            ) and len(pods_and_namespaces) > len(current_pods_and_namespaces):
+                # update on missing_pods set is idempotent since the tuple
+                # pod_name,namespace is unique in the cluster
+                missing_pods.update(
+                    set(pods_and_namespaces) - set(current_pods_and_namespaces)
+                )
+                continue
+            # no change has been made in the pod set,
+            # maybe is taking some time to
+            # inject the chaos, let's see the next iteration.
+            if len(pods_to_wait) == 0:
+                continue
+
+            futures = []
+
+            with ThreadPoolExecutor() as executor:
+                for pod_and_namespace in pods_to_wait:
+                    if pod_and_namespace not in pods_already_watching:
+                        future = executor.submit(
+                            self.__wait_until_pod_is_ready_worker,
+                            pod_name=pod_and_namespace[0],
+                            namespace=pod_and_namespace[1],
+                            event=_event,
+                        )
+                        futures.append(future)
+                        pods_already_watching.add(pod_and_namespace)
+
+                # this will wait all the futures to
+                # finish within the remaining time
+                done, undone = wait(futures, timeout=remaining_time)
+                _event.set()
+                for future in done:
+                    result = future.result()
+                    # sum the time elapsed waiting before the pod
+                    # has been rescheduled (rescheduling time)
+                    # to the effective recovery time of the pod
+                    result.pod_rescheduling_time = (
+                        time.time() - start_time - result.pod_readiness_time
+                    )
+                    result.total_recovery_time = (
+                        result.pod_readiness_time
+                        + result.pod_rescheduling_time
+                    )
+
+                    pods_status.recovered.append(result)
+                for future in undone:
+                    result = future.result()
+                    pods_status.unrecovered.append(result)
+
+                missing_pods.clear()
+        # if there are missing pods, pods affected
+        # by the chaos did not restart after the chaos
+        # an exception will be set in the PodsStatus
+        # structure that will be catched at the end of
+        # the monitoring,
+        if len(missing_pods) > 0:
+            if not _event.is_set():
+                pods_status.error = f'{", ".join([f"pod: {p[0]} namespace:{p[1]}" for p in missing_pods])}'  # NOQA
+
+        return pods_status
+
+    def __wait_until_pod_is_ready_worker(
+        self, pod_name: str, namespace: str, event: threading.Event
+    ) -> AffectedPod:
+        start_time = time.time()
+        ready = False
+
+        while not ready and not event.is_set():
+            ready = self.is_pod_running(pod_name, namespace)
+        end_time = time.time()
+        pod = AffectedPod(
+            pod_name=pod_name,
+            namespace=namespace,
+        )
+        if not event.is_set():
+            pod.pod_readiness_time = end_time - start_time
+        return pod
+
+    def replace_service_selector(
+        self, new_selectors: list[str], service_name: str, namespace: str
+    ) -> Optional[dict[Any]]:
+        """
+        Replaces a service selector with one or more new selectors
+        Patching the target service
+
+        :param new_selectors: a list of selectors in the format "key=value"
+        :param service_name: the service name that needs to be patched
+        :param namespace: the namespace of the service
+
+        :return: the original service spec
+            (useful to restore it after the scenario)
+            returns None if self.api_client hasn't been initialized
+        """
+
+        if self.api_client:
+            try:
+                service = self.cli.read_namespaced_service(
+                    service_name, namespace
+                )
+            except ApiException:
+                logging.error(f"{service_name} not found in {namespace}")
+                return None
+            original_service = self.api_client.sanitize_for_serialization(
+                service
+            )
+
+            splitted_selectors = [
+                s.split("=") for s in new_selectors if len(s.split("=")) == 2
+            ]
+            selectors = {}
+            for selector in splitted_selectors:
+                selectors[selector[0]] = selector[1]
+
+            if len(splitted_selectors) == 0:
+                return None
+            try:
+                body = [
+                    {
+                        "op": "replace",
+                        "path": "/spec/selector",
+                        "value": selectors,
+                    }
+                ]
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = self.api_client.select_header_accept(
+                    ["application/json"]
+                )
+                header_params["Content-Type"] = (
+                    self.api_client.select_header_accept(
+                        ["application/json-patch+json"]
+                    )
+                )
+
+                path = (
+                    f"/api/v1/namespaces/{namespace}/services/"
+                    f"{service_name}"
+                )
+                self.api_client.call_api(
+                    path,
+                    "PATCH",
+                    path_params,
+                    query_params,
+                    header_params,
+                    body=body,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+
+            except ApiException as e:
+                logging.error(
+                    f"Failed to patch service, "
+                    f"Kubernetes Api Exception: {str(e)}"
+                )
+                raise e
+            if "status" in original_service:
+                original_service.pop("status")
+            if "managedFields" in original_service["metadata"]:
+                original_service["metadata"].pop("managedFields")
+            if "annotations" in original_service["metadata"]:
+                original_service["metadata"].pop("annotations")
+            if "creationTimestamp" in original_service["metadata"]:
+                original_service["metadata"].pop("creationTimestamp")
+            if "resourceVersion" in original_service["metadata"]:
+                original_service["metadata"].pop("resourceVersion")
+            if "uid" in original_service["metadata"]:
+                original_service["metadata"].pop("uid")
+            return original_service
+
+        else:
+            return None
+
+    def deploy_service_hijacking(
+        self,
+        namespace: str,
+        plan: dict[any],
+        image: str,
+        port_number: int = 5000,
+        port_name: str = "flask",
+        stats_route: str = "/stats",
+    ) -> ServiceHijacking:
+        """
+        Deploys a pod running the service-hijacking webservice
+        along with the test plan deployed in krkn stored in a
+        ConfigMap and bound as a file to the container
+
+        :param namespace: The namespace where the Pod and the
+            ConfigMap will be deployed
+        :param plan: the dictionary converted test plan to be
+            executed in the service
+        :param image: the image container image of the service
+        :param port_number: the port where the pod will be listening
+            default 5000
+        :param port_name: the port name if the Service is pointing to
+            a string name instead of a port number
+        :param stats_route: overrides the defautl route where the stats
+            action will be mapped, change it only if you have a /stats
+            route in your test_plan
+        :return: a structure containing all the infos of the
+            Pod and the ConfigMap deployment
+        """
+        pod_name = f"service-hijacking-pod-{get_random_string(5)}"
+        config_map_name = f"service-hijacking-cm-{get_random_string(5)}"
+        selector_key = "service-hijacking"
+        selector_value = f"sh-{get_random_string(5)}"
+
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        config_map_template = env.get_template(
+            "service_hijacking_config_map.j2"
+        )
+        plan_dump = yaml.dump(plan)
+        cm_body = yaml.safe_load(
+            config_map_template.render(
+                name=config_map_name, namespace=namespace, plan=plan_dump
+            )
+        )
+        self.cli.create_namespaced_config_map(
+            namespace=namespace, body=cm_body
+        )
+
+        pod_template = env.get_template("service_hijacking_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                selector_key=selector_key,
+                selector_value=selector_value,
+                image=image,
+                port_name=port_name,
+                config_map_name=config_map_name,
+                port_number=port_number,
+                stats_route=stats_route,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)
+
+        return ServiceHijacking(
+            pod_name=pod_name,
+            namespace=namespace,
+            selector="=".join([selector_key, selector_value]),
+            config_map_name=config_map_name,
+        )
+
+    def undeploy_service_hijacking(self, service_infos: ServiceHijacking):
+        """
+        Undeploys the resource created for the ServiceHijacking Scenario
+
+        :param service_infos: the structure returned by the
+            deploy_service_hijacking method
+        """
+        self.delete_pod(service_infos.pod_name, service_infos.namespace)
+        self.cli.delete_namespaced_config_map(
+            service_infos.config_map_name, service_infos.namespace
+        )
+
+    def service_exists(self, service_name: str, namespace: str) -> bool:
+        """
+        Checks wheter a kubernetes Service exist or not
+        :param service_name: the name of the service to check
+        :param namespace: the namespace where the service should exist
+        :return: True if the service exists, False if not
+        """
+        try:
+            _ = self.cli.read_namespaced_service(service_name, namespace)
+            return True
+        except ApiException:
+            return False
+
+    def deploy_syn_flood(
+        self,
+        pod_name: str,
+        namespace: str,
+        image: str,
+        target: str,
+        target_port: int,
+        packet_size: int,
+        window_size: int,
+        duration: int,
+        node_selectors: dict[str, list[str]],
+    ):
+        """
+        Deploys a Pod to run the Syn Flood scenario
+
+        :param pod_name: The name of the pod that will be deployed
+        :param namespace: The namespace where the pod will be deployed
+        :param image: the syn flood scenario container image
+        :param target: the target hostname or ip address
+        :param target_port: the target TCP port
+        :param packet_size: the SYN packet size in bytes
+        :param window_size: the TCP window size in bytes
+        :param duration: the duration of the flood in seconds
+        :param node_selectors: the node selectors of the node(s) where
+            the pod will be scheduled by kubernetes
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        pod_template = env.get_template("syn_flood_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                has_node_selectors=len(node_selectors.keys()) > 0,
+                node_selectors=node_selectors,
+                image=image,
+                target=target,
+                duration=duration,
+                target_port=target_port,
+                packet_size=packet_size,
+                window_size=window_size,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)

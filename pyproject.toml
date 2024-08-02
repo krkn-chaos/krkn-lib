@@ -10,8 +10,8 @@ homepage = "https://github.com/redhat-chaos/krkn"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-kubernetes ="26.1.0"
-arcaflow-lib-kubernetes="0.1.2"
+kubernetes ="28.1.0"
+arcaflow-lib-kubernetes="^0.2.1"
 sphinxnotes-markdown-builder="^0.5.6"
 requests="^2.29.0"
 kubeconfig = "^1.1.1"
@@ -19,9 +19,10 @@ base64io = "^1.0.3"
 sphinx-rtd-theme = "^1.2.2"
 tzlocal = "5.1"
 pytz = "^2023.3"
-PyYAML = "6.0"
+PyYAML = "6.0.1"
 prometheus-api-client = "^0.5.4"
-elasticsearch = "7.13.4"
+elasticsearch = "8.14.0"
+elasticsearch-dsl = "8.14.0"
 wheel = "^0.42.0"
 cython = "3.0"
 
@@ -56,4 +57,3 @@ exclude = '''
 [build-system]
 requires = ["poetry-core>=1.1.0"]
 build-backend = "poetry.core.masonry.api"
-

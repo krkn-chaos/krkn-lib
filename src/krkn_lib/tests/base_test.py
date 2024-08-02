@@ -1,8 +1,11 @@
+import cProfile
 import logging
+import os
 import random
 import string
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from typing import Dict, List
@@ -14,6 +17,7 @@ from kubernetes import config
 from kubernetes.client.rest import ApiException
 from requests import ConnectTimeout
 
+from krkn_lib.elastic.krkn_elastic import KrknElastic
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.k8s import KrknTelemetryKubernetes
@@ -26,9 +30,18 @@ class BaseTest(unittest.TestCase):
     lib_ocp: KrknOpenshift
     lib_telemetry_k8s: KrknTelemetryKubernetes
     lib_telemetry_ocp: KrknTelemetryOpenshift
+    lib_elastic: KrknElastic
+    pr: cProfile.Profile
 
     @classmethod
     def setUpClass(cls):
+        cls.lib_elastic = KrknElastic(
+            SafeLogger(),
+            os.getenv("ELASTIC_URL"),
+            int(os.getenv("ELASTIC_PORT")),
+            username=os.getenv("ELASTIC_USER"),
+            password=os.getenv("ELASTIC_PASSWORD"),
+        )
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
@@ -39,6 +52,11 @@ class BaseTest(unittest.TestCase):
         )
         host = cls.lib_k8s.api_client.configuration.host
         logging.disable(logging.CRITICAL)
+        # PROFILER
+        # """init each test"""
+        # cls.pr = cProfile.Profile()
+        # cls.pr.enable()
+        # print("\n<<<---")
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:
@@ -53,6 +71,14 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        # PROFILER
+        # """finish any test"""
+        # p = Stats(cls.pr)
+        # p.strip_dirs()
+        # p.sort_stats("cumtime")
+        # p.print_stats()
+        # print
+        # "\n--->>>"
         pass
 
     def wait_pod(
@@ -105,6 +131,43 @@ class BaseTest(unittest.TestCase):
         environment = Environment(loader=FileSystemLoader("src/testdata/"))
         template = environment.get_template("alpine.j2")
         content = template.render(name=name, namespace=namespace)
+        self.apply_template(content)
+
+    def deploy_nginx(
+        self,
+        namespace: str,
+        pod_name: str = "nginx",
+        service_name: str = "nginx",
+    ):
+        env = Environment(loader=FileSystemLoader("src/testdata/"))
+        pod_template = env.get_template("nginx-test-pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                pod_name=pod_name,
+                service_name=service_name,
+                namespace=namespace,
+            )
+        )
+        service_template = env.get_template("nginx-test-service.j2")
+        service_body = yaml.safe_load(
+            service_template.render(
+                service_name=service_name,
+                namespace=namespace,
+            )
+        )
+        self.lib_k8s.create_pod(namespace=namespace, body=pod_body)
+        self.lib_k8s.cli.create_namespaced_service(
+            body=service_body, namespace=namespace
+        )
+
+    def deploy_delayed_readiness_pod(
+        self, name: str, namespace: str, delay: int, label: str = "readiness"
+    ):
+        environment = Environment(loader=FileSystemLoader("src/testdata/"))
+        template = environment.get_template("delayed_readiness_pod.j2")
+        content = template.render(
+            name=name, namespace=namespace, delay=delay, label=label
+        )
         self.apply_template(content)
 
     def deploy_persistent_volume(
@@ -218,6 +281,20 @@ class BaseTest(unittest.TestCase):
         except Exception:
             return False
 
+    def create_networkpolicy(self, name: str, namespace: str = "default"):
+        """
+        Create a network policy in a namespace
+
+        :param name: network policy name
+        :param namespace: namespace (optional default `default`),
+            `Note:` if namespace is specified in the body won't
+            override
+        """
+        content = self.file_to_template("net-policy.j2", name, namespace)
+
+        dep = yaml.safe_load(content)
+        self.lib_k8s.create_net_policy(dep, namespace)
+
     def create_deployment(self, name: str, namespace: str = "default"):
         """
         Create a deployment in a namespace
@@ -230,8 +307,8 @@ class BaseTest(unittest.TestCase):
         content = self.file_to_template("deployment.j2", name, namespace)
 
         dep = yaml.safe_load(content)
-        self.lib_k8s.apps_api.create_namespaced_deployment(
-            body=dep, namespace=namespace
+        self.lib_k8s.create_obj(
+            dep, namespace, self.lib_k8s.apps_api.create_namespaced_deployment
         )
 
     def create_daemonset(self, name: str, namespace: str = "default"):
@@ -348,3 +425,68 @@ class BaseTest(unittest.TestCase):
                 str(e),
             )
             raise e
+
+    def background_delete_pod(self, pod_name: str, namespace: str):
+        thread = threading.Thread(
+            target=self.lib_k8s.delete_pod, args=(pod_name, namespace)
+        )
+        thread.daemon = True
+        thread.start()
+
+    def get_ChaosRunTelemetry_json(self, run_uuid: str) -> dict:
+        example_data = {
+            "scenarios": [
+                {
+                    "start_timestamp": 1628493021.0,
+                    "end_timestamp": 1628496621.0,
+                    "scenario": "example_scenario.yaml",
+                    "exit_status": 0,
+                    "parameters_base64": "",
+                    "parameters": {
+                        "parameter_1": "test",
+                        "parameter_2": "test",
+                        "parameter_3": {"sub_parameter_1": "test"},
+                    },
+                    "affected_pods": {
+                        "recovered": [
+                            {
+                                "pod_name": "pod1",
+                                "namespace": "default",
+                                "total_recovery_time": 10.0,
+                                "pod_readiness_time": 5.0,
+                                "pod_rescheduling_time": 2.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"pod_name": "pod2", "namespace": "default"}
+                        ],
+                        "error": "some error",
+                    },
+                }
+            ],
+            "node_summary_infos": [
+                {
+                    "count": 5,
+                    "architecture": "aarch64",
+                    "instance_type": "m2i.xlarge",
+                    "kernel_version": "5.4.0-66-generic",
+                    "kubelet_version": "v2.1.2",
+                    "os_version": "Linux",
+                }
+            ],
+            "node_taints": [
+                {
+                    "key": "node.kubernetes.io/unreachable",
+                    "value": "NoExecute",
+                    "effect": "NoExecute",
+                }
+            ],
+            "kubernetes_objects_count": {"Pod": 5, "Service": 2},
+            "network_plugins": ["Calico"],
+            "timestamp": "2023-05-22T14:55:02Z",
+            "total_node_count": 3,
+            "cloud_infrastructure": "AWS",
+            "cloud_type": "EC2",
+            "run_uuid": run_uuid,
+        }
+        return example_data

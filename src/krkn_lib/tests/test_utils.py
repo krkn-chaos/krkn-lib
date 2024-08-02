@@ -9,13 +9,14 @@ import yaml
 import krkn_lib.utils as utils
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import (
-    deep_set_attribute,
-    filter_log_line,
-    get_yaml_item_value,
     check_date_in_localized_interval,
+    deep_set_attribute,
     filter_dictionary,
+    filter_log_line,
     find_executable_in_path,
     get_random_string,
+    get_yaml_item_value,
+    is_host_reachable,
 )
 
 
@@ -316,3 +317,9 @@ class UtilFunctionTests(BaseTest):
         string_one = get_random_string(10)
         string_two = get_random_string(10)
         self.assertNotEquals(string_one, string_two)
+
+    def test_is_host_reachable(self):
+        self.assertTrue(is_host_reachable("www.google.com", 443))
+        self.assertFalse(
+            is_host_reachable(f"{get_random_string(10)}.com", 12345)
+        )

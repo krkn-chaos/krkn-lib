@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import os
 import random
 import re
@@ -7,15 +8,16 @@ import tempfile
 import time
 import unittest
 import uuid
+
 import yaml
-import logging
+from jinja2 import Environment, FileSystemLoader
 from kubernetes import config
 from kubernetes.client import ApiException
-from jinja2 import Environment, FileSystemLoader
+from tzlocal import get_localzone
+
 from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
-from tzlocal import get_localzone
 
 
 class KrknKubernetesTests(BaseTest):
@@ -368,6 +370,18 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
+
+    def test_net_policy(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test"
+        self.deploy_namespace(namespace, [])
+        self.create_networkpolicy(name, namespace)
+        np = self.lib_k8s.get_namespaced_net_policy(namespace=namespace)
+        self.assertTrue(len(np) == 1)
+        self.lib_k8s.delete_net_policy(name, namespace)
+        np = self.lib_k8s.get_namespaced_net_policy(namespace=namespace)
+        self.assertTrue(len(np) == 0)
+        self.lib_k8s.delete_namespace(namespace)
 
     def test_delete_deployment(self):
         namespace = "test-" + self.get_random_string(10)
@@ -739,15 +753,16 @@ class KrknKubernetesTests(BaseTest):
 
     def test_get_nodes_infos(self):
         telemetry = ChaosRunTelemetry()
-        nodes = self.lib_k8s.get_nodes_infos()
+        nodes, _ = self.lib_k8s.get_nodes_infos()
         for node in nodes:
+            self.assertTrue(node.count > 0)
             self.assertTrue(node.node_type)
             self.assertTrue(node.architecture)
             self.assertTrue(node.instance_type)
             self.assertTrue(node.os_version)
             self.assertTrue(node.kernel_version)
             self.assertTrue(node.kubelet_version)
-            telemetry.node_infos.append(node)
+            telemetry.node_summary_infos.append(node)
         try:
             _ = telemetry.to_json()
         except Exception:
@@ -854,6 +869,506 @@ class KrknKubernetesTests(BaseTest):
             "do_not_exists", "do_not_exists"
         )
         self.assertIsNone(not_token)
+
+    def test_is_terminating(self):
+        namespace = "test-ns-" + self.get_random_string(10)
+        terminated = "terminated-" + self.get_random_string(10)
+        not_terminated = "not-terminated-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(terminated, namespace, 0)
+        self.background_delete_pod(terminated, namespace)
+        time.sleep(3)
+        self.assertTrue(self.lib_k8s.is_pod_terminating(terminated, namespace))
+        self.deploy_delayed_readiness_pod(not_terminated, namespace, 10)
+        self.assertFalse(
+            self.lib_k8s.is_pod_terminating(not_terminated, namespace)
+        )
+
+    def test_monitor_pods_by_label_no_pods_affected(self):
+        # test no pods affected
+        namespace = "test-ns-0-" + self.get_random_string(10)
+        delayed_1 = "delayed-0-" + self.get_random_string(10)
+        delayed_2 = "delayed-0-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(delayed_1, namespace) or (
+            not self.lib_k8s.is_pod_running(delayed_2, namespace)
+        ):
+            time.sleep(1)
+            continue
+
+        monitor_timeout = 2
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        start_time = time.time()
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}", pods_and_namespaces, monitor_timeout
+        )
+
+        result = pods_thread.join()
+        end_time = time.time() - start_time
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        # added half second of delay that might be introduced to API
+        # calls
+        self.assertTrue(monitor_timeout < end_time < monitor_timeout + 0.5)
+        self.assertIsNone(result.error)
+        self.assertEqual(len(result.recovered), 0)
+        self.assertEqual(len(result.unrecovered), 0)
+
+    def test_pods_by_name_and_namespace_pattern_different_names_respawn(
+        self,
+    ):
+        # test pod with different name recovered
+        namespace = "test-ns-1-" + self.get_random_string(10)
+        delayed_1 = "delayed-1-" + self.get_random_string(10)
+        delayed_2 = "delayed-1-" + self.get_random_string(10)
+        delayed_respawn = "delayed-1-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        pod_delay = 1
+        monitor_timeout = 10
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        pods_and_namespaces = (
+            self.lib_k8s.select_pods_by_name_pattern_and_namespace_pattern(
+                "^delayed-1-.*", "^test-ns-1-.*"
+            )
+        )
+
+        pods_thread = (
+            self.lib_k8s.monitor_pods_by_name_pattern_and_namespace_pattern(
+                "^delayed-1-.*",
+                "^test-ns-1-.*",
+                pods_and_namespaces,
+                monitor_timeout,
+            )
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn, namespace, pod_delay, label
+        )
+
+        result = pods_thread.join()
+        self.assertIsNone(result.error)
+        self.background_delete_pod(delayed_respawn, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.assertEqual(len(result.recovered), 1)
+        self.assertEqual(result.recovered[0].pod_name, delayed_respawn)
+        self.assertEqual(result.recovered[0].namespace, namespace)
+        self.assertTrue(result.recovered[0].pod_readiness_time > 0)
+        self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
+        self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
+        self.assertEqual(len(result.unrecovered), 0)
+
+    def test_pods_by_namespace_pattern_and_label_same_name_respawn(
+        self,
+    ):
+        # not working
+        # test pod with same name recovered
+        namespace = "test-ns-2-" + self.get_random_string(10)
+        delayed_1 = "delayed-2-" + self.get_random_string(10)
+        delayed_2 = "delayed-2-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        monitor_timeout = 45
+        pod_delay = 1
+        pods_and_namespaces = (
+            self.lib_k8s.select_pods_by_namespace_pattern_and_label(
+                "^test-ns-2-.*", f"test={label}"
+            )
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_namespace_pattern_and_label(
+            "^test-ns-2-.*",
+            f"test={label}",
+            pods_and_namespaces,
+            monitor_timeout,
+        )
+
+        self.lib_k8s.delete_pod(delayed_1, namespace)
+        self.deploy_delayed_readiness_pod(
+            delayed_1, namespace, pod_delay, label
+        )
+
+        result = pods_thread.join()
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.assertIsNone(result.error)
+        self.assertEqual(len(result.recovered), 1)
+        self.assertEqual(result.recovered[0].pod_name, delayed_1)
+        self.assertEqual(result.recovered[0].namespace, namespace)
+        self.assertTrue(result.recovered[0].pod_readiness_time > 0)
+        self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
+        self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
+        self.assertEqual(len(result.unrecovered), 0)
+
+    def test_pods_by_label_respawn_timeout(self):
+        # test pod will not recover before the timeout
+        namespace = "test-ns-3-" + self.get_random_string(10)
+        delayed_1 = "delayed-3-" + self.get_random_string(10)
+        delayed_2 = "delayed-3-" + self.get_random_string(10)
+        delayed_respawn = "delayed-respawn-3-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        monitor_timeout = 20
+        pod_delay = 30
+        # pod with same name recovered
+
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}",
+            pods_and_namespaces,
+            monitor_timeout,
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn, namespace, pod_delay, label
+        )
+
+        result = pods_thread.join()
+        self.assertIsNone(result.error)
+        self.assertEqual(len(result.unrecovered), 1)
+        self.assertEqual(result.unrecovered[0].pod_name, delayed_respawn)
+        self.assertEqual(result.unrecovered[0].namespace, namespace)
+        self.assertEqual(len(result.recovered), 0)
+        self.background_delete_pod(delayed_respawn, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+
+    def test_pods_by_label_never_respawn(self):
+        # test pod will never recover
+        namespace = "test-ns-4-" + self.get_random_string(10)
+        delayed_1 = "delayed-4-" + self.get_random_string(10)
+        delayed_2 = "delayed-4-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        monitor_timeout = 7
+
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}", pods_and_namespaces, monitor_timeout
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+
+        result = pods_thread.join()
+        self.assertIsNotNone(result.error)
+        self.background_delete_pod(delayed_2, namespace)
+
+    def test_pods_by_label_multiple_respawn(self):
+        # test pod will never recover
+        namespace = "test-ns-4-" + self.get_random_string(10)
+        delayed_1 = "delayed-4-" + self.get_random_string(10)
+        delayed_2 = "delayed-4-" + self.get_random_string(10)
+        delayed_3 = "delayed-4-" + self.get_random_string(10)
+        delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
+        delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
+        monitor_timeout = 20
+        pod_delay = 2
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}", pods_and_namespaces, monitor_timeout
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_1, namespace, pod_delay, label
+        )
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_2, namespace, pod_delay, label
+        )
+
+        result = pods_thread.join()
+        self.background_delete_pod(delayed_3, namespace)
+        self.background_delete_pod(delayed_respawn_1, namespace)
+        self.background_delete_pod(delayed_respawn_2, namespace)
+        self.assertIsNone(result.error)
+        self.assertEqual(len(result.unrecovered), 0)
+        self.assertEqual(len(result.recovered), 2)
+        self.assertTrue(
+            delayed_respawn_1 in [p.pod_name for p in result.recovered]
+        )
+        self.assertTrue(
+            delayed_respawn_2 in [p.pod_name for p in result.recovered]
+        )
+
+    def test_pods_by_label_multiple_respawn_one_too_late(self):
+        # test pod will never recover
+        namespace = "test-ns-4-" + self.get_random_string(10)
+        delayed_1 = "delayed-4-" + self.get_random_string(10)
+        delayed_2 = "delayed-4-" + self.get_random_string(10)
+        delayed_3 = "delayed-4-" + self.get_random_string(10)
+        delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
+        delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
+        monitor_timeout = 20
+        pod_delay = 2
+        pod_too_much_delay = 25
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}", pods_and_namespaces, monitor_timeout
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_1, namespace, pod_delay, label
+        )
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_2, namespace, pod_too_much_delay, label
+        )
+
+        result = pods_thread.join()
+        self.background_delete_pod(delayed_3, namespace)
+        self.background_delete_pod(delayed_respawn_1, namespace)
+        self.background_delete_pod(delayed_respawn_2, namespace)
+        self.assertIsNone(result.error)
+        self.assertEqual(len(result.unrecovered), 1)
+        self.assertEqual(len(result.recovered), 1)
+        self.assertTrue(
+            delayed_respawn_1 in [p.pod_name for p in result.recovered]
+        )
+        self.assertTrue(
+            delayed_respawn_2 in [p.pod_name for p in result.unrecovered]
+        )
+
+    def test_pods_by_label_multiple_respawn_one_fails(self):
+        # test pod will never recover
+        namespace = "test-ns-4-" + self.get_random_string(10)
+        delayed_1 = "delayed-4-" + self.get_random_string(10)
+        delayed_2 = "delayed-4-" + self.get_random_string(10)
+        delayed_3 = "delayed-4-" + self.get_random_string(10)
+        delayed_respawn_1 = "delayed-4-respawn-" + self.get_random_string(10)
+        delayed_respawn_2 = "delayed-4-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_3, namespace, 0, label)
+        monitor_timeout = 5
+        pod_delay = 2
+        pods_and_namespaces = self.lib_k8s.select_pods_by_label(
+            f"test={label}"
+        )
+        pods_thread = self.lib_k8s.monitor_pods_by_label(
+            f"test={label}", pods_and_namespaces, monitor_timeout
+        )
+
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_1, namespace, pod_delay, label
+        )
+
+        result = pods_thread.join()
+        self.background_delete_pod(delayed_3, namespace)
+        self.background_delete_pod(delayed_respawn_1, namespace)
+        self.background_delete_pod(delayed_respawn_2, namespace)
+        self.assertIsNotNone(result.error)
+        self.assertEqual(len(result.unrecovered), 0)
+        self.assertEqual(len(result.recovered), 0)
+
+    def test_replace_service_selector(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_service(name, namespace)
+        self.lib_k8s.replace_service_selector(
+            ["app=selector", "test=replace"], name, namespace
+        )
+
+        service = self.lib_k8s.cli.read_namespaced_service(name, namespace)
+        sanitized_service = self.lib_k8s.api_client.sanitize_for_serialization(
+            service
+        )
+        self.assertEqual(len(sanitized_service["spec"]["selector"].keys()), 2)
+        self.assertTrue("app" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["app"], "selector"
+        )
+        self.assertTrue("test" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["test"], "replace"
+        )
+
+        # test None result with non-existent service
+
+        none_result = self.lib_k8s.replace_service_selector(
+            ["app=selector"], "doesnotexist", "doesnotexist"
+        )
+        self.assertIsNone(none_result)
+
+        # test None result with empty selector list
+        none_result = self.lib_k8s.replace_service_selector(
+            [], name, namespace
+        )
+        self.assertIsNone(none_result)
+
+        # test selector validation (bad_selector will be ignored)
+        self.lib_k8s.replace_service_selector(
+            ["bad_selector", "good=selector"], name, namespace
+        )
+        service = self.lib_k8s.cli.read_namespaced_service(name, namespace)
+        sanitized_service = self.lib_k8s.api_client.sanitize_for_serialization(
+            service
+        )
+        self.assertEqual(len(sanitized_service["spec"]["selector"].keys()), 1)
+        self.assertTrue("good" in sanitized_service["spec"]["selector"])
+        self.assertEqual(
+            sanitized_service["spec"]["selector"]["good"], "selector"
+        )
+
+    def test_deploy_undeploy_service_hijacking(self):
+        # test deploy
+        namespace = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        with open("src/testdata/service_hijacking_test_plan.yaml") as stream:
+            plan = yaml.safe_load(stream)
+
+        service_infos = self.lib_k8s.deploy_service_hijacking(
+            namespace,
+            plan,
+            "quay.io/redhat-chaos/krkn-service-hijacking:v0.1.0",
+        )
+
+        self.assertIsNotNone(service_infos)
+        self.assertIsNotNone(service_infos.config_map_name)
+        self.assertIsNotNone(service_infos.selector)
+        self.assertIsNotNone(service_infos.pod_name)
+        self.assertIsNotNone(service_infos.namespace)
+
+        pod_infos = self.lib_k8s.get_pod_info(
+            service_infos.pod_name, service_infos.namespace
+        )
+        config_map_infos = self.lib_k8s.cli.read_namespaced_config_map(
+            service_infos.config_map_name, service_infos.namespace
+        )
+        self.assertIsNotNone(pod_infos)
+        self.assertIsNotNone(config_map_infos)
+
+        # test undeploy
+        self.lib_k8s.undeploy_service_hijacking(service_infos)
+
+        pod_infos = self.lib_k8s.get_pod_info(
+            service_infos.pod_name, service_infos.namespace
+        )
+
+        self.assertIsNone(pod_infos)
+        with self.assertRaises(ApiException):
+            self.lib_k8s.cli.read_namespaced_config_map(
+                service_infos.config_map_name, service_infos.namespace
+            )
+
+    def test_service_exists(self):
+        namespace = "test-" + self.get_random_string(10)
+        name = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_service(name, namespace)
+        self.assertTrue(self.lib_k8s.service_exists(name, namespace))
+        self.assertFalse(
+            self.lib_k8s.service_exists("doesnotexist", "doesnotexist")
+        )
+
+    def test_deploy_syn_flood(self):
+        namespace = "test-" + self.get_random_string(10)
+        syn_flood_pod_name = "krkn-syn-flood-" + self.get_random_string(10)
+        nginx_pod_name = "nginx-test-pod-" + self.get_random_string(10)
+        service_name = "nginx-test-service" + self.get_random_string(10)
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_nginx(
+            namespace=namespace,
+            pod_name=nginx_pod_name,
+            service_name=service_name,
+        )
+        count = 0
+        while not self.lib_k8s.is_pod_running(nginx_pod_name, namespace):
+            time.sleep(3)
+            if count > 20:
+                self.assertTrue(
+                    False, "container is not running after 20 retries"
+                )
+            count += 1
+            continue
+        test_duration = 10
+        self.lib_k8s.deploy_syn_flood(
+            pod_name=syn_flood_pod_name,
+            namespace=namespace,
+            image="quay.io/krkn-chaos/krkn-syn-flood",
+            target=service_name,
+            target_port=80,
+            packet_size=120,
+            window_size=64,
+            duration=test_duration,
+            node_selectors={},
+        )
+
+        start = time.time()
+        end = 0
+        while self.lib_k8s.is_pod_running(syn_flood_pod_name, namespace):
+            end = time.time()
+            continue
+        # using assertAlmostEqual with delta because the is_pod_running check
+        # introduces some latency due to the api calls that makes difficult
+        # to record the test duration with sufficient accuracy
+        self.assertAlmostEqual(
+            first=end - start,
+            second=test_duration,
+            places=None,
+            delta=1.7,
+        )
+
+    def test_select_services_by_label(self):
+        namespace = "test-" + self.get_random_string(10)
+        service_name_1 = "krkn-syn-flood-" + self.get_random_string(10)
+        service_name_2 = "krkn-syn-flood-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_service(service_name_1, namespace)
+        self.deploy_service(service_name_2, namespace)
+        service = self.lib_k8s.select_service_by_label(
+            namespace, "test=service"
+        )
+        self.assertEqual(len(service), 2)
+
+        self.assertTrue(service_name_1 in service)
+        self.assertTrue(service_name_2 in service)
+
+        service = self.lib_k8s.select_service_by_label(namespace, "not=found")
+        self.assertEqual(len(service), 0)
 
 
 if __name__ == "__main__":

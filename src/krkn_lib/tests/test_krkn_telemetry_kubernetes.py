@@ -5,9 +5,11 @@ import tempfile
 import time
 import unittest
 import uuid
+
 import boto3
 import yaml
 
+from krkn_lib.models.krkn import ChaosRunAlert, ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from krkn_lib.tests import BaseTest
 
@@ -27,7 +29,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
         input_file_yaml_orig = yaml.safe_load(input_file_data_orig)
         input_file_yaml_processed = yaml.safe_load(
             base64.b64decode(
-                scenario_telemetry.parametersBase64.encode()
+                scenario_telemetry.parameters_base64.encode()
             ).decode()
         )
 
@@ -71,7 +73,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
         prometheus_pod_name = "fedtools"
         prometheus_container_name = "fedtools"
         prometheus_namespace = namespace
-        bucket_folder = f"test_folder/{int(time.time())}"
+        bucket_folder = f"{int(time.time())}"
         workdir_basepath = os.getenv("TEST_WORKDIR")
         workdir = self.get_random_string(10)
         test_workdir = os.path.join(workdir_basepath, workdir)
@@ -162,10 +164,11 @@ class KrknTelemetryKubernetesTests(BaseTest):
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
             "backup_threads": 6,
             "archive_path": test_workdir,
             "prometheus_backup": "True",
+            "telemetry_group": "default",
         }
 
         file_list = self.lib_k8s.archive_and_get_path_from_pod(
@@ -186,22 +189,23 @@ class KrknTelemetryKubernetesTests(BaseTest):
         bucket_name = os.getenv("BUCKET_NAME")
         self.assertTrue(bucket_name)
         remote_files = s3.list_objects_v2(
-            Bucket=bucket_name, Prefix=bucket_folder
+            Bucket=bucket_name,
+            Prefix=f'{telemetry_config["telemetry_group"]}/{bucket_folder}',
         )
         self.assertEqual(len(remote_files["Contents"]), len(file_list))
 
     def test_collect_cluster_metadata(self):
         chaos_telemetry = ChaosRunTelemetry()
-        self.assertEqual(len(chaos_telemetry.node_infos), 0)
-        self.assertEqual(chaos_telemetry.node_count, 0)
+        self.assertEqual(len(chaos_telemetry.node_summary_infos), 0)
+        self.assertEqual(chaos_telemetry.total_node_count, 0)
         self.assertEqual(
             len(chaos_telemetry.kubernetes_objects_count.keys()), 0
         )
         self.assertEqual(len(chaos_telemetry.network_plugins), 1)
         self.assertEqual(chaos_telemetry.network_plugins[0], "Unknown")
         self.lib_telemetry_k8s.collect_cluster_metadata(chaos_telemetry)
-        self.assertNotEqual(len(chaos_telemetry.node_infos), 0)
-        self.assertNotEqual(chaos_telemetry.node_count, 0)
+        self.assertNotEqual(len(chaos_telemetry.node_summary_infos), 0)
+        self.assertNotEqual(chaos_telemetry.total_node_count, 0)
         self.assertNotEqual(
             len(chaos_telemetry.kubernetes_objects_count.keys()), 0
         )
@@ -213,11 +217,12 @@ class KrknTelemetryKubernetesTests(BaseTest):
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
             "backup_threads": 6,
             "archive_path": request_id,
             "prometheus_backup": "True",
             "enabled": True,
+            "telemetry_group": "default",
         }
         chaos_telemetry = ChaosRunTelemetry()
         self.lib_telemetry_k8s.collect_cluster_metadata(chaos_telemetry)
@@ -231,11 +236,13 @@ class KrknTelemetryKubernetesTests(BaseTest):
 
         bucket_name = os.getenv("BUCKET_NAME")
         remote_files = s3.list_objects_v2(
-            Bucket=bucket_name, Prefix=request_id
+            Bucket=bucket_name,
+            Prefix=f'{telemetry_config["telemetry_group"]}/{request_id}',
         )
         self.assertTrue("Contents" in remote_files.keys())
         self.assertEqual(
             remote_files["Contents"][0]["Key"],
+            f'{telemetry_config["telemetry_group"]}/'
             f"{request_id}/telemetry.json",
         )
 
@@ -246,8 +253,9 @@ class KrknTelemetryKubernetesTests(BaseTest):
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
             "backup_threads": 6,
+            "telemetry_group": "default",
         }
         now = datetime.datetime.now()
         one_hour_ago = now - datetime.timedelta(hours=1)
@@ -262,25 +270,59 @@ class KrknTelemetryKubernetesTests(BaseTest):
         bucket_name = os.getenv("BUCKET_NAME")
         s3 = boto3.client("s3")
         remote_files = s3.list_objects_v2(
-            Bucket=bucket_name, Prefix=request_id
+            Bucket=bucket_name,
+            Prefix=f'{telemetry_config["telemetry_group"]}/{request_id}',
         )
         self.assertTrue("Contents" in remote_files.keys())
         self.assertEqual(
             remote_files["Contents"][0]["Key"],
+            f'{telemetry_config["telemetry_group"]}/'
             f"{request_id}/events-00.json",
         )
 
+    def test_put_alerts(self):
+        request_id = f"test_folder/{int(time.time())}"
+        telemetry_config = {
+            "events_backup": True,
+            "username": os.getenv("API_USER"),
+            "password": os.getenv("API_PASSWORD"),
+            "max_retries": 5,
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
+            "backup_threads": 6,
+            "telemetry_group": "default",
+        }
+        summary = ChaosRunAlertSummary()
+        alert = ChaosRunAlert("testAlert", "testState", "default", "critical")
+        summary.chaos_alerts.append(alert)
+        self.lib_telemetry_k8s.put_critical_alerts(
+            request_id, telemetry_config, summary
+        )
+
+        bucket_name = os.getenv("BUCKET_NAME")
+        s3 = boto3.client("s3")
+        remote_files = s3.list_objects_v2(
+            Bucket=bucket_name,
+            Prefix=f'{telemetry_config["telemetry_group"]}/{request_id}',
+        )
+        self.assertTrue("Contents" in remote_files.keys())
+        self.assertEqual(
+            remote_files["Contents"][0]["Key"],
+            f'{telemetry_config["telemetry_group"]}/'
+            f"{request_id}/critical-alerts-00.log",
+        )
+
     def test_get_bucket_url_for_filename(self):
-        test_workdir = f"test_folder/{int(time.time())}"
+        test_workdir = f"default/test_folder/{int(time.time())}"
         telemetry_config = {
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
             "backup_threads": 6,
             "archive_path": test_workdir,
             "prometheus_backup": "True",
             "enabled": True,
+            "telemetry_group": "default",
         }
         with tempfile.NamedTemporaryFile() as file:
             file_content = self.get_random_string(100).encode("utf-8")

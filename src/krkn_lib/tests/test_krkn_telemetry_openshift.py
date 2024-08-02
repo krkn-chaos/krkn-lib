@@ -24,7 +24,7 @@ class KrknTelemetryOpenshiftTests(BaseTest):
             "username": os.getenv("API_USER"),
             "password": os.getenv("API_PASSWORD"),
             "max_retries": 5,
-            "api_url": "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production",  # NOQA
+            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
             "backup_threads": 6,
             "archive_path": test_workdir,
             "prometheus_backup": "True",
