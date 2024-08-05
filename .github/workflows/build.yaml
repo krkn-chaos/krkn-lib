@@ -75,6 +75,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ELASTIC_URL: ${{ secrets.ES_SERVER }}
+          ES_SERVER: ${{ secrets.ES_SERVER }}
 
         run: |
           export TEST_WORKDIR=`pwd`/`date +%s`
