@@ -6,7 +6,6 @@ from krkn_lib.tests import BaseTest
 
 
 class TestKrknElasticModels(BaseTest):
-
     def check_test_ElasticChaosRunTelemetry(
         self, elastic_telemetry: ElasticChaosRunTelemetry, run_uuid: str
     ):

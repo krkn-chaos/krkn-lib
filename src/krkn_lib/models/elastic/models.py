@@ -1,15 +1,16 @@
+import datetime
+
 from elasticsearch_dsl import (
-    Keyword,
-    Text,
     Date,
     Document,
     Float,
-    Long,
-    Nested,
     InnerDoc,
     Integer,
+    Keyword,
+    Long,
+    Nested,
+    Text,
 )
-import datetime
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 

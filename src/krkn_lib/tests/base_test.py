@@ -38,7 +38,6 @@ class BaseTest(unittest.TestCase):
         cls.lib_elastic = KrknElastic(
             SafeLogger(),
             os.getenv("ES_SERVER")
-            # int(os.getenv("ELASTIC_PORT")),
             # username=os.getenv("ELASTIC_USER"),
             # password=os.getenv("ELASTIC_PASSWORD"),
         )

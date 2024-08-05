@@ -1935,10 +1935,10 @@ class KrknKubernetes:
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            api_client.select_header_accept(
-                                ["application/json"]
-                            )
+                        header_params[
+                            "Accept"
+                        ] = api_client.select_header_accept(
+                            ["application/json"]
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
@@ -3083,10 +3083,10 @@ class KrknKubernetes:
                 header_params["Accept"] = self.api_client.select_header_accept(
                     ["application/json"]
                 )
-                header_params["Content-Type"] = (
-                    self.api_client.select_header_accept(
-                        ["application/json-patch+json"]
-                    )
+                header_params[
+                    "Content-Type"
+                ] = self.api_client.select_header_accept(
+                    ["application/json-patch+json"]
                 )
 
                 path = (

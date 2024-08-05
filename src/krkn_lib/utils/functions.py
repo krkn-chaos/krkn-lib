@@ -3,9 +3,9 @@ import logging
 import os
 import random
 import re
+import socket
 import string
 import sys
-import socket
 from queue import Queue
 from typing import Optional
 
