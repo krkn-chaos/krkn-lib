@@ -6,6 +6,7 @@ import time
 
 import math
 import urllib3
+
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch_dsl import Search
 
@@ -95,7 +96,7 @@ class KrknElastic:
     def upload_metrics_to_elasticsearch(
         self,
         run_uuid: str,
-        raw_data: list[dict[str, str | int | float]],
+        raw_data: list[dict[str, str | int | float ]],
         index: str,
     ) -> int:
         """
@@ -204,6 +205,7 @@ class KrknElastic:
                 "match", run_uuid=run_uuid
             )
             result = search.execute()
+            print('result' + str(result))
             documents = [
                 ElasticChaosRunTelemetry(**hit.to_dict()) for hit in result
             ]
