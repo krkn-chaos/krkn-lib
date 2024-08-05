@@ -74,10 +74,7 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+          ELASTIC_URL: ${{ secrets.ES_SERVER }}
 
         run: |
           export TEST_WORKDIR=`pwd`/`date +%s`
