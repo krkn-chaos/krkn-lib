@@ -46,8 +46,6 @@ class TestKrknElastic(BaseTest):
             self.assertTrue(str(e), "elastic search url is not valid")
     
     def testsearch_telemetry(self):
-    
-        elastic = KrknElastic(self.safe_logger, self.url)
 
         index = "chaos_test"
         
