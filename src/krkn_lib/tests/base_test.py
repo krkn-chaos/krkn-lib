@@ -432,6 +432,16 @@ class BaseTest(unittest.TestCase):
         thread.daemon = True
         thread.start()
 
+    def get_ChaosRunMetric_json(self, run_uuid: str) -> dict:
+        example_data = {
+                "created_at": 1628493021.0,
+                "timestamp": "2023-05-22T14:55:02Z",
+                "value": 13234.23,
+                "name": "test",
+                "run_uuid": run_uuid
+        }
+        return example_data
+
     def get_ChaosRunTelemetry_json(self, run_uuid: str) -> dict:
         example_data = {
             "scenarios": [
