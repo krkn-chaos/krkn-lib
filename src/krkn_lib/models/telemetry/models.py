@@ -242,6 +242,10 @@ class ChaosRunTelemetry:
     """
     Cloud infrastructure (if available) of the target cluster
     """
+    version: str = "Unknown"
+    """
+    K8s or OCP version
+    """
     cloud_type: str = "self-managed"
     """
     Cloud Type (if available) of the target cluster: self-managed, rosa, etc
@@ -270,17 +274,17 @@ class ChaosRunTelemetry:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
                 raise Exception("scenarios param must be a list of object")
+            for scenario in scenarios:
+                scenario_telemetry = ScenarioTelemetry(scenario)
+                self.scenarios.append(scenario_telemetry)
 
-            self.scenarios = [ScenarioTelemetry(s) for s in scenarios]
-
-            self.node_summary_infos = [
-                NodeInfo(j) for j in json_dict.get("node_summary_infos")
-            ]
-            self.node_taints = [Taint(t) for t in json_dict.get("node_taints")]
-            self.total_node_count = json_dict.get("total_node_count")
-            self.cloud_infrastructure = json_dict.get("cloud_infrastructure")
-            self.cloud_type = json_dict.get("cloud_type")
-            self.kubernetes_objects_count = json_dict.get(
+            self.node_summary_infos = json_object.get("node_summary_infos")
+            self.node_taints = json_object.get("node_taints")
+            self.total_node_count = json_object.get("total_node_count")
+            self.cloud_infrastructure = json_object.get("cloud_infrastructure")
+            self.cloud_type = json_object.get("cloud_type")
+            self.version = json_object.get("version")
+            self.kubernetes_objects_count = json_object.get(
                 "kubernetes_objects_count"
             )
             self.network_plugins = json_dict.get("network_plugins")
