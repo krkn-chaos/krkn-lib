@@ -13,6 +13,7 @@ import pytz
 from base64io import Base64IO
 from dateutil import parser
 from dateutil.parser import ParserError
+import xml.etree.cElementTree as ET
 
 
 def decode_base64_file(source_filename: str, destination_filename: str):
@@ -380,3 +381,48 @@ def is_host_reachable(host: str, port: int, timeout: int = 2) -> bool:
             return True
     except OSError:
         return False
+
+
+def get_junit_test_case(
+    success: bool,
+    time: int,
+    test_suite_name: str,
+    test_case_description: str,
+    test_stdout: str = "",
+    test_version: str = None,
+) -> str:
+    """
+    Creates an XML compatible with sippy to track regressions
+    on OCP tests.
+
+    :param success: if true will print a success test case,
+        otherwise a failure test case
+    :param time: sets the duration in seconds of the testsuite
+    :param test_suite_name: sets the name of the test suite
+    :param test_case_description: sets the description of
+        the testcase, it has to contain tags that map the test case
+        to the monitored component on sippy like [sig-etcd]
+        or others
+    :param test_stdout: if a test failes the stdout of the krkn-run
+        is attached to the testcase element in the XML
+    :param test_version: sets an optional property to the testsuite
+        containing the version on the test
+    :return: the XML string to be written in the junit xml file
+    """
+
+    root = ET.Element("testsuite")
+    root.attrib["name"] = test_suite_name
+    root.attrib["tests"] = "1"
+    root.attrib["skipped"] = "0"
+    root.attrib["failures"] = "0" if success else "1"
+    root.attrib["time"] = f"{time}"
+    if test_version:
+        ET.SubElement(root, "property", name="TestVersion", value=test_version)
+
+    test_case = ET.SubElement(
+        root, "testcase", name=test_case_description, time=f"{time}"
+    )
+    if not success:
+        ET.SubElement(test_case, "failure", message="").text = test_stdout
+
+    return ET.tostring(root, encoding="utf-8").decode("UTF-8")
