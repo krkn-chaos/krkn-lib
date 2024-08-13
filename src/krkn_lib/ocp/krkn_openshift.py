@@ -45,8 +45,8 @@ class KrknOpenshift(KrknKubernetes):
             )
             for cv in cvs["items"]:
                 for condition in cv["status"]["conditions"]:
-                    if condition["type"] == "Progressing":
-                        return condition["message"]
+                    if condition["type"] == "Available":
+                        return condition["message"].split(' ')[-1]
             return ""
         except client.exceptions.ApiException as e:
             if e.status == 404:

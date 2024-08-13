@@ -119,6 +119,13 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             self.fail(f"exception on node command execution: {e}")
 
+    def test_get_version(self):
+        try:
+            response = self.lib_k8s.get_version()
+            self.assertGreater(float(response), 0)
+        except Exception as e:
+            self.fail(f"exception on getting kubectl version execution: {e}")
+
     def test_get_kubeconfig_path(self):
         kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
         if "~" in kubeconfig_path:

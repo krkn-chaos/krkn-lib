@@ -53,6 +53,7 @@ class KrknKubernetes:
 
     request_chunk_size: int = 250
     api_client: client.ApiClient = None
+    version_client: client.VersionApi = None
     cli: client.CoreV1Api = None
     batch_cli: client.BatchV1Api = None
     watch_resource: watch.Watch = None
@@ -152,6 +153,7 @@ class KrknKubernetes:
                 config_file=kubeconfig_path
             )
             self.cli = client.CoreV1Api(self.k8s_client)
+            self.version_client = client.VersionApi(self.api_client)
             self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
             self.net_cli = client.NetworkingV1Api(self.api_client)
@@ -216,6 +218,16 @@ class KrknKubernetes:
             kubeconfig_path = kubeconfig.name
             kubeconfig.close()
         return kubeconfig_path
+
+    def get_version(self) -> str: 
+        
+        try:
+            api_response = self.version_client.get_code()
+            major_version = api_response.major
+            minor_version = api_response.minor
+            return major_version + "." + minor_version
+        except ApiException as e:
+            print("Exception when calling VersionApi->get_code: %s\n" % e)
 
     def get_host(self) -> str:
         """
