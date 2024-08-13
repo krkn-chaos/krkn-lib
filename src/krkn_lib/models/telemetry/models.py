@@ -50,7 +50,9 @@ class ScenarioTelemetry:
             self.exit_status = json_object.get("exit_status")
             self.parameters_base64 = json_object.get("parameters_base64")
             self.parameters = json_object.get("parameters")
-            self.affected_pods = PodsStatus(json_object.get("affected_pods"))
+            self.affected_pods = PodsStatus(
+                json_object=json_object.get("affected_pods")
+            )
 
             if (
                 self.parameters_base64 is not None
@@ -105,11 +107,22 @@ class Taint:
     Taint Value
     """
 
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.node_name = (
+                json_dict["node_name"] if "node_name" in json_dict else None
+            )
+            self.effect = (
+                json_dict["effect"] if "effect" in json_dict else None
+            )
+            self.key = json_dict["key"] if "key" in json_dict else None
+            self.value = json_dict["value"] if "value" in json_dict else None
+
 
 @dataclass(order=False)
 class NodeInfo:
     """
-    Cluster node telemetry informations
+    Cluster node telemetry infos
     """
 
     count: int = 1
@@ -135,6 +148,36 @@ class NodeInfo:
     "Kubelet Version"
     os_version: str = ""
     "Operating system version"
+
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.count = json_dict["count"] if "count" in json_dict else None
+            self.architecture = (
+                json_dict["architecture"]
+                if "architecture" in json_dict
+                else None
+            )
+            self.instance_type = (
+                json_dict["instance_type"]
+                if "instance_type" in json_dict
+                else None
+            )
+            self.node_type = (
+                json_dict["node_type"] if "node_type" in json_dict else None
+            )
+            self.kernel_version = (
+                json_dict["kernel_version"]
+                if "kernel_version" in json_dict
+                else None
+            )
+            self.kubelet_version = (
+                json_dict["kubelet_version"]
+                if "kubelet_version" in json_dict
+                else None
+            )
+            self.os_version = (
+                json_dict["os_version"] if "os_version" in json_dict else None
+            )
 
     def __eq__(self, other):
         if isinstance(other, NodeInfo):
@@ -231,9 +274,6 @@ class ChaosRunTelemetry:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
                 raise Exception("scenarios param must be a list of object")
-            for scenario in scenarios:
-                scenario_telemetry = ScenarioTelemetry(scenario)
-                self.scenarios.append(scenario_telemetry)
 
             self.scenarios = [ScenarioTelemetry(s) for s in scenarios]
 
@@ -250,6 +290,7 @@ class ChaosRunTelemetry:
             )
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
+            self.timestamp = json_dict.get("timestamp")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
