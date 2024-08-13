@@ -218,7 +218,7 @@ class ChaosRunTelemetry:
 
     affected_pods: PodsStatus = PodsStatus()
 
-    def __init__(self, json_object: any = None):
+    def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
         self.node_summary_infos = list[NodeInfo]()
         self.node_taints = list[Taint]()
@@ -227,8 +227,8 @@ class ChaosRunTelemetry:
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
-        if json_object is not None:
-            scenarios = json_object.get("scenarios")
+        if json_dict is not None:
+            scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
                 raise Exception("scenarios param must be a list of object")
             for scenario in scenarios:
@@ -248,8 +248,8 @@ class ChaosRunTelemetry:
             self.kubernetes_objects_count = json_dict.get(
                 "kubernetes_objects_count"
             )
-            self.network_plugins = json_object.get("network_plugins")
-            self.run_uuid = json_object.get("run_uuid")
+            self.network_plugins = json_dict.get("network_plugins")
+            self.run_uuid = json_dict.get("run_uuid")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

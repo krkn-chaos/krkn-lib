@@ -219,8 +219,7 @@ class KrknKubernetes:
             kubeconfig.close()
         return kubeconfig_path
 
-    def get_version(self) -> str: 
-        
+    def get_version(self) -> str:
         try:
             api_response = self.version_client.get_code()
             major_version = api_response.major
