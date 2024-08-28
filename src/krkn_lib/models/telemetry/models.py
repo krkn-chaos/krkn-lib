@@ -242,7 +242,7 @@ class ChaosRunTelemetry:
     """
     Cloud infrastructure (if available) of the target cluster
     """
-    version: str = "Unknown"
+    cluster_version: str = "Unknown"
     """
     K8s or OCP version
     """
@@ -284,7 +284,7 @@ class ChaosRunTelemetry:
             self.total_node_count = json_dict.get("total_node_count")
             self.cloud_infrastructure = json_dict.get("cloud_infrastructure")
             self.cloud_type = json_dict.get("cloud_type")
-            self.version = json_dict.get("version")
+            self.cluster_version = json_dict.get("cluster_version")
             self.kubernetes_objects_count = json_dict.get(
                 "kubernetes_objects_count"
             )

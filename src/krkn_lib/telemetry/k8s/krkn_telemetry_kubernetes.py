@@ -64,7 +64,7 @@ class KrknTelemetryKubernetes:
         )
         node_infos, taints = self.kubecli.get_nodes_infos()
         chaos_telemetry.node_summary_infos = node_infos
-        chaos_telemetry.version = self.kubecli.get_version()
+        chaos_telemetry.cluster_version = self.kubecli.get_version()
         chaos_telemetry.node_taints = taints
         for info in node_infos:
             chaos_telemetry.total_node_count += info.count
