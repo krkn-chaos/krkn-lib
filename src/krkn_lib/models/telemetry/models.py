@@ -138,7 +138,7 @@ class NodeInfo:
     """
     Cloud instance type (if available)
     """
-    node_type: str = ""
+    nodes_type: str = ""
     """
     Node Type (worker/infra/master etc.)
     """
@@ -162,8 +162,8 @@ class NodeInfo:
                 if "instance_type" in json_dict
                 else None
             )
-            self.node_type = (
-                json_dict["node_type"] if "node_type" in json_dict else None
+            self.nodes_type = (
+                json_dict["nodes_type"] if "nodes_type" in json_dict else None
             )
             self.kernel_version = (
                 json_dict["kernel_version"]
@@ -184,7 +184,7 @@ class NodeInfo:
             return (
                 other.architecture == self.architecture
                 and other.instance_type == self.instance_type
-                and other.node_type == self.node_type
+                and other.nodes_type == self.nodes_type
                 and other.kernel_version == self.kernel_version
                 and other.kubelet_version == self.kubelet_version
                 and other.os_version == self.os_version
@@ -195,7 +195,7 @@ class NodeInfo:
     def __repr__(self):
         return (
             f"{self.architecture} {self.instance_type} "
-            f"{self.node_type} {self.kernel_version} "
+            f"{self.nodes_type} {self.kernel_version} "
             f"{self.kubelet_version} {self.os_version}"
         )
 
