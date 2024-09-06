@@ -69,6 +69,32 @@ class UtilFunctionTests(BaseTest):
         self.assertEqual(unserialized_updated_object.count("__UPDATED__"), 4)
         self.assertEqual(unserialized_updated_object.count("__MARKER__"), 0)
 
+    def test_deep_get(self):
+        deep_yaml = """
+            test:
+                - namespace: "default"
+                  property_1: test
+                  property_2: test
+                  obj_1:
+                    namespace: "kubernetes"
+                    obj_1:
+                        element: __MARKER__
+                        property_1: test
+                        property_2:
+                            - property_3: test
+                              property_4: test
+                            - property_5:
+                                namespace: "kube-system"
+            """  # NOQA
+
+        yaml_obj = yaml.safe_load(deep_yaml)
+
+        results = utils.deep_get_attribute("namespace", yaml_obj)
+        self.assertEqual(len(results), 3)
+        self.assertTrue("default" in results)
+        self.assertTrue("kubernetes" in results)
+        self.assertTrue("kube-system" in results)
+
     def test_check_date_in_localized_interval(self):
         timezone = "UTC"
 

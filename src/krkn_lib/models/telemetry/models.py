@@ -1,11 +1,43 @@
+from __future__ import annotations
 import base64
 import json
-from dataclasses import dataclass
-from datetime import datetime, timezone
-
 import yaml
-
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from krkn_lib.models.k8s import PodsStatus
+
+relevant_event_reasons: frozenset[str] = frozenset(
+    [
+        "Failed",
+        "Killing",
+        "Preempting",
+        "ExceededGracePeriod",
+        "FailedKillPod",
+        "FailedCreatePodContainer",
+        "NetworkNotReady",
+        "InspectFailed",
+        "ErrImageNeverPull",
+        "BackOff",
+        "NodeNotReady",
+        "NodeNotSchedulable",
+        "KubeletSetupFailed",
+        "FailedAttachVolume",
+        "FailedMount",
+        "VolumeResizeFailed",
+        "FileSystemResizeFailed",
+        "ImageGCFailed",
+        "FailedCreatePodSandBox",
+        "FailedMountOnFilesystemMismatch",
+        "FailedPrepareDynamicResources",
+        "InvalidDiskCapacity",
+        "FreeDiskSpaceFailed",
+        "Unhealthy",
+        "FailedSync",
+        "FailedValidation",
+        "FailedPostStartHook",
+        "FailedPreStopHook",
+    ]
+)
 
 
 @dataclass(order=False)
@@ -35,12 +67,28 @@ class ScenarioTelemetry:
     Scenario configuration file base64 encoded
     """
     parameters: any
-
+    """
+    scenario parameters
+    """
+    affected_pods: PodsStatus
     """
     Pods affected by the chaos scenario
     """
+    cluster_events: list[ClusterEvent]
+    """
+    Cluster events collected during the chaos run
+    """
 
-    affected_pods: PodsStatus
+    def set_cluster_events(self, events: list[ClusterEvent]):
+        """
+        Sets the cluster events filtering them by the accepted
+        reasons
+
+        :param events: a list of ClusterEvents
+        """
+        self.cluster_events = [
+            evt for evt in events if evt.reason in relevant_event_reasons
+        ]
 
     def __init__(self, json_object: any = None):
         if json_object is not None:
@@ -53,6 +101,16 @@ class ScenarioTelemetry:
             self.affected_pods = PodsStatus(
                 json_object=json_object.get("affected_pods")
             )
+            if json_object.get("cluster_events") and isinstance(
+                json_object.get("cluster_events"), list
+            ):
+                self.cluster_events = [
+                    ClusterEvent(json_dict=evt)
+                    for evt in json_object.get("cluster_events")
+                    if evt["reason"] in relevant_event_reasons
+                ]
+            else:
+                self.cluster_events = []
 
             if (
                 self.parameters_base64 is not None
@@ -82,6 +140,10 @@ class ScenarioTelemetry:
             self.parameters_base64 = ""
             self.parameters = {}
             self.affected_pods = PodsStatus()
+            self.cluster_events = []
+
+    def to_json(self) -> str:
+        return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
 
 @dataclass(order=False)
@@ -201,6 +263,79 @@ class NodeInfo:
 
     def __hash__(self):
         return hash(self.__repr__())
+
+
+@dataclass(order=False)
+class ClusterEvent:
+    """
+    Summary of cluster event more relevant fields
+    """
+
+    name: str
+    """ Event name assigned by the cluster"""
+    creation: str
+    """ Event creation date time"""
+    reason: str
+    """ Reason of the event trigger """
+    message: str
+    """ Message associated to the event """
+    namespace: str
+    """ Event namespace """
+    source_component: str
+    """ Cluster component that triggered the event """
+    involved_object_kind: str
+    """ Kind of the object that triggered the event """
+    involved_object_name: str
+    """ Name of the object that triggered the event"""
+    involved_object_namespace: str
+    """ Namespace of the object that triggered the event """
+    type: str
+    """ Event severity"""
+
+    def __init__(self, k8s_json_dict: any = None, json_dict: any = None):
+        self.name = ""
+        self.creation = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        self.reason = ""
+        self.message = ""
+        self.namespace = ""
+        self.source_component = ""
+        self.involved_object_kind = ""
+        self.involved_object_name = ""
+        self.involved_object_namespace = ""
+        self.type = ""
+
+        if k8s_json_dict:
+            self.name = k8s_json_dict["metadata"]["name"]
+            self.creation = k8s_json_dict["metadata"]["creationTimestamp"]
+            self.reason = k8s_json_dict["reason"]
+            self.message = k8s_json_dict["message"]
+            self.namespace = k8s_json_dict["metadata"]["namespace"]
+            self.source_component = k8s_json_dict["source"]["component"]
+            self.involved_object_kind = k8s_json_dict["involvedObject"]["kind"]
+            self.involved_object_name = k8s_json_dict["involvedObject"]["name"]
+            self.involved_object_namespace = k8s_json_dict["involvedObject"][
+                "namespace"
+            ]
+            self.type = k8s_json_dict["type"]
+
+        if json_dict:
+            self.name = json_dict["name"]
+            self.namespace = json_dict["namespace"]
+            self.creation = json_dict["creation"]
+            self.reason = json_dict["reason"]
+            self.message = json_dict["message"]
+            self.source_component = json_dict["source_component"]
+            self.involved_object_name = json_dict["involved_object_name"]
+            self.involved_object_namespace = json_dict[
+                "involved_object_namespace"
+            ]
+            self.involved_object_kind = json_dict["involved_object_kind"]
+            self.type = json_dict["type"]
+
+    def to_json(self) -> str:
+        return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
 
 @dataclass(order=False)

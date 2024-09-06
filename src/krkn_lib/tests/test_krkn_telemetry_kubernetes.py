@@ -7,7 +7,9 @@ import unittest
 import uuid
 
 import boto3
+import deprecation
 import yaml
+from tzlocal.unix import get_localzone
 
 from krkn_lib.models.krkn import ChaosRunAlert, ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
@@ -19,9 +21,12 @@ class KrknTelemetryKubernetesTests(BaseTest):
         file_path = "src/testdata/input.yaml"
         scenario_telemetry = ScenarioTelemetry()
 
-        self.lib_telemetry_k8s.set_parameters_base64(
+        config = self.lib_telemetry_k8s.set_parameters_base64(
             scenario_telemetry, file_path
         )
+
+        self.assertTrue(isinstance(config, dict))
+        self.assertGreater(len(config.keys()), 0)
         with open(file_path, "rb") as file_stream:
             input_file_data_orig = file_stream.read().decode("utf-8")
             self.assertIsNotNone(input_file_data_orig)
@@ -246,7 +251,18 @@ class KrknTelemetryKubernetesTests(BaseTest):
             f"{request_id}/telemetry.json",
         )
 
+    @deprecation.fail_if_not_removed
     def test_put_cluster_events(self):
+
+        # generate a cluster event on a namespace
+
+        namespace_with_evt = "test-" + self.get_random_string(10)
+        pod_name = "test-" + self.get_random_string(10)
+        self.deploy_namespace(namespace_with_evt, [])
+        self.deploy_delayed_readiness_pod(pod_name, namespace_with_evt, 0)
+        self.background_delete_pod(pod_name, namespace_with_evt)
+        time.sleep(10)
+
         request_id = f"test_folder/{int(time.time())}"
         telemetry_config = {
             "events_backup": True,
@@ -265,6 +281,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
             telemetry_config,
             int(one_hour_ago.timestamp()),
             int(now.timestamp()),
+            str(get_localzone()),
         )
 
         bucket_name = os.getenv("BUCKET_NAME")
@@ -281,6 +298,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
         )
 
     def test_put_alerts(self):
+
         request_id = f"test_folder/{int(time.time())}"
         telemetry_config = {
             "events_backup": True,

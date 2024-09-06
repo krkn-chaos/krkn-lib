@@ -12,8 +12,10 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
+from krkn_lib.version import __version__
 
 import arcaflow_lib_kubernetes
+import deprecation
 import kubernetes
 import urllib3
 import yaml
@@ -40,7 +42,7 @@ from krkn_lib.models.k8s import (
     Volume,
     VolumeMount,
 )
-from krkn_lib.models.telemetry import NodeInfo, Taint
+from krkn_lib.models.telemetry import NodeInfo, Taint, ClusterEvent
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -321,6 +323,19 @@ class KrknKubernetes:
             for namespace in ret_list.items:
                 namespaces.append(namespace.metadata.name)
         return namespaces
+
+    def list_namespaces_by_regex(self, regex: str) -> list[str]:
+        """
+        Lists all the namespaces matching a regex
+
+        :param regex: The regular expression against which the
+            namespaces will be compared
+        :return: a list of namespaces matching the regex
+
+        """
+        namespaces = self.list_namespaces()
+        filtered_namespaces = [ns for ns in namespaces if re.match(regex, ns)]
+        return filtered_namespaces
 
     def get_namespace_status(self, namespace_name: str) -> str:
         """
@@ -1522,6 +1537,12 @@ class KrknKubernetes:
             )
             return None
 
+    @deprecation.deprecated(
+        deprecated_in="3.1.0",
+        removed_in="3.2.0",
+        current_version=__version__,
+        details="litmus support dropped from krkn",
+    )
     def get_litmus_chaos_object(
         self, kind: str, name: str, namespace: str = "default"
     ) -> LitmusChaosObject:
@@ -2467,6 +2488,82 @@ class KrknKubernetes:
         except Exception:
             return False
 
+    def collect_and_parse_cluster_events(
+        self,
+        start_timestamp: int,
+        end_timestamp: int,
+        local_timezone: str,
+        cluster_timezone: str = "UTC",
+        limit: int = 500,
+        namespace: str = None,
+    ) -> list[ClusterEvent]:
+        """
+        Collects cluster events querying `/api/v1/events`
+        filtered in a given time interval and writes them in
+        a temporary file in json format.
+
+        :param start_timestamp: timestamp of the minimum date
+            after that the event is relevant
+        :param end_timestamp: timestamp of the maximum date
+            before that the event is relevant
+        :param local_timezone: timezone of the local system
+        :param cluster_timezone: timezone of the remote cluster
+        :param limit: limit of the number of events to be fetched
+            from the cluster
+        :param namespace: Namespace from which the events must be
+            collected, if None all-namespaces will be selected
+        :return: Returns a list of parsed ClusterEvents
+
+        """
+        events = []
+        try:
+            path_params: Dict[str, str] = {}
+            query_params = {"limit": limit}
+            header_params: Dict[str, str] = {}
+            auth_settings = ["BearerToken"]
+            header_params["Accept"] = self.api_client.select_header_accept(
+                ["application/json"]
+            )
+
+            path = "/api/v1/events"
+            if namespace:
+                path = f"/api/v1/namespaces/{namespace}/events"
+
+            (data) = self.api_client.call_api(
+                path,
+                "GET",
+                path_params,
+                query_params,
+                header_params,
+                response_type="str",
+                auth_settings=auth_settings,
+            )
+
+            json_obj = ast.literal_eval(data[0])
+            events_list = reversed(json_obj["items"])
+            for obj in events_list:
+                filtered_obj = filter_dictionary(
+                    obj,
+                    "firstTimestamp",
+                    start_timestamp,
+                    end_timestamp,
+                    cluster_timezone,
+                    local_timezone,
+                )
+                if filtered_obj:
+                    events.append(ClusterEvent(k8s_json_dict=obj))
+
+        except Exception as e:
+            logging.error(str(e))
+
+        return events
+
+    @deprecation.deprecated(
+        deprecated_in="3.1.0",
+        removed_in="3.2.0",
+        current_version=__version__,
+        details="replaced by `collect_and_parse_cluster_events`",
+    )
     def collect_cluster_events(
         self,
         start_timestamp: int,
@@ -2474,6 +2571,7 @@ class KrknKubernetes:
         local_timezone: str,
         cluster_timezone: str = "UTC",
         limit: int = 500,
+        namespace: str = None,
     ) -> Optional[str]:
         """
         Collects cluster events querying `/api/v1/events`
@@ -2488,6 +2586,8 @@ class KrknKubernetes:
         :param cluster_timezone: timezone of the remote cluster
         :param limit: limit of the number of events to be fetched
             from the cluster
+        :param namespace: Namespace from which the events must be
+            collected, if None all-namespaces will be selected
 
         """
 
@@ -2501,6 +2601,9 @@ class KrknKubernetes:
             )
 
             path = "/api/v1/events"
+            if namespace:
+                path = f"/api/v1/namespaces/{namespace}/events"
+
             (data) = self.api_client.call_api(
                 path,
                 "GET",
@@ -2537,6 +2640,26 @@ class KrknKubernetes:
         except Exception as e:
             logging.error(str(e))
             return None
+
+    def parse_events_from_file(
+        self, events_filename: str
+    ) -> Optional[list[ClusterEvent]]:
+        if not events_filename or not os.path.exists(events_filename):
+            logging.error(f"events file do not exist {events_filename}")
+            return
+
+        events = []
+        with open(events_filename, "r") as jstream:
+            try:
+                json_obj = json.load(jstream)
+                for event in json_obj:
+                    events.append(ClusterEvent(k8s_json_dict=event))
+            except Exception:
+                logging.error(
+                    f"failed to parse events file: {events_filename}"
+                )
+
+        return events
 
     def create_token_for_sa(
         self, namespace: str, service_account: str, token_expiration=43200

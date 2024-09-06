@@ -4,19 +4,21 @@ import tempfile
 import threading
 import time
 import warnings
+import deprecation
 from queue import Queue
 from typing import Optional
 
 import requests
 import urllib3
 import yaml
-from tzlocal import get_localzone
+from tzlocal.unix import get_localzone
 
 import krkn_lib.utils as utils
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.krkn import ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from krkn_lib.utils.safe_logger import SafeLogger
+from krkn_lib.version import __version__
 
 
 class KrknTelemetryKubernetes:
@@ -497,7 +499,7 @@ class KrknTelemetryKubernetes:
 
     def set_parameters_base64(
         self, scenario_telemetry: ScenarioTelemetry, file_path: str
-    ):
+    ) -> dict:
         if not os.path.exists(file_path):
             raise Exception(
                 "telemetry : scenario file not found {0} ".format(file_path)
@@ -522,7 +524,15 @@ class KrknTelemetryKubernetes:
         except Exception as e:
             raise Exception("telemetry: {0}".format(str(e)))
         scenario_telemetry.parameters_base64 = input_file_base64
+        return input_file_yaml
 
+    @deprecation.deprecated(
+        deprecated_in="3.1.0",
+        removed_in="3.2.0",
+        current_version=__version__,
+        details="Cluster events has been added to the telemetry json,"
+        "so won't be uploaded as separated file",
+    )
     def put_cluster_events(
         self,
         request_id: str,

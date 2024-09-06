@@ -1,6 +1,9 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
+from krkn_lib.version import __version__
+
+import deprecation
 
 
 @dataclass(frozen=True, order=False)
@@ -116,12 +119,20 @@ class Pod:
     """
 
 
-@dataclass(frozen=True, order=False)
 class LitmusChaosObject:
     """
     Data class to hold information regarding
     a custom object of litmus project
     """
+
+    @deprecation.deprecated(
+        deprecated_in="3.1.0",
+        removed_in="3.2.0",
+        current_version=__version__,
+        details="litmus support removed from krkn",
+    )
+    def __init__(self):
+        pass
 
     kind: str
     """
@@ -149,7 +160,6 @@ class LitmusChaosObject:
     """
 
 
-@dataclass(frozen=True, order=False)
 class ChaosEngine(LitmusChaosObject):
     """
     Data class to hold information
@@ -166,7 +176,6 @@ class ChaosEngine(LitmusChaosObject):
     """
 
 
-@dataclass(frozen=True, order=False)
 class ChaosResult(LitmusChaosObject):
     """
     Data class to hold information

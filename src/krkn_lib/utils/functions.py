@@ -84,6 +84,37 @@ def deep_set_attribute(attribute: str, value: str, obj: any) -> any:
     return obj
 
 
+def deep_get_attribute(
+    attribute: str, obj: any, values: list[any] = None
+) -> list[any]:
+    """
+    Recursively finds the attribute value in all the occurrences of the
+    object and returns the value.
+
+    :param attribute: the attribute to search in the object
+    :param obj: the object that will be traversed and modified
+    :param values: the list of values found each step that will
+        be recursively passed to the function itself each time.
+        can be left empty.
+    :return: a list of values found
+    """
+    if values is None:
+        values = []
+    if isinstance(obj, list):
+        for element in obj:
+            deep_get_attribute(attribute, element, values)
+    if isinstance(obj, dict):
+        for key in obj.keys():
+            if isinstance(obj[key], dict):
+                deep_get_attribute(attribute, obj[key], values)
+            elif isinstance(obj[key], list):
+                for element in obj[key]:
+                    deep_get_attribute(attribute, element, values)
+            if key == attribute:
+                values.append(obj[key])
+    return values
+
+
 def check_date_in_localized_interval(
     start_timestamp: Optional[int],
     end_timestamp: Optional[int],
