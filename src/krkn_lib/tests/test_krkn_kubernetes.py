@@ -918,6 +918,9 @@ class KrknKubernetesTests(BaseTest):
         )
         self.assertGreater(len(events), 0)
 
+    def test_is_kubernetes(self):
+        self.assertTrue(self.lib_k8s.is_kubernetes())
+
     def test_create_token_for_namespace(self):
         token = self.lib_k8s.create_token_for_sa("default", "default")
         self.assertIsNotNone(token)

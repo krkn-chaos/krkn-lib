@@ -21,7 +21,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                 {
                     "name":"test",
                     "creation":"2024-09-02T14:00:53Z",
-                    "reason":"no reason",
+                    "reason":"Failed",
                     "message":"message",
                     "namespace":"default",
                     "source_component":"kubelet",

@@ -2,7 +2,7 @@ from __future__ import annotations
 import base64
 import json
 import yaml
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from krkn_lib.models.k8s import PodsStatus
 

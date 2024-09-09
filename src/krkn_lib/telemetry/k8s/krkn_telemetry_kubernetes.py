@@ -25,9 +25,13 @@ class KrknTelemetryKubernetes:
     kubecli: KrknKubernetes = None
     safe_logger: SafeLogger = None
     default_telemetry_group = "default"
+    krkn_telemetry_config: dict[str, any] = None
 
     def __init__(
-        self, safe_logger: SafeLogger, lib_kubernetes: KrknKubernetes
+        self,
+        safe_logger: SafeLogger,
+        lib_kubernetes: KrknKubernetes,
+        krkn_telemetry_config: dict[str, any] = None,
     ):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         urllib3.disable_warnings(DeprecationWarning)
@@ -36,6 +40,10 @@ class KrknTelemetryKubernetes:
         )
         self.kubecli = lib_kubernetes
         self.safe_logger = safe_logger
+        if not krkn_telemetry_config:
+            self.krkn_telemetry_config = {}
+        else:
+            self.krkn_telemetry_config = krkn_telemetry_config
 
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
         """

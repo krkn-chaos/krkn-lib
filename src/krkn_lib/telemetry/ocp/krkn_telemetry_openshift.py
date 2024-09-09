@@ -12,8 +12,17 @@ from krkn_lib.utils import SafeLogger
 class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
     ocpcli: KrknOpenshift
 
-    def __init__(self, safe_logger: SafeLogger, lib_openshift: KrknOpenshift):
-        super().__init__(safe_logger=safe_logger, lib_kubernetes=lib_openshift)
+    def __init__(
+        self,
+        safe_logger: SafeLogger,
+        lib_openshift: KrknOpenshift,
+        krkn_telemetry_config: dict[str, any] = None,
+    ):
+        super().__init__(
+            safe_logger=safe_logger,
+            lib_kubernetes=lib_openshift,
+            krkn_telemetry_config=krkn_telemetry_config,
+        )
         self.ocpcli = lib_openshift
 
     def get_ocp_prometheus_data(
@@ -61,6 +70,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         telemetry_config: dict,
         start_timestamp: int,
         end_timestamp: int,
+        namespace: str = None,
     ):
         """
         Collects, filters, archive and put on the telemetry S3 Buckets
@@ -74,6 +84,8 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             will start filter starting from the earliest
         :param end_timestamp: timestamp of the last relevant entry, if None
             will end filtering until the latest
+        :param namespace: if set the logs will be collected
+            only for the provided namespace
         """
 
         queue = Queue()
@@ -158,6 +170,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 logs_filter_patterns,
                 backup_threads,
                 self.safe_logger,
+                namespace,
                 oc_cli_path,
             )
             # volume_number : 0 only one file
@@ -172,6 +185,9 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         uploaded_files = list[str]()
         queue_size = queue.qsize()
         self.safe_logger.info("uploading ocp logs...")
+        logs_filename_prefix = (
+            "logs-" if namespace is None else f"logs-{namespace}-"
+        )
         worker = threading.Thread(
             target=self.generate_url_and_put_to_s3_worker,
             args=(
@@ -185,7 +201,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 0,
                 uploaded_files,
                 max_retries,
-                "logs-",
+                logs_filename_prefix,
                 ".tar.gz",
             ),
         )

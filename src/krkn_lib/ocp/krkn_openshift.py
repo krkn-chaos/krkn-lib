@@ -10,7 +10,6 @@ from pathlib import Path
 from queue import Queue
 from typing import Optional
 
-from kubernetes import client
 from tzlocal import get_localzone
 
 from krkn_lib.k8s import KrknKubernetes
@@ -37,22 +36,7 @@ class KrknOpenshift(KrknKubernetes):
         :return: clusterversion status
         """
 
-        try:
-            cvs = self.custom_object_client.list_cluster_custom_object(
-                "config.openshift.io",
-                "v1",
-                "clusterversions",
-            )
-            for cv in cvs["items"]:
-                for condition in cv["status"]["conditions"]:
-                    if condition["type"] == "Available":
-                        return condition["message"].split(' ')[-1]
-            return ""
-        except client.exceptions.ApiException as e:
-            if e.status == 404:
-                return ""
-            else:
-                raise e
+        return self._get_clusterversion_string()
 
     def get_cluster_type(self) -> str:
         """
@@ -292,6 +276,7 @@ class KrknOpenshift(KrknKubernetes):
         log_filter_patterns: list[str],
         threads: int,
         safe_logger: SafeLogger,
+        namespace: str = None,
         oc_path: str = None,
     ) -> str:
         """
@@ -314,6 +299,8 @@ class KrknOpenshift(KrknKubernetes):
             (it supports several formats by default but not every date format)
         :param safe_logger: thread safe logger used to log
             the output on a file stream
+        :param namespace: if set the logs will refer only to the provided
+            namespace
         :param oc_path: the path of the `oc` CLI, if None will
             be searched in the PATH
 
@@ -368,16 +355,29 @@ class KrknOpenshift(KrknKubernetes):
         os.chdir(src_dir)
         safe_logger.info(f"collecting openshift logs in {src_dir}...")
         try:
-            subprocess.Popen(
-                [
-                    oc,
-                    "adm",
-                    "must-gather",
-                    "--kubeconfig",
-                    kubeconfig_path,
-                ],
-                stdout=subprocess.DEVNULL,
-            ).wait()
+            if namespace:
+                subprocess.Popen(
+                    [
+                        oc,
+                        "adm",
+                        "inspect",
+                        f"ns/{namespace}",
+                        "--kubeconfig",
+                        kubeconfig_path,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                ).wait()
+            else:
+                subprocess.Popen(
+                    [
+                        oc,
+                        "adm",
+                        "must-gather",
+                        "--kubeconfig",
+                        kubeconfig_path,
+                    ],
+                    stdout=subprocess.DEVNULL,
+                ).wait()
             os.chdir(cur_dir)
         except Exception as e:
             safe_logger.error(
@@ -475,3 +475,11 @@ class KrknOpenshift(KrknKubernetes):
                 f"Route: {prometheus_route}"
             )
             return None
+
+    def is_openshift(self) -> bool:
+        """
+        Checks if is an openshift cluster
+        :return: true if it's openshift, false if not
+        """
+        value = self._get_clusterversion_string()
+        return value is not None and value != ""
