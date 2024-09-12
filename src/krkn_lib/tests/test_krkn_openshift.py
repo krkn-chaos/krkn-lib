@@ -79,6 +79,9 @@ class KrknOpenshiftTest(BaseTest):
         self.assertEqual(test_file_1_lines, 7)
         self.assertEqual(test_file_2_lines, 4)
 
+    def test_is_openshift(self):
+        self.assertFalse(self.lib_ocp.is_openshift())
+
     def test_get_cluster_version(self):
         # TODO
         result = self.lib_ocp.get_clusterversion_string()

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "krkn-lib"
-version = "0.0.0"
+version = "1.0.0"
 description = "Foundation library for Kraken"
 authors = ["Red Hat Chaos Team"]
 license = "Apache-2.0"
@@ -25,6 +25,8 @@ elasticsearch = "7.13.4"
 elasticsearch-dsl = "7.4.1"
 wheel = "^0.42.0"
 cython = "3.0"
+numpy= "1.26.4"
+deprecation="2.1.0"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
