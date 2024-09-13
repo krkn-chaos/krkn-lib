@@ -22,28 +22,56 @@ from krkn_lib.version import __version__
 
 
 class KrknTelemetryKubernetes:
-    kubecli: KrknKubernetes = None
+    __kubecli: KrknKubernetes = None
+    __krkn_telemetry_config: dict[str, any] = None
+    __telemetry_request_id: str = ""
     safe_logger: SafeLogger = None
     default_telemetry_group = "default"
-    krkn_telemetry_config: dict[str, any] = None
 
     def __init__(
         self,
         safe_logger: SafeLogger,
         lib_kubernetes: KrknKubernetes,
         krkn_telemetry_config: dict[str, any] = None,
+        telemetry_request_id: str = "",
     ):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         urllib3.disable_warnings(DeprecationWarning)
         warnings.filterwarnings(
             action="ignore", message="unclosed", category=ResourceWarning
         )
-        self.kubecli = lib_kubernetes
+        self.__kubecli = lib_kubernetes
         self.safe_logger = safe_logger
+        self.__telemetry_request_id = telemetry_request_id
         if not krkn_telemetry_config:
-            self.krkn_telemetry_config = {}
+            self.__krkn_telemetry_config = {}
         else:
-            self.krkn_telemetry_config = krkn_telemetry_config
+            self.__krkn_telemetry_config = krkn_telemetry_config
+
+    def get_lib_kubernetes(self) -> KrknKubernetes:
+        """
+        Returns the instance of KrknKubernetes
+
+        :return: a KrknKubernetes instance
+        """
+        return self.__kubecli
+
+    def get_telemetry_config(self) -> dict[str, any]:
+        """
+        Returns the telemetry config section from config.yaml
+
+        :return: the telemetry config section
+        """
+        return self.__krkn_telemetry_config
+
+    def get_telemetry_request_id(self) -> str:
+        """
+        Gets the telemetry request id that represents the path
+        on S3 where the telemetry data is uploaded
+
+        :return: the krkn telemetry id
+        """
+        return self.__telemetry_request_id
 
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
         """
@@ -61,7 +89,7 @@ class KrknTelemetryKubernetes:
         self.safe_logger.info("collecting telemetry data, please wait....")
 
         chaos_telemetry.kubernetes_objects_count = (
-            self.kubecli.get_all_kubernetes_object_count(
+            self.__kubecli.get_all_kubernetes_object_count(
                 [
                     "Deployment",
                     "Pod",
@@ -72,9 +100,9 @@ class KrknTelemetryKubernetes:
                 ]
             )
         )
-        node_infos, taints = self.kubecli.get_nodes_infos()
+        node_infos, taints = self.__kubecli.get_nodes_infos()
         chaos_telemetry.node_summary_infos = node_infos
-        chaos_telemetry.cluster_version = self.kubecli.get_version()
+        chaos_telemetry.cluster_version = self.__kubecli.get_version()
         chaos_telemetry.node_taints = taints
         for info in node_infos:
             chaos_telemetry.total_node_count += info.count
@@ -217,7 +245,7 @@ class KrknTelemetryKubernetes:
         if not prometheus_backup:
             return file_list
 
-        prometheus_pod = self.kubecli.get_pod_info(
+        prometheus_pod = self.__kubecli.get_pod_info(
             prometheus_pod_name, prometheus_namespace
         )
         if not prometheus_pod:
@@ -234,7 +262,7 @@ class KrknTelemetryKubernetes:
             target_path = "/prometheus/wal"
 
         try:
-            file_list = self.kubecli.archive_and_get_path_from_pod(
+            file_list = self.__kubecli.archive_and_get_path_from_pod(
                 prometheus_pod_name,
                 prometheus_container_name,
                 prometheus_namespace,
@@ -591,7 +619,7 @@ class KrknTelemetryKubernetes:
         if len(exceptions) > 0:
             raise Exception(", ".join(exceptions))
 
-        events_file = self.kubecli.collect_cluster_events(
+        events_file = self.__kubecli.collect_cluster_events(
             start_timestamp,
             end_timestamp,
             str(get_localzone()),

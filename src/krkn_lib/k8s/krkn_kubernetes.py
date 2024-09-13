@@ -2143,19 +2143,19 @@ class KrknKubernetes:
                     node_info.instance_type = "unknown"
 
                 if node_type_infra_label in node.metadata.labels.keys():
-                    node_info.nodes_type= "infra"
+                    node_info.nodes_type = "infra"
                 elif node_type_worker_label in node.metadata.labels.keys():
-                    node_info.nodes_type= "worker"
+                    node_info.nodes_type = "worker"
                 elif node_type_master_label in node.metadata.labels.keys():
-                    node_info.nodes_type= "master"
+                    node_info.nodes_type = "master"
                 elif node_type_workload_label in node.metadata.labels.keys():
-                    node_info.nodes_type= "workload"
+                    node_info.nodes_type = "workload"
                 elif (
                     node_type_application_label in node.metadata.labels.keys()
                 ):
-                    node_info.nodes_type= "application"
+                    node_info.nodes_type = "application"
                 else:
-                    node_info.nodes_type= "unknown"
+                    node_info.nodes_type = "unknown"
 
                 node_info.architecture = node.status.node_info.architecture
                 node_info.architecture = node.status.node_info.architecture
