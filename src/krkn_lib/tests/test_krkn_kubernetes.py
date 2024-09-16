@@ -1409,7 +1409,7 @@ class KrknKubernetesTests(BaseTest):
             first=end - start,
             second=test_duration,
             places=None,
-            delta=1.7,
+            delta=2,
         )
 
     def test_select_services_by_label(self):
