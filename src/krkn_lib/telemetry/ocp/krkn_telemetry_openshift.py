@@ -66,14 +66,14 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
         super().collect_cluster_metadata(chaos_telemetry)
         chaos_telemetry.cloud_infrastructure = (
-            self.ocpcli.get_cloud_infrastructure()
+            self.__ocpcli.get_cloud_infrastructure()
         )
-        chaos_telemetry.cloud_type = self.ocpcli.get_cluster_type()
+        chaos_telemetry.cloud_type = self.__ocpcli.get_cluster_type()
         chaos_telemetry.cluster_version = (
-            self.ocpcli.get_clusterversion_string()
+            self.__ocpcli.get_clusterversion_string()
         )
         chaos_telemetry.network_plugins = (
-            self.ocpcli.get_cluster_network_plugins()
+            self.__ocpcli.get_cluster_network_plugins()
         )
         vm_number = self.get_vm_number()
         if vm_number > 0:
@@ -178,7 +178,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             dst_dir = os.path.join(archive_path, f"filtered-logs-{timestamp}")
             os.mkdir(workdir)
             os.mkdir(dst_dir)
-            archive_path = self.ocpcli.collect_filter_archive_ocp_logs(
+            archive_path = self.__ocpcli.collect_filter_archive_ocp_logs(
                 workdir,
                 dst_dir,
                 self.__kubecli.get_kubeconfig_path(),
