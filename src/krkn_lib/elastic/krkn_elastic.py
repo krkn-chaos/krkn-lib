@@ -123,6 +123,7 @@ class KrknElastic:
                     and isinstance(metric["value"], float)
                     and isinstance(metric["name"], str)
                 ):
+
                     result = self.push_metric(
                         ElasticMetric(
                             run_uuid=run_uuid,

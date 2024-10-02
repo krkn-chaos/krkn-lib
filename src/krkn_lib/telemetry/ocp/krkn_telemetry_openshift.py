@@ -1,4 +1,6 @@
 import datetime
+import json
+import logging
 import os
 import threading
 from queue import Queue
@@ -63,6 +65,11 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         chaos_telemetry.network_plugins = (
             self.ocpcli.get_cluster_network_plugins()
         )
+        vm_number = self.get_vm_number()
+        if vm_number > 0:
+            chaos_telemetry.kubernetes_objects_count[
+                "VirtualMachineInstance"
+            ] = vm_number
 
     def put_ocp_logs(
         self,
@@ -209,3 +216,34 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         worker.start()
         queue.join()
         self.safe_logger.info("ocp logs successfully uploaded")
+
+    def get_vm_number(self) -> int:
+        api_client = self.ocpcli.api_client
+        if api_client:
+            try:
+                path_params: dict[str, str] = {}
+                query_params: list[str] = []
+                header_params: dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = "/apis/kubevirt.io/v1/virtualmachineinstances"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+                if data[1] != 200:
+                    return 0
+
+                json_obj = json.loads(data[0])
+                return len(json_obj["items"])
+            except Exception as e:
+                logging.error(f"failed to parse virtualmachines API: {e}")
+                return 0
