@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 from queue import Queue
-
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.k8s import KrknTelemetryKubernetes
@@ -12,20 +11,31 @@ from krkn_lib.utils import SafeLogger
 
 
 class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
-    ocpcli: KrknOpenshift
+    __ocpcli: KrknOpenshift
+    __telemetry_id: str = None
 
     def __init__(
         self,
         safe_logger: SafeLogger,
         lib_openshift: KrknOpenshift,
+        telemetry_request_id: str = "",
         krkn_telemetry_config: dict[str, any] = None,
     ):
         super().__init__(
             safe_logger=safe_logger,
             lib_kubernetes=lib_openshift,
             krkn_telemetry_config=krkn_telemetry_config,
+            telemetry_request_id=telemetry_request_id,
         )
-        self.ocpcli = lib_openshift
+        self.__ocpcli = lib_openshift
+
+    def get_lib_ocp(self) -> KrknOpenshift:
+        """
+        Returns the instance of KrknOpenshift
+
+        :return: a KrknOpenshift instance
+        """
+        return self.__ocpcli
 
     def get_ocp_prometheus_data(
         self,
@@ -56,14 +66,14 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
         super().collect_cluster_metadata(chaos_telemetry)
         chaos_telemetry.cloud_infrastructure = (
-            self.ocpcli.get_cloud_infrastructure()
+            self.__ocpcli.get_cloud_infrastructure()
         )
-        chaos_telemetry.cloud_type = self.ocpcli.get_cluster_type()
+        chaos_telemetry.cloud_type = self.__ocpcli.get_cluster_type()
         chaos_telemetry.cluster_version = (
-            self.ocpcli.get_clusterversion_string()
+            self.__ocpcli.get_clusterversion_string()
         )
         chaos_telemetry.network_plugins = (
-            self.ocpcli.get_cluster_network_plugins()
+            self.__ocpcli.get_cluster_network_plugins()
         )
         vm_number = self.get_vm_number()
         if vm_number > 0:
@@ -168,10 +178,10 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             dst_dir = os.path.join(archive_path, f"filtered-logs-{timestamp}")
             os.mkdir(workdir)
             os.mkdir(dst_dir)
-            archive_path = self.ocpcli.collect_filter_archive_ocp_logs(
+            archive_path = self.__ocpcli.collect_filter_archive_ocp_logs(
                 workdir,
                 dst_dir,
-                self.kubecli.get_kubeconfig_path(),
+                self.__kubecli.get_kubeconfig_path(),
                 start_timestamp,
                 end_timestamp,
                 logs_filter_patterns,
