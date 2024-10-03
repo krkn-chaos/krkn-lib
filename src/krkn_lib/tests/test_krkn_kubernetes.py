@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 import os
 import random
@@ -9,7 +8,6 @@ import time
 import unittest
 import uuid
 
-import deprecation
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from kubernetes import config
@@ -855,50 +853,6 @@ class KrknKubernetesTests(BaseTest):
             continue
         result = self.lib_k8s.is_pod_running("do_not_exist", "do_not_exist")
         self.assertFalse(result)
-
-    @deprecation.fail_if_not_removed
-    def test_collect_cluster_events(self):
-        namespace_with_evt = "test-" + self.get_random_string(10)
-        namespace_no_evt = "test-" + self.get_random_string(10)
-        pod_name = "test-" + self.get_random_string(10)
-        self.deploy_namespace(namespace_with_evt, [])
-        self.deploy_namespace(namespace_no_evt, [])
-        self.deploy_delayed_readiness_pod(pod_name, namespace_with_evt, 0)
-        self.background_delete_pod(pod_name, namespace_with_evt)
-        time.sleep(10)
-        local_timezone = f"{get_localzone()}"
-        now = datetime.datetime.now()
-        one_hour_ago = now - datetime.timedelta(hours=1)
-
-        event_file_namespaced = self.lib_k8s.collect_cluster_events(
-            int(one_hour_ago.timestamp()),
-            int(now.timestamp()),
-            local_timezone,
-            namespace=namespace_with_evt,
-        )
-
-        event_file_not_namespaced = self.lib_k8s.collect_cluster_events(
-            int(one_hour_ago.timestamp()), int(now.timestamp()), local_timezone
-        )
-
-        self.assertIsNotNone(event_file_namespaced)
-        self.assertIsNotNone(event_file_not_namespaced)
-        with open(event_file_namespaced) as file:
-            obj_list = json.load(file)
-            self.assertTrue(len(obj_list) > 0)
-
-        with open(event_file_not_namespaced) as file:
-            obj_list = json.load(file)
-            self.assertTrue(len(obj_list) > 0)
-
-        event_file_no_event = self.lib_k8s.collect_cluster_events(
-            int(one_hour_ago.timestamp()),
-            int(now.timestamp()),
-            local_timezone,
-            namespace=namespace_no_evt,
-        )
-
-        self.assertIsNone(event_file_no_event)
 
     def test_collect_and_parse_cluster_events(self):
         namespace_with_evt = "test-" + self.get_random_string(10)

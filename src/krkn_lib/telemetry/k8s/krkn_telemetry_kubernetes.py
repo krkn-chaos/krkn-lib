@@ -4,21 +4,18 @@ import tempfile
 import threading
 import time
 import warnings
-import deprecation
 from queue import Queue
 from typing import Optional
 
 import requests
 import urllib3
 import yaml
-from tzlocal.unix import get_localzone
 
 import krkn_lib.utils as utils
 from krkn_lib.k8s import KrknKubernetes
 from krkn_lib.models.krkn import ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
 from krkn_lib.utils.safe_logger import SafeLogger
-from krkn_lib.version import __version__
 
 
 class KrknTelemetryKubernetes:
@@ -561,105 +558,6 @@ class KrknTelemetryKubernetes:
             raise Exception("telemetry: {0}".format(str(e)))
         scenario_telemetry.parameters_base64 = input_file_base64
         return input_file_yaml
-
-    @deprecation.deprecated(
-        deprecated_in="3.1.0",
-        removed_in="3.2.0",
-        current_version=__version__,
-        details="Cluster events has been added to the telemetry json,"
-        "so won't be uploaded as separated file",
-    )
-    def put_cluster_events(
-        self,
-        request_id: str,
-        telemetry_config: dict,
-        start_timestamp: int,
-        end_timestamp: int,
-        cluster_timezone: str = "UTC",
-    ):
-        """
-        Collects and puts cluster events on telemetry S3 bucket
-
-        :param request_id: uuid of the session that will represent the
-            S3 folder on which the prometheus files will be stored
-        :param telemetry_config: telemetry section of kraken config.yaml
-        :param start_timestamp: timestamp of the minimum date
-            after that the event is relevant
-        :param end_timestamp: timestamp of the maximum date
-            before that the event is relevant
-        :param cluster_timezone: timezone of the remote cluster
-        """
-
-        queue = Queue()
-        events_backup = telemetry_config.get("events_backup")
-        url = telemetry_config.get("api_url")
-        username = telemetry_config.get("username")
-        password = telemetry_config.get("password")
-        max_retries = telemetry_config.get("max_retries")
-        group = telemetry_config.get("telemetry_group")
-        exceptions = []
-        if events_backup is None:
-            exceptions.append("telemetry -> logs_backup flag is missing")
-        if url is None:
-            exceptions.append("telemetry -> api_url is missing")
-        if username is None:
-            exceptions.append("telemetry -> username is missing")
-        if password is None:
-            exceptions.append("telemetry -> password is missing")
-        if max_retries is None:
-            exceptions.append("telemetry -> max_retries is missing")
-        if not group:
-            group = "default"
-
-        if not events_backup:
-            self.safe_logger.info(
-                "logs_backup is False: skipping events collection"
-            )
-            return
-        if len(exceptions) > 0:
-            raise Exception(", ".join(exceptions))
-
-        events_file = self.__kubecli.collect_cluster_events(
-            start_timestamp,
-            end_timestamp,
-            str(get_localzone()),
-            cluster_timezone,
-            limit=500,
-        )
-        if not events_file:
-            self.safe_logger.warning(
-                "no cluster events found in the specified time interval"
-            )
-            return
-
-        # this parameter has doesn't have an utility in this context
-        # used to match the method signature and reuse it (Poor design?)
-        uploaded_files = list[str]()
-        queue.put((0, events_file, 0))
-        queue_size = queue.qsize()
-        self.safe_logger.info("uploading cluster events...")
-
-        worker = threading.Thread(
-            target=self.generate_url_and_put_to_s3_worker,
-            args=(
-                queue,
-                queue_size,
-                request_id,
-                group,
-                f"{url}/presigned-url",
-                username,
-                password,
-                0,
-                uploaded_files,
-                max_retries,
-                "events-",
-                ".json",
-            ),
-        )
-        worker.daemon = True
-        worker.start()
-        queue.join()
-        self.safe_logger.info("cluster events successfully uploaded")
 
     def put_critical_alerts(
         self,

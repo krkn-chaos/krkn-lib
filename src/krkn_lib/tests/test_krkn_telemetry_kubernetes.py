@@ -1,5 +1,4 @@
 import base64
-import datetime
 import os
 import tempfile
 import time
@@ -7,9 +6,7 @@ import unittest
 import uuid
 
 import boto3
-import deprecation
 import yaml
-from tzlocal.unix import get_localzone
 
 from krkn_lib.models.krkn import ChaosRunAlert, ChaosRunAlertSummary
 from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
@@ -249,52 +246,6 @@ class KrknTelemetryKubernetesTests(BaseTest):
             remote_files["Contents"][0]["Key"],
             f'{telemetry_config["telemetry_group"]}/'
             f"{request_id}/telemetry.json",
-        )
-
-    @deprecation.fail_if_not_removed
-    def test_put_cluster_events(self):
-
-        # generate a cluster event on a namespace
-
-        namespace_with_evt = "test-" + self.get_random_string(10)
-        pod_name = "test-" + self.get_random_string(10)
-        self.deploy_namespace(namespace_with_evt, [])
-        self.deploy_delayed_readiness_pod(pod_name, namespace_with_evt, 0)
-        self.background_delete_pod(pod_name, namespace_with_evt)
-        time.sleep(10)
-
-        request_id = f"test_folder/{int(time.time())}"
-        telemetry_config = {
-            "events_backup": True,
-            "username": os.getenv("API_USER"),
-            "password": os.getenv("API_PASSWORD"),
-            "max_retries": 5,
-            "api_url": "https://9ead3157ti.execute-api.us-west-2.amazonaws.com/dev",  # NOQA
-            "backup_threads": 6,
-            "telemetry_group": "default",
-        }
-        now = datetime.datetime.now()
-        one_hour_ago = now - datetime.timedelta(hours=1)
-
-        self.lib_telemetry_k8s.put_cluster_events(
-            request_id,
-            telemetry_config,
-            int(one_hour_ago.timestamp()),
-            int(now.timestamp()),
-            str(get_localzone()),
-        )
-
-        bucket_name = os.getenv("BUCKET_NAME")
-        s3 = boto3.client("s3")
-        remote_files = s3.list_objects_v2(
-            Bucket=bucket_name,
-            Prefix=f'{telemetry_config["telemetry_group"]}/{request_id}',
-        )
-        self.assertTrue("Contents" in remote_files.keys())
-        self.assertEqual(
-            remote_files["Contents"][0]["Key"],
-            f'{telemetry_config["telemetry_group"]}/'
-            f"{request_id}/events-00.json",
         )
 
     def test_put_alerts(self):
