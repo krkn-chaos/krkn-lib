@@ -1,5 +1,5 @@
+import ast
 import datetime
-import json
 import logging
 import os
 import threading
@@ -242,7 +242,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 if data[1] != 200:
                     return 0
 
-                json_obj = json.loads(data[0])
+                json_obj = ast.literal_eval(data[0])
                 return len(json_obj["items"])
             except Exception as e:
                 logging.error(f"failed to parse virtualmachines API: {e}")
