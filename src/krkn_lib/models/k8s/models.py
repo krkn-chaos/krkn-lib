@@ -1,9 +1,6 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
-from krkn_lib.version import __version__
-
-import deprecation
 
 
 @dataclass(frozen=True, order=False)
@@ -116,79 +113,6 @@ class Pod:
     volumes: list[Volume]
     """
     Volumes mounted in the Pod
-    """
-
-
-class LitmusChaosObject:
-    """
-    Data class to hold information regarding
-    a custom object of litmus project
-    """
-
-    @deprecation.deprecated(
-        deprecated_in="3.1.0",
-        removed_in="3.2.0",
-        current_version=__version__,
-        details="litmus support removed from krkn",
-    )
-    def __init__(self):
-        pass
-
-    kind: str
-    """
-    Litmus Object Kind
-    """
-    group: str
-    """
-    Api Group
-    """
-    namespace: str
-    """
-    Namespace where the object is deployed
-    """
-    name: str
-    """
-    Object name
-    """
-    plural: str
-    """
-    CRD plural
-    """
-    version: str
-    """
-    Version
-    """
-
-
-class ChaosEngine(LitmusChaosObject):
-    """
-    Data class to hold information
-    regarding a ChaosEngine object
-    """
-
-    engineStatus: str
-    """
-    Litmus Chaos engine status
-    """
-    expStatus: str
-    """
-    Litmus Chaos Engine experiment status
-    """
-
-
-class ChaosResult(LitmusChaosObject):
-    """
-    Data class to hold information
-    regarding a ChaosResult object
-    """
-
-    verdict: str
-    """
-    Verdict of the chaos experiment
-    """
-    failStep: str
-    """
-    Flag to show the failure step of the ChaosExperiment
     """
 
 
