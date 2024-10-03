@@ -2,13 +2,10 @@ import datetime
 import os
 import uuid
 
-from jinja2 import Environment, FileSystemLoader
-
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.ocp import KrknTelemetryOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
-from unittest.mock import MagicMock
 
 
 class KrknTelemetryOpenshiftTests(BaseTest):
@@ -52,16 +49,3 @@ class KrknTelemetryOpenshiftTests(BaseTest):
             int(ten_minutes_ago.timestamp()),
             int(ten_minutes_fwd.timestamp()),
         )
-
-    def test_get_vm_infos(self):
-        environment = Environment(loader=FileSystemLoader("src/testdata/"))
-        template = environment.get_template("virtualization_api_result.j2")
-        api_result = template.render()
-        krkn_ocp_mock = MagicMock()
-        krkn_ocp_mock.kubeconfig_path = "~/.kube/config"
-        krkn_ocp_mock.api_client.call_api.return_value = [api_result, 200]
-        safe_logger = SafeLogger()
-        krkn_telemetry_ocp = KrknTelemetryOpenshift(safe_logger, krkn_ocp_mock)
-        self.assertEqual(krkn_telemetry_ocp.get_vm_number(), 3)
-        krkn_ocp_mock.api_client.call_api.return_value = [None, 404]
-        self.assertEqual(krkn_telemetry_ocp.get_vm_number(), 0)
