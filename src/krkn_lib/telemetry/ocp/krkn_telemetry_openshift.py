@@ -228,7 +228,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         self.safe_logger.info("ocp logs successfully uploaded")
 
     def get_vm_number(self) -> int:
-        api_client = self.ocpcli.api_client
+        api_client = self.__ocpcli.api_client
         if api_client:
             try:
                 path_params: dict[str, str] = {}
