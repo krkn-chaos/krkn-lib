@@ -181,7 +181,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             archive_path = self.__ocpcli.collect_filter_archive_ocp_logs(
                 workdir,
                 dst_dir,
-                self.__kubecli.get_kubeconfig_path(),
+                self.__ocpcli.get_kubeconfig_path(),
                 start_timestamp,
                 end_timestamp,
                 logs_filter_patterns,

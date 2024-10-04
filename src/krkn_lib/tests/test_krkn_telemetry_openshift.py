@@ -49,3 +49,8 @@ class KrknTelemetryOpenshiftTests(BaseTest):
             int(ten_minutes_ago.timestamp()),
             int(ten_minutes_fwd.timestamp()),
         )
+
+    def test_get_kubeconfig_path(self):
+        kube_path = self.lib_ocp.get_kubeconfig_path()
+        self.assertIsNotNone(kube_path)
+        self.assertEqual(kube_path, "~/.kube/config")
