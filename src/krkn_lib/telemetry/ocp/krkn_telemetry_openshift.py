@@ -75,6 +75,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         chaos_telemetry.network_plugins = (
             self.__ocpcli.get_cluster_network_plugins()
         )
+
         vm_number = self.get_vm_number()
         if vm_number > 0:
             chaos_telemetry.kubernetes_objects_count[
@@ -254,6 +255,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
 
                 json_obj = ast.literal_eval(data[0])
                 return len(json_obj["items"])
-            except Exception as e:
-                logging.error(f"failed to parse virtualmachines API: {e}")
+            except Exception:
+                logging.info("failed to parse virtualmachines API")
                 return 0
+        return 0
