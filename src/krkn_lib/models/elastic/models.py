@@ -126,6 +126,7 @@ class ElasticChaosRunTelemetry(Document):
     total_node_count = Integer()
     cloud_infrastructure = Text()
     cloud_type = Text()
+    cluster_version = Text()
     run_uuid = Text(fields={"keyword": Keyword()})
 
     class Index:
@@ -192,4 +193,6 @@ class ElasticChaosRunTelemetry(Document):
         self.total_node_count = chaos_run_telemetry.total_node_count
         self.cloud_infrastructure = chaos_run_telemetry.cloud_infrastructure
         self.cloud_type = chaos_run_telemetry.cloud_type
+        self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
+
