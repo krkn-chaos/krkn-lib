@@ -1,6 +1,5 @@
-from krkn_lib.version import __version__
-
 from krkn_lib.tests import BaseTest
+from krkn_lib.version import __version__
 
 
 class VersionTest(BaseTest):
