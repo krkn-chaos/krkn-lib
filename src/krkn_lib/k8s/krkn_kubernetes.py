@@ -24,6 +24,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
+from urllib.parse import urlparse
 
 from krkn_lib.models.k8s import (
     PVC,
@@ -144,20 +145,36 @@ class KrknKubernetes:
                 conf.use_context("krkn-context")
 
         try:
-            config.load_kube_config(kubeconfig_path)
-            self.api_client = client.ApiClient()
-            self.k8s_client = config.new_client_from_config(
-                config_file=kubeconfig_path
-            )
-            self.cli = client.CoreV1Api(self.k8s_client)
+            # config.load_kube_config(kubeconfig_path)
+
+            client_config = client.Configuration()
+            http_proxy = os.getenv('http_proxy',None)
+            if http_proxy and "@" in http_proxy:
+                proxy_auth = urlparse(http_proxy)
+                auth_string = proxy_auth.username + ":" +  proxy_auth.password
+                client_config.username = proxy_auth.username
+                client_config.password = proxy_auth.password
+            config.load_kube_config(kubeconfig_path, persist_config=True, client_configuration=client_config)
+
+            proxy_url = http_proxy
+            if proxy_url:
+                client_config.proxy = proxy_url
+                if proxy_auth:
+                    client_config.proxy_headers = urllib3.util.make_headers(proxy_basic_auth=auth_string)
+
+            client.Configuration.set_default(client_config)
+
+            self.api_client = client.ApiClient(client_config)
+
+            self.cli = client.CoreV1Api(self.api_client)
             self.version_client = client.VersionApi(self.api_client)
             self.apps_api = client.AppsV1Api(self.api_client)
-            self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.batch_cli = client.BatchV1Api(self.api_client)
             self.net_cli = client.NetworkingV1Api(self.api_client)
             self.custom_object_client = client.CustomObjectsApi(
-                self.k8s_client
+                self.api_client
             )
-            self.dyn_client = DynamicClient(self.k8s_client)
+            self.dyn_client = DynamicClient(self.api_client)
             self.watch_resource = watch.Watch()
 
         except OSError:
