@@ -50,7 +50,7 @@ class BaseTest(unittest.TestCase):
         cls.lib_telemetry_ocp = KrknTelemetryOpenshift(
             SafeLogger(), cls.lib_ocp
         )
-        host = cls.lib_k8s.api_client.configuration.host
+        host = cls.lib_k8s.get_host()
         logging.disable(logging.CRITICAL)
         # PROFILER
         # """init each test"""
@@ -102,6 +102,7 @@ class BaseTest(unittest.TestCase):
     def deploy_namespace(self, name: str, labels: List[Dict[str, str]]):
         template = self.template_to_namespace(name, labels)
         self.apply_template(template)
+
 
     def deploy_fedtools(
         self,
@@ -266,7 +267,12 @@ class BaseTest(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w") as file:
             file.write(template)
             file.flush()
-            self.lib_k8s.apply_yaml(file.name, "")
+            retries = 3
+            while retries > 0:
+                template_applied = self.lib_k8s.apply_yaml(file.name, namespace="")
+                if template_applied is not None:
+                    return
+                retries -= 1
 
     def get_random_string(self, length: int) -> str:
         letters = string.ascii_lowercase
