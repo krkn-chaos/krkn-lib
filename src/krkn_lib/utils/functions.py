@@ -3,9 +3,10 @@ import logging
 import os
 import random
 import re
+import socket
 import string
 import sys
-import socket
+import xml.etree.cElementTree as ET
 from queue import Queue
 from typing import Optional
 
@@ -13,7 +14,6 @@ import pytz
 from base64io import Base64IO
 from dateutil import parser
 from dateutil.parser import ParserError
-import xml.etree.cElementTree as ET
 
 
 def decode_base64_file(source_filename: str, destination_filename: str):

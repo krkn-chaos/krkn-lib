@@ -3,8 +3,8 @@ import unittest
 
 from krkn_lib.models.telemetry import (
     ChaosRunTelemetry,
-    ScenarioTelemetry,
     ClusterEvent,
+    ScenarioTelemetry,
 )
 
 

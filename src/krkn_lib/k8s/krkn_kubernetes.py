@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -37,7 +38,7 @@ from krkn_lib.models.k8s import (
     Volume,
     VolumeMount,
 )
-from krkn_lib.models.telemetry import NodeInfo, Taint, ClusterEvent
+from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -144,20 +145,28 @@ class KrknKubernetes:
                 conf.use_context("krkn-context")
 
         try:
-            config.load_kube_config(kubeconfig_path)
-            self.api_client = client.ApiClient()
-            self.k8s_client = config.new_client_from_config(
-                config_file=kubeconfig_path
+            # config.load_kube_config(kubeconfig_path)
+
+            client_config = client.Configuration()
+            
+            config.load_kube_config(
+                kubeconfig_path,
+                client_configuration=client_config,
             )
-            self.cli = client.CoreV1Api(self.k8s_client)
+
+            client.Configuration.set_default(client_config)
+
+            self.api_client = client.ApiClient()
+
+            self.cli = client.CoreV1Api(self.api_client)
             self.version_client = client.VersionApi(self.api_client)
             self.apps_api = client.AppsV1Api(self.api_client)
-            self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.batch_cli = client.BatchV1Api(self.api_client)
             self.net_cli = client.NetworkingV1Api(self.api_client)
             self.custom_object_client = client.CustomObjectsApi(
-                self.k8s_client
+                self.api_client
             )
-            self.dyn_client = DynamicClient(self.k8s_client)
+            self.dyn_client = DynamicClient(self.api_client)
             self.watch_resource = watch.Watch()
 
         except OSError:
@@ -1127,11 +1136,12 @@ class KrknKubernetes:
         pod_body = yaml.safe_load(
             pod_template.render(nodename=node_name, podname=exec_pod_name)
         )
+
         logging.info(
             f"Creating pod to exec command {command} on node {node_name}"
         )
         try:
-            self.create_pod(pod_body, exec_pod_namespace, 300)
+            self.create_pod(pod_body, exec_pod_namespace, 500)
         except Exception as e:
             logging.error(
                 f"failed to create pod {exec_pod_name} on node {node_name},"
@@ -1498,10 +1508,12 @@ class KrknKubernetes:
             the resource (optional default `default`)
         :return: the list of names of created objects
         """
-
-        return utils.create_from_yaml(
-            self.api_client, yaml_file=path, namespace=namespace
-        )
+        try:
+            return utils.create_from_yaml(
+                self.api_client, yaml_file=path, namespace=namespace
+            )
+        except Exception as e:
+            logging.error("Error trying to apply_yaml" + str(e))
 
     def get_pod_info(self, name: str, namespace: str = "default") -> Pod:
         """
@@ -1712,9 +1724,7 @@ class KrknKubernetes:
                 raise e
         return node_name
 
-    def watch_node_status(
-        self, node: str, status: str, timeout: int
-    ):
+    def watch_node_status(self, node: str, status: str, timeout: int):
         """
         Watch for a specific node status
 
