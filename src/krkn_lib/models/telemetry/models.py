@@ -1,5 +1,4 @@
 from __future__ import annotations
-from ast import Tuple
 import base64
 import json
 import yaml
@@ -352,14 +351,15 @@ class SloAlert:
     """
     severity of the alert
     """
+    description: str
+    """
+    description of the alert
+    """
 
-    def __init__(self, json_dict: any = None, alert_tuple: Tuple[int, str] = None):
-        if json_dict is not None:
-            self.timestamp = json_dict.get("timestamp")
-            self.severity = json_dict.get("severity")
-        if alert_tuple is not None:
-            self.timestamp = alert_tuple[0]
-            self.severity = alert_tuple[1]
+    def __init__(self, timestamp: int, severity: str, description: str):
+            self.timestamp = timestamp
+            self.severity = severity
+            self.description = description
     
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -395,6 +395,10 @@ class ChaosRunTelemetry:
     """
     Network plugins deployed in the target cluster
     """
+    slo_alert: list[SloAlert]
+    """
+    Alerts defined using SLOs firing during and after the chaos run
+    """
     total_node_count: int = 0
     """
     Number of all kind of nodes in the target cluster
@@ -419,10 +423,6 @@ class ChaosRunTelemetry:
     """
     Current time stamp of run
     """
-    slo_alert: tuple[SloAlert]
-    """
-    Alerts defined using SLOs firing during and after the chaos run
-    """
 
     affected_pods: PodsStatus = PodsStatus()
 
@@ -435,7 +435,7 @@ class ChaosRunTelemetry:
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
-        self.slo_alert = tuple[SloAlert]()
+        self.slo_alert = list[SloAlert]()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
