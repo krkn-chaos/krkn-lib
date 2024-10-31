@@ -1926,26 +1926,26 @@ class KrknKubernetes:
         :param objects: list of the kinds that must be counted
         :return: a dictionary of Kinds and the number of objects counted
         """
-        api_client = self.api_client
-        resources = self.get_api_resources_by_group("", "v1")
+
         result = dict[str, int]()
 
-        for resource in resources.resources:
-            if resource.kind in objects:
-                if api_client:
-                    try:
+        try:
+            resources = self.cli.get_api_resources()
+            for resource in resources.resources:
+                if resource.kind in objects:
+                    if self.api_client:
                         path_params: Dict[str, str] = {}
                         query_params: List[str] = []
                         header_params: Dict[str, str] = {}
                         auth_settings = ["BearerToken"]
                         header_params["Accept"] = (
-                            api_client.select_header_accept(
+                            self.api_client.select_header_accept(
                                 ["application/json"]
                             )
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
-                        (data) = api_client.call_api(
+                        (data) = self.api_client.call_api(
                             path,
                             "GET",
                             path_params,
@@ -1958,8 +1958,8 @@ class KrknKubernetes:
                         json_obj = ast.literal_eval(data[0])
                         count = len(json_obj["items"])
                         result[resource.kind] = count
-                    except ApiException:
-                        pass
+        except ApiException:
+            pass
         return result
 
     def get_kubernetes_custom_objects_count(
@@ -1972,7 +1972,6 @@ class KrknKubernetes:
         :param objects: list of Kinds that must be counted
         :return: a dictionary of Kinds and number of objects counted
         """
-        custom_object_api = client.CustomObjectsApi(self.api_client)
         groups = client.ApisApi(self.api_client).get_api_versions().groups
         result = dict[str, int]()
         for api in groups:
@@ -1992,12 +1991,11 @@ class KrknKubernetes:
                 )
                 for resource in data.resources:
                     if resource.kind in objects:
-                        custom_resource = (
-                            custom_object_api.list_cluster_custom_object(
-                                group=api.name,
-                                version=api.preferred_version.version,
-                                plural=resource.name,
-                            )
+                        cust_cli = self.custom_object_client
+                        custom_resource = cust_cli.list_cluster_custom_object(
+                            group=api.name,
+                            version=api.preferred_version.version,
+                            plural=resource.name,
                         )
                         result[resource.kind] = len(custom_resource["items"])
 
@@ -2006,32 +2004,13 @@ class KrknKubernetes:
         return result
 
     def get_api_resources_by_group(self, group, version):
-        api_client = self.api_client
-        if api_client:
-            try:
-                path_params: Dict[str, str] = {}
-                query_params: List[str] = []
-                header_params: Dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
-                )
-
-                path = f"/apis/{group}/{version}"
-                if group == "":
-                    path = f"/api/{version}"
-                (data) = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="V1APIResourceList",
-                    auth_settings=auth_settings,
-                )
-                return data[0]
-            except Exception:
-                pass
+        try:
+            api_response = self.custom_object_client.get_api_resources(
+                group, version
+            )
+            return api_response
+        except Exception:
+            pass
 
         return None
 
