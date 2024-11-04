@@ -1713,7 +1713,7 @@ class KrknKubernetes:
         return node_name
 
     def watch_node_status(
-        self, node: str, status: str, timeout: int, resource_version: str
+        self, node: str, status: str, timeout: int
     ):
         """
         Watch for a specific node status
@@ -1728,7 +1728,6 @@ class KrknKubernetes:
             self.cli.list_node,
             field_selector=f"metadata.name={node}",
             timeout_seconds=timeout,
-            resource_version=f"{resource_version}",
         ):
             conditions = [
                 status
