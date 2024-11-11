@@ -56,7 +56,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                 {
                     "timestamp": "2024-10-23T15:25:47Z",
                     "severity": "high",
-                    "description": "API latency is too high."
+                    "description": "API latency is too high"
                 },
                 {
                     "timestamp": "2024-10-23T15:30:47Z",
