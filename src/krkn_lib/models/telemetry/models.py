@@ -457,7 +457,7 @@ class ChaosRunTelemetry:
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
-            self.slo_alert = [SloAlert(a) for a in json_dict.get("slo_alert")]
+            self.slo_alert = [SloAlert(a) for a in json_dict.get("slo_alert", [])]
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
