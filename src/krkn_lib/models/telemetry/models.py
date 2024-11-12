@@ -337,6 +337,32 @@ class ClusterEvent:
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
+@dataclass(order=False)
+class SloAlert:
+    """
+    Represents alerts collected from prometheus
+    """
+
+    timestamp: int
+    """
+    prometheus alert name
+    """
+    severity: str
+    """
+    severity of the alert
+    """
+    description: str
+    """
+    description of the alert
+    """
+
+    def __init__(self, timestamp: int, severity: str, description: str):
+            self.timestamp = timestamp
+            self.severity = severity
+            self.description = description
+    
+    def to_json(self) -> str:
+        return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
 @dataclass(order=False)
 class ChaosRunTelemetry:
@@ -368,6 +394,10 @@ class ChaosRunTelemetry:
     network_plugins: list[str]
     """
     Network plugins deployed in the target cluster
+    """
+    slo_alert: list[SloAlert]
+    """
+    Alerts defined using SLOs firing during and after the chaos run
     """
     total_node_count: int = 0
     """
@@ -405,6 +435,7 @@ class ChaosRunTelemetry:
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
+        self.slo_alert = list[SloAlert]()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -426,6 +457,7 @@ class ChaosRunTelemetry:
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
+            self.slo_alert = [SloAlert(a) for a in json_dict.get("slo_alert")]
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
