@@ -21,18 +21,14 @@ from krkn_lib.tests import BaseTest
 
 class KrknKubernetesTests(BaseTest):
     def test_exec_command(self):
-        namespace = "test-ec-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         alpine_name = "alpine-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         count = 0
-        MAX_RETRIES = 20
+        MAX_RETRIES = 5
         while not self.lib_k8s.is_pod_running("fedtools", namespace):
             if count > MAX_RETRIES:
-                print(
-                    "fedtools pod info "
-                    + str(self.lib_k8s.get_pod_info("fedtools", namespace))
-                )
                 self.assertFalse(True, "container failed to become ready")
             count += 1
             time.sleep(3)
@@ -73,13 +69,11 @@ class KrknKubernetesTests(BaseTest):
 
         try:
             self.lib_k8s.exec_cmd_in_pod(["ls", "-al"], alpine_name, namespace)
-            self.lib_k8s.delete_namespace(namespace)
         except Exception:
-            self.lib_k8s.delete_namespace(namespace)
             self.fail()
 
     def test_pod_shell(self):
-        namespace = "test-ps-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         alpine_name = "alpine-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
 
@@ -110,14 +104,13 @@ class KrknKubernetesTests(BaseTest):
             continue
         shell = self.lib_k8s.get_pod_shell("fedtools", namespace)
         self.assertEqual(shell, "bash")
-        self.lib_k8s.delete_namespace(namespace)
 
-    def test_command_on_node(self):
+    def test_exec_command_on_node(self):
         try:
             response = self.lib_k8s.exec_command_on_node(
                 "kind-control-plane",
                 ["timedatectl", "status"],
-                f"test-pod-{self.get_random_string(6)}",
+                f"test-pod-{time.time()}",
             )
             self.assertTrue(
                 "NTP service: active" or "Network time on: yes" in response
@@ -207,7 +200,7 @@ class KrknKubernetesTests(BaseTest):
             self.lib_k8s.get_namespace_status("not-exists")
 
     def test_delete_namespace(self):
-        name = "test-d-ns-" + self.get_random_string(6)
+        name = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(name, [{"name": "name", "label": name}])
         result = self.lib_k8s.get_namespace_status(name)
         self.assertTrue(result == "Active")
@@ -283,7 +276,7 @@ class KrknKubernetesTests(BaseTest):
         self.delete_fake_kraken()
 
     def test_list_pods(self):
-        namespace = "test-lp" + self.get_random_string(10)
+        namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fake_kraken(namespace=namespace)
         pods = self.lib_k8s.list_pods(namespace=namespace)
@@ -293,7 +286,7 @@ class KrknKubernetesTests(BaseTest):
         self.delete_fake_kraken(namespace=namespace)
 
     def test_get_all_pods(self):
-        namespace = "test-ap" + self.get_random_string(10)
+        namespace = "test-" + self.get_random_string(10)
         random_label = self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fake_kraken(random_label=random_label, namespace=namespace)
@@ -309,36 +302,32 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(len(results) == 1)
         self.assertEqual(results[0][0], "kraken-deployment")
         self.assertEqual(results[0][1], namespace)
-
-        self.delete_fake_kraken(namespace=namespace)
         self.lib_k8s.delete_namespace(namespace)
+        self.delete_fake_kraken(namespace=namespace)
 
     def test_delete_pod(self):
-        namespace = "test-dp-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         self.wait_pod("fedtools", namespace=namespace)
         self.lib_k8s.delete_pod("fedtools", namespace=namespace)
         with self.assertRaises(ApiException):
             self.lib_k8s.read_pod("fedtools", namespace=namespace)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_create_pod(self):
-        namespace = "test-cp-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         template_str = self.template_to_pod("fedtools", namespace=namespace)
         body = yaml.safe_load(template_str)
         self.lib_k8s.create_pod(body, namespace)
         try:
             self.wait_pod("fedtools", namespace=namespace)
-            self.lib_k8s.delete_namespace(namespace)
         except Exception:
             logging.error("failed to create pod")
             self.assertTrue(False)
-            self.lib_k8s.delete_namespace(namespace)
 
     def test_read_pod(self):
-        namespace = "test-rp" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
@@ -353,10 +342,9 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_get_pod_log(self):
-        namespace = "test-pl-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
@@ -370,10 +358,9 @@ class KrknKubernetesTests(BaseTest):
                 "failed to get logs due to an exception: %s" % str(e)
             )
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_get_containers_in_pod(self):
-        namespace = "test-cip-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace, name=name)
@@ -389,10 +376,9 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_net_policy(self):
-        namespace = "test-np" + self.get_random_string(10)
+        namespace = "test-" + self.get_random_string(10)
         name = "test"
         self.deploy_namespace(namespace, [])
         self.create_networkpolicy(name, namespace)
@@ -404,7 +390,7 @@ class KrknKubernetesTests(BaseTest):
         self.lib_k8s.delete_namespace(namespace)
 
     def test_delete_deployment(self):
-        namespace = "test-dd" + self.get_random_string(10)
+        namespace = "test-" + self.get_random_string(10)
         name = "test"
         self.deploy_namespace(namespace, [])
         self.deploy_deployment(name, namespace)
@@ -416,7 +402,7 @@ class KrknKubernetesTests(BaseTest):
         self.lib_k8s.delete_namespace(namespace)
 
     def test_delete_statefulsets(self):
-        namespace = "test-ss" + self.get_random_string(10)
+        namespace = "test-" + self.get_random_string(10)
         name = "test"
         self.deploy_namespace(namespace, [])
         self.deploy_statefulset(name, namespace)
@@ -489,7 +475,6 @@ class KrknKubernetesTests(BaseTest):
                     "job deleted after %d seconds" % (counter * sleep)
                 )
                 break
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_create_job(self):
         namespace = "test-ns-" + self.get_random_string(10)
@@ -507,10 +492,9 @@ class KrknKubernetesTests(BaseTest):
                 )
             )
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_get_job_status(self):
-        namespace = "test-js-" + self.get_random_string(10)
+        namespace = "test-ns-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_job(name, namespace)
@@ -532,7 +516,6 @@ class KrknKubernetesTests(BaseTest):
             except ApiException:
                 continue
         self.assertTrue(status.metadata.name == name)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_monitor_nodes(self):
         try:
@@ -567,8 +550,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(len(status[1]) == 1)
         self.assertTrue(status[1][0] == "kraken-deployment")
         self.delete_fake_kraken(namespace=bad_namespace)
-        self.lib_k8s.delete_namespace(good_namespace)
-        self.lib_k8s.delete_namespace(bad_namespace)
 
     def test_monitor_component(self):
         good_namespace = "test-ns-" + self.get_random_string(10)
@@ -596,8 +577,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(len(status[1]) == 1)
         self.assertTrue(status[1][0] == "kraken-deployment")
         self.delete_fake_kraken(namespace=bad_namespace)
-        self.lib_k8s.delete_namespace(good_namespace)
-        self.lib_k8s.delete_namespace(bad_namespace)
 
     def test_apply_yaml(self):
         try:
@@ -631,7 +610,6 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_check_if_namespace_exists(self):
         try:
@@ -646,7 +624,6 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_check_if_pod_exists(self):
         try:
@@ -664,7 +641,6 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_check_if_pvc_exists(self):
         try:
@@ -688,7 +664,6 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_get_pvc_info(self):
         try:
@@ -713,7 +688,6 @@ class KrknKubernetesTests(BaseTest):
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_find_kraken_node(self):
         namespace = "test-ns-" + self.get_random_string(10)
@@ -726,7 +700,6 @@ class KrknKubernetesTests(BaseTest):
         result = self.lib_k8s.find_kraken_node()
         self.assertEqual(nodes[random_node_index], result)
         self.delete_fake_kraken(namespace)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_get_node_resource_version(self):
         try:
@@ -846,7 +819,7 @@ class KrknKubernetesTests(BaseTest):
         self.deploy_namespace(namespace, [])
         self.deploy_fedtools(namespace=namespace)
         count = 0
-        MAX_RETRIES = 10
+        MAX_RETRIES = 5
         while not self.lib_k8s.is_pod_running("fedtools", namespace):
             if count > MAX_RETRIES:
                 self.assertFalse(True, "container failed to become ready")
@@ -865,7 +838,6 @@ class KrknKubernetesTests(BaseTest):
                 "fedtools", "fedtools", namespace, "/does_not_exist"
             )
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_is_pod_running(self):
         namespace = "test-" + self.get_random_string(10)
@@ -881,7 +853,6 @@ class KrknKubernetesTests(BaseTest):
             continue
         result = self.lib_k8s.is_pod_running("do_not_exist", "do_not_exist")
         self.assertFalse(result)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_collect_and_parse_cluster_events(self):
         namespace_with_evt = "test-" + self.get_random_string(10)
@@ -900,7 +871,6 @@ class KrknKubernetesTests(BaseTest):
             namespace=namespace_with_evt,
         )
         self.assertGreater(len(events), 0)
-        self.lib_k8s.delete_namespace(namespace_with_evt)
 
     def test_is_kubernetes(self):
         self.assertTrue(self.lib_k8s.is_kubernetes())
@@ -927,7 +897,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertFalse(
             self.lib_k8s.is_pod_terminating(not_terminated, namespace)
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_monitor_pods_by_label_no_pods_affected(self):
         # test no pods affected
@@ -964,7 +933,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertIsNone(result.error)
         self.assertEqual(len(result.recovered), 0)
         self.assertEqual(len(result.unrecovered), 0)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_name_and_namespace_pattern_different_names_respawn(
         self,
@@ -1012,7 +980,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
         self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
         self.assertEqual(len(result.unrecovered), 0)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_namespace_pattern_and_label_same_name_respawn(
         self,
@@ -1057,7 +1024,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(result.recovered[0].pod_rescheduling_time > 0)
         self.assertTrue(result.recovered[0].total_recovery_time >= pod_delay)
         self.assertEqual(len(result.unrecovered), 0)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_label_respawn_timeout(self):
         # test pod will not recover before the timeout
@@ -1096,7 +1062,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertEqual(len(result.recovered), 0)
         self.background_delete_pod(delayed_respawn, namespace)
         self.background_delete_pod(delayed_2, namespace)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_label_never_respawn(self):
         # test pod will never recover
@@ -1121,7 +1086,6 @@ class KrknKubernetesTests(BaseTest):
         result = pods_thread.join()
         self.assertIsNotNone(result.error)
         self.background_delete_pod(delayed_2, namespace)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_label_multiple_respawn(self):
         # test pod will never recover
@@ -1168,7 +1132,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(
             delayed_respawn_2 in [p.pod_name for p in result.recovered]
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_label_multiple_respawn_one_too_late(self):
         # test pod will never recover
@@ -1216,7 +1179,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertTrue(
             delayed_respawn_2 in [p.pod_name for p in result.unrecovered]
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_pods_by_label_multiple_respawn_one_fails(self):
         # test pod will never recover
@@ -1254,7 +1216,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertIsNotNone(result.error)
         self.assertEqual(len(result.unrecovered), 0)
         self.assertEqual(len(result.recovered), 0)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_replace_service_selector(self):
         namespace = "test-" + self.get_random_string(10)
@@ -1305,7 +1266,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertEqual(
             sanitized_service["spec"]["selector"]["good"], "selector"
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_deploy_undeploy_service_hijacking(self):
         # test deploy
@@ -1347,7 +1307,6 @@ class KrknKubernetesTests(BaseTest):
             self.lib_k8s.cli.read_namespaced_config_map(
                 service_infos.config_map_name, service_infos.namespace
             )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_service_exists(self):
         namespace = "test-" + self.get_random_string(10)
@@ -1358,7 +1317,6 @@ class KrknKubernetesTests(BaseTest):
         self.assertFalse(
             self.lib_k8s.service_exists("doesnotexist", "doesnotexist")
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_deploy_syn_flood(self):
         namespace = "test-" + self.get_random_string(10)
@@ -1407,7 +1365,6 @@ class KrknKubernetesTests(BaseTest):
             places=None,
             delta=2,
         )
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_select_services_by_label(self):
         namespace = "test-" + self.get_random_string(10)
@@ -1426,7 +1383,6 @@ class KrknKubernetesTests(BaseTest):
 
         service = self.lib_k8s.select_service_by_label(namespace, "not=found")
         self.assertEqual(len(service), 0)
-        self.lib_k8s.delete_namespace(namespace)
 
     def test_list_namespaces_by_regex(self):
         namespace_1 = (
