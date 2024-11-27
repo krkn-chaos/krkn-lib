@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
