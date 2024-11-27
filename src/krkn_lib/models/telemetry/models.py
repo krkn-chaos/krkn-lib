@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 import base64
 import json
-import yaml
 from dataclasses import dataclass
 from datetime import datetime, timezone
+
+import yaml
+
 from krkn_lib.models.k8s import PodsStatus
 
 relevant_event_reasons: frozenset[str] = frozenset(
@@ -292,7 +295,12 @@ class ClusterEvent:
     type: str
     """ Event severity"""
 
-    def __init__(self, k8s_json_dict: any = None, json_dict: any = None):
+    def __init__(
+        self,
+        k8s_json_dict: any = None,
+        json_dict: any = None,
+        k8s_obj: any = None,
+    ):
         self.name = ""
         self.creation = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -305,6 +313,20 @@ class ClusterEvent:
         self.involved_object_name = ""
         self.involved_object_namespace = ""
         self.type = ""
+
+        if k8s_obj:
+            # This parses CoreV1Event
+            # (https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Event.md)
+            self.name = k8s_obj.metadata.name
+            self.creation = k8s_obj.metadata.creation_timestamp
+            self.reason = k8s_obj.reason
+            self.message = k8s_obj.message
+            self.namespace = k8s_obj.metadata.namespace
+            self.source_component = k8s_obj.source.component
+            self.involved_object_kind = k8s_obj.involved_object.kind
+            self.involved_object_name = k8s_obj.involved_object.name
+            self.involved_object_namespace = k8s_obj.involved_object.namespace
+            self.type = k8s_obj.type
 
         if k8s_json_dict:
             self.name = k8s_json_dict["metadata"]["name"]
