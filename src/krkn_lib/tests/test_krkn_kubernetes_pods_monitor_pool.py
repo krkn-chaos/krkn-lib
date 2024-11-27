@@ -88,9 +88,6 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         self.assertIsNone(status.error)
         self.assertEqual(len(status.recovered), 2)
         self.assertEqual(len(status.unrecovered), 1)
-        self.lib_k8s.delete_namespace(namespace_1)
-        self.lib_k8s.delete_namespace(namespace_2)
-        self.lib_k8s.delete_namespace(namespace_3)
 
     def test_cancel(self):
         namespace_1 = "test-pool-ns-0-" + self.get_random_string(10)
@@ -121,4 +118,3 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         self.background_delete_pod(delayed_2, namespace_1)
         # give the time to wrap up the threads and return
         self.assertLess(end_time, 1)
-        self.lib_k8s.delete_namespace(namespace_1)
