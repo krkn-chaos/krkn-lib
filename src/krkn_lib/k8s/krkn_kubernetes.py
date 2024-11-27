@@ -37,7 +37,7 @@ from krkn_lib.models.k8s import (
     Volume,
     VolumeMount,
 )
-from krkn_lib.models.telemetry import NodeInfo, Taint, ClusterEvent
+from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -150,6 +150,7 @@ class KrknKubernetes:
                 config_file=kubeconfig_path
             )
             self.cli = client.CoreV1Api(self.k8s_client)
+
             self.version_client = client.VersionApi(self.api_client)
             self.apps_api = client.AppsV1Api(self.api_client)
             self.batch_cli = client.BatchV1Api(self.k8s_client)
@@ -1712,9 +1713,7 @@ class KrknKubernetes:
                 raise e
         return node_name
 
-    def watch_node_status(
-        self, node: str, status: str, timeout: int
-    ):
+    def watch_node_status(self, node: str, status: str, timeout: int):
         """
         Watch for a specific node status
 
@@ -2473,41 +2472,22 @@ class KrknKubernetes:
         """
         events = []
         try:
-            path_params: Dict[str, str] = {}
-            query_params = {"limit": limit}
-            header_params: Dict[str, str] = {}
-            auth_settings = ["BearerToken"]
-            header_params["Accept"] = self.api_client.select_header_accept(
-                ["application/json"]
-            )
-
-            path = "/api/v1/events"
             if namespace:
-                path = f"/api/v1/namespaces/{namespace}/events"
+                events_list = self.cli.list_namespaced_event(namespace)
 
-            (data) = self.api_client.call_api(
-                path,
-                "GET",
-                path_params,
-                query_params,
-                header_params,
-                response_type="str",
-                auth_settings=auth_settings,
-            )
-
-            json_obj = ast.literal_eval(data[0])
-            events_list = reversed(json_obj["items"])
+            else:
+                events_list = self.cli.list_event_for_all_namespaces()
+            events_list = events_list.items
             for obj in events_list:
-                filtered_obj = filter_dictionary(
-                    obj,
-                    "firstTimestamp",
+                in_filtered_time = filter_dictionary(
+                    obj.first_timestamp,
                     start_timestamp,
                     end_timestamp,
                     cluster_timezone,
                     local_timezone,
                 )
-                if filtered_obj:
-                    events.append(ClusterEvent(k8s_json_dict=obj))
+                if in_filtered_time:
+                    events.append(ClusterEvent(k8s_obj=obj))
 
         except Exception as e:
             logging.error(str(e))
