@@ -20,8 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create multi-node KinD cluster
-        uses: krkn-chaos/actions/kind@main
-
+        uses: redhat-chaos/actions/kind@main
       - name: get nodes
         run: |
           kubectl get nodes
