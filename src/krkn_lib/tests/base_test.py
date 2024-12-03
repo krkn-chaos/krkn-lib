@@ -81,6 +81,26 @@ class BaseTest(unittest.TestCase):
         # "\n--->>>"
         pass
 
+
+    def wait_delete_namespace(
+        self, namespace: str = "default", timeout: int = 60
+    ):
+        runtime = 0
+        while True:
+            if runtime >= timeout:
+                raise Exception(
+                    "timeout on waiting on namespace {1} deletion".format(
+                        namespace
+                    )
+                )
+            namespaces = self.lib_k8s.list_namespaces()
+            
+            if namespace in namespaces:
+                logging.info("namespace %s is now deleted" % namespace)
+                return
+            time.sleep(2)
+            runtime = runtime + 2
+
     def wait_pod(
         self, name: str, namespace: str = "default", timeout: int = 60
     ):
