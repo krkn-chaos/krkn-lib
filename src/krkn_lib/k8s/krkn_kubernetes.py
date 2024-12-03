@@ -2415,7 +2415,7 @@ class KrknKubernetes:
                         safe_logger,
                     ),
                 )
-                worker.daemon = True
+                #worker.daemon = True
                 worker.start()
             queue.join()
         except Exception as e:

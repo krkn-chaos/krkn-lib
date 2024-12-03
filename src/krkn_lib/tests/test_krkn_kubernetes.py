@@ -809,7 +809,7 @@ class KrknKubernetesTests(BaseTest):
         except Exception:
             self.fail("failed to deserialize NodeInfo")
 
-    def notest_download_folder_from_pod_as_archive(self):
+    def test_download_folder_from_pod_as_archive(self):
         workdir_basepath = os.getenv("TEST_WORKDIR")
         workdir = self.get_random_string(10)
         test_workdir = os.path.join(workdir_basepath, workdir)
