@@ -1,16 +1,15 @@
-import datetime
-
 from elasticsearch_dsl import (
+    Keyword,
+    Text,
     Date,
     Document,
     Float,
-    InnerDoc,
-    Integer,
-    Keyword,
     Long,
     Nested,
-    Text,
+    InnerDoc,
+    Integer,
 )
+import datetime
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 
@@ -196,3 +195,4 @@ class ElasticChaosRunTelemetry(Document):
         self.cloud_type = chaos_run_telemetry.cloud_type
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
+
