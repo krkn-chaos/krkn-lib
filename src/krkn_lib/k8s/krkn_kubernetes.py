@@ -7,12 +7,13 @@ import re
 import tempfile
 import threading
 import time
+from urllib.parse import urlparse
+
 import warnings
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -145,31 +146,32 @@ class KrknKubernetes:
                 conf.use_context("krkn-context")
 
         try:
-            # config.load_kube_config(kubeconfig_path)
+            config.load_kube_config(kubeconfig_path)
 
-            client_config = client.Configuration()
+            client_config = client.Configuration().get_default_copy()
             http_proxy = os.getenv("http_proxy", None)
-            if http_proxy and "@" in http_proxy:
+            if http_proxy is not None: 
+                os.environ["HTTP_PROXY"] = http_proxy
+                client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
                 auth_string = proxy_auth.username + ":" + proxy_auth.password
-                client_config.username = proxy_auth.username
-                client_config.password = proxy_auth.password
-            config.load_kube_config(
-                kubeconfig_path,
-                client_configuration=client_config,
-            )
-
-            proxy_url = http_proxy
-            if proxy_url:
-                client_config.proxy = proxy_url
-                if proxy_auth:
-                    client_config.proxy_headers = urllib3.util.make_headers(
-                        proxy_basic_auth=auth_string
-                    )
-
+                client_config.proxy_headers = urllib3.util.make_headers(
+                    proxy_basic_auth=auth_string
+                )
+                # if http_proxy and "@" in http_proxy:
+                
+            #     # client_config.username = proxy_auth.username
+            #     # client_config.password = proxy_auth.password
+            #     
+            
+            print('set default')
+            # config.load_kube_config(
+            #     kubeconfig_path
+            # )
             client.Configuration.set_default(client_config)
-
-            self.api_client = client.ApiClient()
+            print('load config')
+            
+            self.api_client = client.ApiClient(client_config)
 
             self.cli = client.CoreV1Api(self.api_client)
             self.version_client = client.VersionApi(self.api_client)
