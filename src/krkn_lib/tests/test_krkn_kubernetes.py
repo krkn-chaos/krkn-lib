@@ -28,10 +28,20 @@ class KrknKubernetesTests(BaseTest):
         count = 0
         MAX_RETRIES = 20
         while not self.lib_k8s.is_pod_running("fedtools", namespace):
+            pod_exists = self.lib_k8s.check_if_pod_exists("fedtools", namespace)
+            print('pod exists ' + str(pod_exists))
             if count > MAX_RETRIES:
                 print(
                     "fedtools pod info "
                     + str(self.lib_k8s.get_pod_info("fedtools", namespace))
+                )
+                print(
+                    "fedtools namesapce " 
+                    + str(self.lib_k8s.list_namespaces())
+                )
+                print(
+                    "find namesapce " 
+                    + str(namespace)
                 )
                 self.assertFalse(True, "container failed to become ready")
             count += 1
@@ -840,7 +850,10 @@ class KrknKubernetesTests(BaseTest):
         for file in archive:
             self.assertTrue(os.path.isfile(file[1]))
             self.assertTrue(os.stat(file[1]).st_size > 0)
+        
+        
         self.lib_k8s.delete_namespace(namespace)
+        self.wait_delete_namespace(namespace)
 
     def test_exists_path_in_pod(self):
         namespace = "test-" + self.get_random_string(10)
