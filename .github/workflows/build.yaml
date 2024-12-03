@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create multi-node KinD cluster
-        uses: paigerube14/actions/kind@update_kind
+        uses: krkn-chaos/actions/kind@main
 
       - name: get nodes
         run: |

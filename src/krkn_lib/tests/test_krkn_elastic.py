@@ -1,9 +1,13 @@
 import datetime
 import time
+
 import uuid
 
 from krkn_lib.elastic.krkn_elastic import KrknElastic
-from krkn_lib.models.elastic.models import ElasticAlert, ElasticMetric
+from krkn_lib.models.elastic.models import (
+    ElasticAlert,
+    ElasticMetric,
+)
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
