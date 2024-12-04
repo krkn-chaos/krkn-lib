@@ -850,10 +850,7 @@ class KrknKubernetesTests(BaseTest):
         for file in archive:
             self.assertTrue(os.path.isfile(file[1]))
             self.assertTrue(os.stat(file[1]).st_size > 0)
-        
-        
-        self.lib_k8s.delete_namespace(namespace)
-        self.wait_delete_namespace(namespace)
+
 
     def test_exists_path_in_pod(self):
         namespace = "test-" + self.get_random_string(10)
