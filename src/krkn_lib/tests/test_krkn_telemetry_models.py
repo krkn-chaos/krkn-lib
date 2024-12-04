@@ -10,8 +10,8 @@ from kubernetes.client.models import (
 
 from krkn_lib.models.telemetry import (
     ChaosRunTelemetry,
-    ClusterEvent,
     ScenarioTelemetry,
+    ClusterEvent,
 )
 
 
