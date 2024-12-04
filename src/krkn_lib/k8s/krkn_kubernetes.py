@@ -2447,7 +2447,8 @@ class KrknKubernetes:
                 if not status.ready:
                     is_ready = False
             return is_ready
-        except Exception:
+        except Exception as e:
+            print(f"IS_POD_RUNNING_EXCEPTION: {e}")
             return False
 
     def is_pod_terminating(self, pod_name: str, namespace: str) -> bool:

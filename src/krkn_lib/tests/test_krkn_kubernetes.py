@@ -852,14 +852,16 @@ class KrknKubernetesTests(BaseTest):
     def test_exists_path_in_pod(self):
         namespace = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
+        # to ensure that the namespace is fully deployed
+        time.sleep(5)
         self.deploy_fedtools(namespace=namespace)
         count = 0
-        MAX_RETRIES = 10
+        MAX_RETRIES = 20
         while not self.lib_k8s.is_pod_running("fedtools", namespace):
             if count > MAX_RETRIES:
                 self.assertFalse(True, "container failed to become ready")
             count += 1
-            time.sleep(3)
+            time.sleep(5)
             continue
 
         self.assertTrue(
