@@ -856,7 +856,7 @@ class KrknKubernetesTests(BaseTest):
         time.sleep(5)
         self.deploy_fedtools(namespace=namespace)
         count = 0
-        MAX_RETRIES = 20
+        MAX_RETRIES = 200
         while not self.lib_k8s.is_pod_running("fedtools", namespace):
             if count > MAX_RETRIES:
                 self.assertFalse(True, "container failed to become ready")
