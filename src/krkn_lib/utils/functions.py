@@ -3,9 +3,10 @@ import logging
 import os
 import random
 import re
+import socket
 import string
 import sys
-import socket
+import xml.etree.cElementTree as ET
 from queue import Queue
 from typing import Optional
 
@@ -13,7 +14,7 @@ import pytz
 from base64io import Base64IO
 from dateutil import parser
 from dateutil.parser import ParserError
-import xml.etree.cElementTree as ET
+from dateutil.tz import tzutc # NOQA
 
 
 def decode_base64_file(source_filename: str, destination_filename: str):
@@ -241,7 +242,6 @@ def filter_log_line(
 
 
 def filter_dictionary(
-    dictionary: dict[str, any],
     datetime_key: str,
     start_timestamp: Optional[int],
     end_timestamp: Optional[int],
@@ -263,27 +263,27 @@ def filter_dictionary(
     :param interval_timezone: timezone of the interval within
         the dictionary will be checked
     """
-    date_time = dictionary.get(datetime_key)
-    if not date_time:
+    if not datetime_key:
         return None
 
     try:
-        log_date = parser.parse(date_time)
         if check_date_in_localized_interval(
             start_timestamp,
             end_timestamp,
-            int(log_date.timestamp()),
+            int(datetime_key.timestamp()),
             dictionary_timezone,
             interval_timezone,
         ):
-            return dictionary
-        return None
-    except ParserError:
-        logging.error(f"impossible to parse date: {str(date_time)}")
-        return None
+            return True
+        return False
     except TypeError:
-        logging.error(f"{str(date_time)} does not represent a valid datetime")
-        return None
+        logging.error(
+            f"{str(datetime_key)} does not represent a valid datetime"
+        )
+        return False
+    except Exception as e:
+        logging.error(f"{str(datetime_key)} " + str(e))
+        return False
 
 
 def filter_log_file_worker(
