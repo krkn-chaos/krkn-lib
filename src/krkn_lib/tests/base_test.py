@@ -1,6 +1,7 @@
 import cProfile
 import logging
 import os
+import queue
 import random
 import string
 import sys
@@ -32,6 +33,7 @@ class BaseTest(unittest.TestCase):
     lib_telemetry_ocp: KrknTelemetryOpenshift
     lib_elastic: KrknElastic
     pr: cProfile.Profile
+    pod_delete_queue: queue.Queue
 
     @classmethod
     def setUpClass(cls):
@@ -57,6 +59,14 @@ class BaseTest(unittest.TestCase):
         # cls.pr = cProfile.Profile()
         # cls.pr.enable()
         # print("\n<<<---")
+
+        # starting pod_delete_queue
+        cls.pod_delete_queue = queue.Queue()
+        worker = threading.Thread(target=cls.pod_delete_worker, args=[cls])
+
+        worker.daemon = True
+        worker.start()
+
         try:
             requests.get(host, timeout=2, verify=False)
         except ConnectTimeout:
@@ -69,6 +79,27 @@ class BaseTest(unittest.TestCase):
             )
             sys.exit(1)
 
+    def pod_delete_worker(self):
+        while True:
+            pod_namespace = self.pod_delete_queue.get()
+            if pod_namespace[0] == "exit" and pod_namespace == "exit":
+                print("pod killing thread exiting....")
+                return
+            try:
+                self.lib_k8s.delete_pod(pod_namespace[0], pod_namespace[1])
+                self.lib_k8s.delete_namespace(pod_namespace[1])
+                logging.info(
+                    f"[POD DELETE WORKER] deleted pod: "
+                    f"{pod_namespace[0]} namespace:{pod_namespace[1]}"
+                )
+                self.pod_delete_queue.task_done()
+            except Exception as e:
+                logging.error(
+                    f"[POD DELETE WORKER] "
+                    f"exception raised but continuing:  {e}"
+                )
+                continue
+
     @classmethod
     def tearDownClass(cls) -> None:
         # PROFILER
@@ -79,6 +110,7 @@ class BaseTest(unittest.TestCase):
         # p.print_stats()
         # print
         # "\n--->>>"
+        cls.pod_delete_queue.put(["exit", "exit"])
         pass
 
     def wait_delete_namespace(
