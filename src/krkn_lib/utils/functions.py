@@ -3,9 +3,10 @@ import logging
 import os
 import random
 import re
+import socket
 import string
 import sys
-import socket
+import xml.etree.cElementTree as ET
 from queue import Queue
 from typing import Optional
 
