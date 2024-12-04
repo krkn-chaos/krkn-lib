@@ -20,7 +20,7 @@ from krkn_lib.tests import BaseTest
 
 
 class KrknKubernetesTests(BaseTest):
-    def test_exec_command(self):
+    def test_zzzexec_command(self):
         namespace = "test-ec-" + self.get_random_string(10)
         alpine_name = "alpine-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
