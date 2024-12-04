@@ -58,7 +58,19 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                         "namespace":"failed-namespace"
                     }
                 ]
-             }
+            },
+            "slo_alert": [
+                {
+                    "timestamp": "2024-10-23T15:25:47Z",
+                    "severity": "high",
+                    "description": "API latency is too high"
+                },
+                {
+                    "timestamp": "2024-10-23T15:30:47Z",
+                    "severity": "medium",
+                    "description": "Memory usage is high"
+                }
+            ]
         }
         """  # NOQA
         # wrong base64 format
