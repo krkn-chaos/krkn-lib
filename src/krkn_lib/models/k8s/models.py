@@ -252,3 +252,90 @@ class ServiceHijacking:
         self.namespace = namespace
         self.selector = selector
         self.config_map_name = config_map_name
+
+
+
+class AffectedNode:
+    """
+    A node affected by a chaos scenario
+    """
+
+    node_name: str
+    """
+    Name of the node
+    """
+    node_rescheduling_time: float
+    """
+    The time that the cluster took to reschedule
+    the node after the kill scenario
+
+    creationTimestamp: "2024-12-05T15:16:21Z"
+    """
+    kubelet_readiness_time: float
+    """
+    The time the node took for the kubelet to become ready after the node was created
+    condition[reason=KubeletReady].lastTransitionTime
+
+    """
+    total_recovery_time: float
+    """
+    Total amount of time the node took to get recreated and ready
+    """
+
+    def __init__(
+        self,
+        node_name: str,
+        total_recovery_time: float = None,
+        kubelet_readiness_time: float = None,
+        node_rescheduling_time: float = None,
+    ):
+        self.node_name = node_name
+        self.total_recovery_time = total_recovery_time
+        self.kubelet_readiness_time = kubelet_readiness_time
+        self.node_rescheduling_time = node_rescheduling_time
+
+
+
+class NodesStatus:
+    """
+    Return value of wait_for_pods_to_become_ready_by_label and
+    wait_for_pods_to_become_ready_by_name_pattern containing the list
+    of the pods that did recover (pod_name, namespace,
+    time needed to become ready) and the list of pods that did
+    not recover from the chaos
+    """
+
+    recovered: list[AffectedNode]
+    unrecovered: list[AffectedNode]
+    error: Optional[str]
+
+    def __init__(self, json_object: str = None):
+        self.recovered = []
+        self.unrecovered = []
+        self.error = None
+
+        if json_object:
+            for recovered in json_object["recovered"]:
+                self.recovered.append(
+                    AffectedNode(
+                        recovered["node_name"],
+                        float(recovered["total_recovery_time"]),
+                        float(recovered["kubelet_readiness_time"]),
+                        float(recovered["node_rescheduling_time"]),
+                    )
+                )
+            for unrecovered in json_object["unrecovered"]:
+                self.unrecovered.append(
+                    AffectedNode(
+                        unrecovered["node_name"],
+                    )
+                )
+            if "error" in json_object:
+                self.error = json_object["error"]
+
+    def merge(self, nodes_status: "NodesStatus"):
+        for recovered in nodes_status.recovered:
+            self.recovered.append(recovered)
+        for unrecovered in nodes_status.unrecovered:
+            self.unrecovered.append(unrecovered)
+

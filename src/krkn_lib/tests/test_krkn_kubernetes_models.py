@@ -1,4 +1,4 @@
-from krkn_lib.models.k8s import AffectedPod, PodsStatus
+from krkn_lib.models.k8s import AffectedPod, PodsStatus, NodesStatus, AffectedNode
 from krkn_lib.tests import BaseTest
 
 
@@ -47,4 +47,50 @@ class TestKrknKubernetesModels(BaseTest):
             self.assertTrue(
                 f"test_{index+1}_unrecovered"
                 in [p.pod_name for p in pods_status_merge.unrecovered]
+            )
+
+    def test_nodes_status(self):
+        nodes_status_1 = NodesStatus()
+        nodes_status_2 = NodesStatus()
+        nodes_status_merge = NodesStatus()
+
+        nodes_status_1.recovered.append(
+            AffectedNode(node_name="test_1")
+        )
+        nodes_status_1.recovered.append(
+            AffectedNode(node_name="test_2")
+        )
+
+        nodes_status_1.unrecovered.append(
+            AffectedNode(node_name="test_1_unrecovered")
+        )
+        nodes_status_1.unrecovered.append(
+            AffectedNode(node_name="test_2_unrecovered")
+        )
+
+        nodes_status_2.recovered.append(
+            AffectedNode(node_name="test_3")
+        )
+        nodes_status_2.recovered.append(
+            AffectedNode(node_name="test_4")
+        )
+        nodes_status_2.unrecovered.append(
+            AffectedNode(node_name="test_3_unrecovered")
+        )
+        nodes_status_2.unrecovered.append(
+            AffectedNode(node_name="test_4_unrecovered")
+        )
+
+        nodes_status_merge.merge(nodes_status_1)
+        nodes_status_merge.merge(nodes_status_2)
+
+        for index in range(4):
+            self.assertTrue(
+                f"test_{index+1}"
+                in [p.node_name for p in nodes_status_merge.recovered]
+            )
+        for index in range(4):
+            self.assertTrue(
+                f"test_{index+1}_unrecovered"
+                in [p.node_name for p in nodes_status_merge.unrecovered]
             )

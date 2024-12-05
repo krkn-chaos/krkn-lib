@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import PodsStatus
+from krkn_lib.models.k8s import PodsStatus, NodesStatus
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [
@@ -77,6 +77,10 @@ class ScenarioTelemetry:
     """
     Pods affected by the chaos scenario
     """
+    affected_nodes: NodesStatus
+    """
+    Pods affected by the chaos scenario
+    """
     cluster_events: list[ClusterEvent]
     """
     Cluster events collected during the chaos run
@@ -103,6 +107,9 @@ class ScenarioTelemetry:
             self.parameters = json_object.get("parameters")
             self.affected_pods = PodsStatus(
                 json_object=json_object.get("affected_pods")
+            )
+            self.affected_nodes = NodesStatus(
+                json_object=json_object.get("affected_nodes")
             )
             if json_object.get("cluster_events") and isinstance(
                 json_object.get("cluster_events"), list
@@ -143,6 +150,7 @@ class ScenarioTelemetry:
             self.parameters_base64 = ""
             self.parameters = {}
             self.affected_pods = PodsStatus()
+            self.affected_nodes = NodesStatus()
             self.cluster_events = []
 
     def to_json(self) -> str:
@@ -415,8 +423,8 @@ class ChaosRunTelemetry:
     """
     Current time stamp of run
     """
-
     affected_pods: PodsStatus = PodsStatus()
+    affected_nodes: NodesStatus = NodesStatus()
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()

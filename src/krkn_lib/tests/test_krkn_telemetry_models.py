@@ -58,6 +58,21 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                         "namespace":"failed-namespace"
                     }
                 ]
+             },
+            "affected_nodes":{
+                "recovered":[
+                    {
+                        "node_name": "kind-control-plane",
+                        "node_rescheduling_time": 9.8,
+                        "kubelet_readiness_time": 2.71,
+                        "total_recovery_time": 3.14
+                    }
+                ],
+                "unrecovered":[
+                    {
+                        "node_name":"kind-workers"
+                    }
+                ]
              }
         }
         """  # NOQA
