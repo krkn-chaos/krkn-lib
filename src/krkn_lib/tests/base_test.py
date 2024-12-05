@@ -520,6 +520,16 @@ class BaseTest(unittest.TestCase):
                         ],
                         "error": "some error",
                     },
+                    "affected_nodes": [
+                        {
+                            "node_name": "kind-control-plane",
+                            "ready_time": 2.71,
+                            "not_ready_time": 3.14,
+                            "stopped_time": 0,
+                            "running_time": 0,
+                            "terminating_time": 0,
+                        }
+                    ],
                 }
             ],
             "node_summary_infos": [

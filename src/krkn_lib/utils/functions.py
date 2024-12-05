@@ -14,7 +14,7 @@ import pytz
 from base64io import Base64IO
 from dateutil import parser
 from dateutil.parser import ParserError
-from dateutil.tz import tzutc # NOQA
+from dateutil.tz import tzutc  # NOQA
 
 
 def decode_base64_file(source_filename: str, destination_filename: str):

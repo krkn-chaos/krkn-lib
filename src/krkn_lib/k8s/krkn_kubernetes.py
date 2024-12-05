@@ -7,13 +7,12 @@ import re
 import tempfile
 import threading
 import time
-from urllib.parse import urlparse
-
 import warnings
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
@@ -29,6 +28,7 @@ from urllib3 import HTTPResponse
 
 from krkn_lib.models.k8s import (
     PVC,
+    AffectedNode,
     AffectedPod,
     ApiRequestException,
     Container,
@@ -1729,7 +1729,9 @@ class KrknKubernetes:
                 raise e
         return node_name
 
-    def watch_node_status(self, node: str, status: str, timeout: int):
+    def watch_node_status(
+        self, node: str, status: str, timeout: int, affected_node: AffectedNode
+    ):
         """
         Watch for a specific node status
 
@@ -1739,6 +1741,7 @@ class KrknKubernetes:
         :param resource_version: version of the resource
         """
         count = timeout
+        timer_start = time.time()
         for event in self.watch_resource.stream(
             self.cli.list_node,
             field_selector=f"metadata.name={node}",
@@ -1761,6 +1764,9 @@ class KrknKubernetes:
                 )
             if not count:
                 self.watch_resource.stop()
+        end_time = time.time()
+        affected_node.set_affected_node_status(status, end_time - timer_start)
+        return affected_node
 
     #
     # TODO: Implement this with a watcher instead of polling

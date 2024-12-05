@@ -71,8 +71,6 @@ class ElasticMetric(Document):
 
 
 # Telemetry models
-
-
 class ElasticAffectedPod(InnerDoc):
     pod_name = Text(fields={"keyword": Keyword()})
     namespace = Text()
@@ -87,6 +85,15 @@ class ElasticPodsStatus(InnerDoc):
     error = Text()
 
 
+class ElasticAffectedNodes(InnerDoc):
+    node_name = Text(fields={"keyword": Keyword()})
+    not_ready_time = Float()
+    ready_time = Float()
+    stopped_time = Float()
+    running_time = Float()
+    terminating_time = Float()
+
+
 class ElasticScenarioParameters(InnerDoc):
     pass
 
@@ -99,6 +106,7 @@ class ElasticScenarioTelemetry(InnerDoc):
     parameters_base64 = Text()
     parameters = Nested(ElasticScenarioParameters)
     affected_pods = Nested(ElasticPodsStatus)
+    affected_nodes = Nested(ElasticAffectedNodes, multi=True)
 
 
 class ElasticNodeInfo(InnerDoc):
@@ -167,6 +175,17 @@ class ElasticChaosRunTelemetry(Document):
                     ],
                     error=sc.affected_pods.error,
                 ),
+                affected_nodes=[
+                    ElasticAffectedNodes(
+                        node_name=node.node_name,
+                        not_ready_time=node.not_ready_time,
+                        ready_time=node.ready_time,
+                        stopped_time=node.stopped_time,
+                        running_time=node.running_time,
+                        terminating_time=node.terminating_time,
+                    )
+                    for node in sc.affected_nodes
+                ],
             )
             for sc in chaos_run_telemetry.scenarios
         ]
