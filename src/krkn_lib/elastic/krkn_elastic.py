@@ -188,7 +188,8 @@ class KrknElastic:
             time_start = time.time()
             elastic_chaos.save(using=self.es, index=index)
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            self.safe_logger.info("Elastic push telemetry error: " + str(e))
             return -1
 
     def search_telemetry(self, run_uuid: str, index: str):

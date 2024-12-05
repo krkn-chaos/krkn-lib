@@ -58,7 +58,17 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                         "namespace":"failed-namespace"
                     }
                 ]
-             }
+            },
+            "affected_nodes":[
+                {
+                    "node_name":"kind-control-plane",
+                    "ready_time":2.71,
+                    "not_ready_time":3.14,
+                    "stopped_time":0.0,
+                    "running_time":0.0,
+                    "terminating_time":0.0
+                }
+            ]
         }
         """  # NOQA
         # wrong base64 format

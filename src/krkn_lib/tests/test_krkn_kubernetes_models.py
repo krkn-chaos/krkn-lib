@@ -1,4 +1,9 @@
-from krkn_lib.models.k8s import AffectedPod, PodsStatus
+from krkn_lib.models.k8s import (
+    AffectedNode,
+    AffectedNodeStatus,
+    AffectedPod,
+    PodsStatus,
+)
 from krkn_lib.tests import BaseTest
 
 
@@ -48,3 +53,31 @@ class TestKrknKubernetesModels(BaseTest):
                 f"test_{index+1}_unrecovered"
                 in [p.pod_name for p in pods_status_merge.unrecovered]
             )
+
+    def test_nodes_status(self):
+        nodes_status_1 = AffectedNodeStatus()
+
+        affected_node = AffectedNode(node_name="test_1")
+        affected_node.set_affected_node_status("False", 0.737)
+        affected_node.set_affected_node_status("True", 0.12)
+        nodes_status_1.affected_nodes.append(affected_node)
+
+        affected_node2 = AffectedNode(node_name="test_1")
+        affected_node2.set_affected_node_status("True", 0.12)
+        affected_node2.set_affected_node_status("running", 0.11)
+        
+        nodes_status_1.affected_nodes.append(affected_node2)
+        self.assertEqual(len(nodes_status_1.affected_nodes), 2)
+        nodes_status_1.merge_affected_nodes()
+
+        self.assertEqual(len(nodes_status_1.affected_nodes), 1)
+        self.assertEqual(nodes_status_1.affected_nodes[0].node_name, "test_1")
+        self.assertEqual(
+            nodes_status_1.affected_nodes[0].ready_time, 0.24
+        )
+        self.assertEqual(
+            nodes_status_1.affected_nodes[0].not_ready_time, 0.737
+        )
+        self.assertEqual(
+            nodes_status_1.affected_nodes[0].running_time, 0.11
+        )

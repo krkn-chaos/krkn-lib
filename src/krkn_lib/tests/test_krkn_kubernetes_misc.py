@@ -56,19 +56,25 @@ class KrknKubernetesTestsMisc(BaseTest):
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 
     def test_collect_and_parse_cluster_events(self):
+        start_now = datetime.datetime.now()
         namespace_with_evt = "test-" + self.get_random_string(10)
         pod_name = "test-" + self.get_random_string(10)
         self.deploy_namespace(namespace_with_evt, [])
         self.deploy_delayed_readiness_pod(pod_name, namespace_with_evt, 0)
-        self.pod_delete_queue.put([pod_name, namespace_with_evt])
-
+        try:
+            self.wait_pod(pod_name, namespace=namespace_with_evt)
+        except Exception:
+            logging.error("failed to create pod")
+            self.assertTrue(False)
+        finally:
+            self.pod_delete_queue.put([pod_name, namespace_with_evt])
+        
         time.sleep(10)
         local_timezone = f"{get_localzone()}"
-        now = datetime.datetime.now()
-        one_hour_ago = now - datetime.timedelta(hours=1)
+        end__time = datetime.datetime.now()
         events = self.lib_k8s.collect_and_parse_cluster_events(
-            int(one_hour_ago.timestamp()),
-            int(now.timestamp()),
+            int(start_now.timestamp()),
+            int(end__time.timestamp()),
             local_timezone,
             namespace=namespace_with_evt,
         )
