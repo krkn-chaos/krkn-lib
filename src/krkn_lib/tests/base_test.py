@@ -540,7 +540,7 @@ class BaseTest(unittest.TestCase):
                 }
             ],
             "kubernetes_objects_count": {"Pod": 5, "Service": 2},
-            "network_plugins": ["Calico"],
+            "network_plugins": "Calico",
             "timestamp": "2023-05-22T14:55:02Z",
             "total_node_count": 3,
             "cloud_infrastructure": "AWS",

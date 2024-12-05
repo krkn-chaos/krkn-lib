@@ -1744,12 +1744,14 @@ class KrknKubernetes:
             field_selector=f"metadata.name={node}",
             timeout_seconds=timeout,
         ):
+            logging.info('set conditions in node status')
             conditions = [
                 status
                 for status in event["object"].status.conditions
                 if status.type == "Ready"
             ]
             if conditions[0].status == status:
+                logging.info('status condition matches')
                 self.watch_resource.stop()
                 break
             else:
@@ -1760,8 +1762,9 @@ class KrknKubernetes:
                     str(conditions[0].status),
                 )
             if not count:
+                logging.info('node count maxed and stopping')
                 self.watch_resource.stop()
-
+         
     #
     # TODO: Implement this with a watcher instead of polling
     def watch_managedcluster_status(

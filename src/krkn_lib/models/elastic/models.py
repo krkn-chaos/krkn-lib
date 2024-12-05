@@ -12,8 +12,8 @@ from elasticsearch_dsl import (
     Text,
 )
 
-from krkn_lib.models.telemetry import ChaosRunTelemetry
-
+from krkn_lib.models.telemetry.models import *
+from krkn_lib.models.k8s.models import *
 
 class ElasticAlert(Document):
     run_uuid = Keyword()
@@ -73,20 +73,6 @@ class ElasticMetric(Document):
 # Telemetry models
 
 
-class ElasticAffectedPod(InnerDoc):
-    pod_name = Text(fields={"keyword": Keyword()})
-    namespace = Text()
-    total_recovery_time = Float()
-    pod_readiness_time = Float()
-    pod_rescheduling_time = Float()
-
-
-class ElasticPodsStatus(InnerDoc):
-    recovered = Nested(ElasticAffectedPod, multi=True)
-    unrecovered = Nested(ElasticAffectedPod, multi=True)
-    error = Text()
-
-
 class ElasticScenarioParameters(InnerDoc):
     pass
 
@@ -98,31 +84,15 @@ class ElasticScenarioTelemetry(InnerDoc):
     exit_status = Integer()
     parameters_base64 = Text()
     parameters = Nested(ElasticScenarioParameters)
-    affected_pods = Nested(ElasticPodsStatus)
-
-
-class ElasticNodeInfo(InnerDoc):
-    count = Integer()
-    architecture = Text()
-    instance_type = Text()
-    node_type = Text()
-    kernel_version = Text()
-    kubelet_version = Text()
-    os_version = Text()
-
-
-class ElasticTaint(InnerDoc):
-    key = Text()
-    value = Text()
-    effect = Text()
+    affected_pods = Text(multi=True)
 
 
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
-    node_summary_infos = Nested(ElasticNodeInfo, multi=True)
-    node_taints = Nested(ElasticTaint, multi=True)
+    node_summary_infos = Text(multi=True)
+    node_taints = Text(multi=True)
     kubernetes_objects_count = Nested(InnerDoc)
-    network_plugins = Text(multi=True)
+    network_plugins = Text()
     timestamp = Text()
     total_node_count = Integer()
     cloud_infrastructure = Text()
@@ -148,44 +118,13 @@ class ElasticChaosRunTelemetry(Document):
                 exit_status=sc.exit_status,
                 parameters_base64=sc.parameters_base64,
                 parameters=sc.parameters,
-                affected_pods=ElasticPodsStatus(
-                    recovered=[
-                        ElasticAffectedPod(
-                            pod_name=pod.pod_name,
-                            namespace=pod.namespace,
-                            total_recovery_time=pod.total_recovery_time,
-                            pod_readiness_time=pod.pod_readiness_time,
-                            pod_rescheduling_time=pod.pod_rescheduling_time,
-                        )
-                        for pod in sc.affected_pods.recovered
-                    ],
-                    unrecovered=[
-                        ElasticAffectedPod(
-                            pod_name=pod.pod_name, namespace=pod.namespace
-                        )
-                        for pod in sc.affected_pods.unrecovered
-                    ],
-                    error=sc.affected_pods.error,
-                ),
+                affected_pods=sc.affected_pods.to_json(),
             )
             for sc in chaos_run_telemetry.scenarios
         ]
 
-        self.node_summary_infos = [
-            ElasticNodeInfo(
-                count=info.count,
-                architecture=info.architecture,
-                instance_type=info.instance_type,
-                kernel_version=info.kernel_version,
-                kubelet_version=info.kubelet_version,
-                os_version=info.os_version,
-            )
-            for info in chaos_run_telemetry.node_summary_infos
-        ]
-        self.node_taints = [
-            ElasticTaint(key=taint.key, value=taint.value, effect=taint.effect)
-            for taint in chaos_run_telemetry.node_taints
-        ]
+        self.node_summary_infos = [info.to_json() for info in chaos_run_telemetry.node_summary_infos]
+        self.node_taints = [taint.to_json() for taint in chaos_run_telemetry.node_taints]
         self.kubernetes_objects_count = (
             chaos_run_telemetry.kubernetes_objects_count
         )
@@ -196,3 +135,5 @@ class ElasticChaosRunTelemetry(Document):
         self.cloud_type = chaos_run_telemetry.cloud_type
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
+
+

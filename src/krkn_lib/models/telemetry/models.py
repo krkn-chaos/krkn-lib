@@ -143,6 +143,7 @@ class ScenarioTelemetry:
             self.parameters_base64 = ""
             self.parameters = {}
             self.affected_pods = PodsStatus()
+            self.affected_nodes = AffectedNodeStatus()
             self.cluster_events = []
 
     def to_json(self) -> str:
@@ -181,8 +182,10 @@ class Taint:
                 json_dict["effect"] if "effect" in json_dict else None
             )
             self.key = json_dict["key"] if "key" in json_dict else None
-            self.value = json_dict["value"] if "value" in json_dict else None
+            self.value = json_dict["value"] if "value" in json_dict else ""
 
+    def to_json(self) -> dict:
+        return self.__dict__
 
 @dataclass(order=False)
 class NodeInfo:
@@ -243,6 +246,10 @@ class NodeInfo:
             self.os_version = (
                 json_dict["os_version"] if "os_version" in json_dict else None
             )
+    
+    def to_json(self) -> dict:
+        
+        return self.__dict__
 
     def __eq__(self, other):
         if isinstance(other, NodeInfo):
@@ -318,7 +325,7 @@ class ClusterEvent:
             # This parses CoreV1Event
             # (https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Event.md)
             self.name = k8s_obj.metadata.name
-            self.creation = k8s_obj.metadata.creation_timestamp
+            self.creation = str(k8s_obj.metadata.creation_timestamp)
             self.reason = k8s_obj.reason
             self.message = k8s_obj.message
             self.namespace = k8s_obj.metadata.namespace
@@ -330,7 +337,7 @@ class ClusterEvent:
 
         if k8s_json_dict:
             self.name = k8s_json_dict["metadata"]["name"]
-            self.creation = k8s_json_dict["metadata"]["creationTimestamp"]
+            self.creation = str(k8s_json_dict["metadata"]["creationTimestamp"])
             self.reason = k8s_json_dict["reason"]
             self.message = k8s_json_dict["message"]
             self.namespace = k8s_json_dict["metadata"]["namespace"]
@@ -345,7 +352,7 @@ class ClusterEvent:
         if json_dict:
             self.name = json_dict["name"]
             self.namespace = json_dict["namespace"]
-            self.creation = json_dict["creation"]
+            self.creation = str(json_dict["creation"])
             self.reason = json_dict["reason"]
             self.message = json_dict["message"]
             self.source_component = json_dict["source_component"]
@@ -387,7 +394,7 @@ class ChaosRunTelemetry:
     Dictionary containing the number of objects deployed
     in the cluster during the chaos run
     """
-    network_plugins: list[str]
+    network_plugins: str
     """
     Network plugins deployed in the target cluster
     """
@@ -415,15 +422,13 @@ class ChaosRunTelemetry:
     """
     Current time stamp of run
     """
-
-    affected_pods: PodsStatus = PodsStatus()
-
+    
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
         self.node_summary_infos = list[NodeInfo]()
         self.node_taints = list[Taint]()
         self.kubernetes_objects_count = dict[str, int]()
-        self.network_plugins = ["Unknown"]
+        self.network_plugins = "Unknown"
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )

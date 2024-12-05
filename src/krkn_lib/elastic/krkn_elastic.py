@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import datetime
 import logging
-import math
 import time
 
+import math
 import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch_dsl import Search
 
 from krkn_lib.models.elastic.models import (
     ElasticAlert,
-    ElasticChaosRunTelemetry,
     ElasticMetric,
+    ElasticChaosRunTelemetry,
 )
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -186,7 +186,8 @@ class KrknElastic:
         try:
             elastic_chaos = ElasticChaosRunTelemetry(telemetry)
             time_start = time.time()
-            elastic_chaos.save(using=self.es, index=index)
+            result = elastic_chaos.save(using=self.es, index=index)
+            print('elastic result ' + str(result))
             return int(time.time() - time_start)
         except Exception:
             return -1

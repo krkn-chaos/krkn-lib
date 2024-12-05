@@ -166,6 +166,8 @@ class AffectedPod:
         self.pod_readiness_time = pod_readiness_time
         self.pod_rescheduling_time = pod_rescheduling_time
 
+    def to_json(self) -> dict:
+        return self.__dict__
 
 class PodsStatus:
     """
@@ -184,7 +186,7 @@ class PodsStatus:
         self.recovered = []
         self.unrecovered = []
         self.error = None
-
+        print('pod status' + str(json_object) + str(type(json_object)))
         if json_object:
             for recovered in json_object["recovered"]:
                 self.recovered.append(
@@ -212,6 +214,9 @@ class PodsStatus:
         for unrecovered in pods_status.unrecovered:
             self.unrecovered.append(unrecovered)
 
+    def to_json(self) -> dict:
+
+        return self.__dict__
 
 class PodsMonitorThread:
     executor: ThreadPoolExecutor
@@ -233,8 +238,7 @@ class PodsMonitorThread:
                 f"aborting.\nException: {e}"
             )
             return pods_status
-
-
+    
 class ServiceHijacking:
     pod_name: str
     namespace: str

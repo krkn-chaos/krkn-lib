@@ -131,14 +131,14 @@ class KrknOpenshift(KrknKubernetes):
 
         return None
 
-    def get_cluster_network_plugins(self) -> list[str]:
+    def get_cluster_network_plugins(self) -> str:
         """
         Get the cluster Cloud network plugins list
 
         :return: the cluster infrastructure name or `Unknown` when unavailable
         """
         api_client = self.api_client
-        network_plugins = list[str]()
+        network_plugins = str
         if api_client:
             try:
                 path_params: dict[str, str] = {}
@@ -161,13 +161,13 @@ class KrknOpenshift(KrknKubernetes):
                 )
                 json_obj = ast.literal_eval(data[0])
                 for plugin in json_obj["items"]:
-                    network_plugins.append(plugin["status"]["networkType"])
+                    network_plugins = plugin["status"]["networkType"]
             except Exception as e:
                 logging.warning(
                     "Impossible to retrieve cluster Network plugins  -> %s",
                     str(e),
                 )
-                network_plugins.append("Unknown")
+                network_plugins = "Unknown"
         return network_plugins
 
     def filter_must_gather_ocp_log_folder(
