@@ -1,4 +1,5 @@
 import ast
+import datetime
 import json
 import logging
 import os
@@ -33,6 +34,7 @@ from krkn_lib.models.k8s import (
     Pod,
     PodsMonitorThread,
     PodsStatus,
+    AffectedNode,
     ServiceHijacking,
     Volume,
     VolumeMount,
@@ -1722,6 +1724,7 @@ class KrknKubernetes:
         :param timeout: timeout
         :param resource_version: version of the resource
         """
+        start_time = datetime.datetime.now()
         count = timeout
         for event in self.watch_resource.stream(
             self.cli.list_node,
@@ -1735,6 +1738,8 @@ class KrknKubernetes:
             ]
             if conditions[0].status == status:
                 self.watch_resource.stop()
+                end_time =  datetime.datetime.now()
+                change_time = end_time - start_time
                 break
             else:
                 count -= 1
@@ -1745,6 +1750,10 @@ class KrknKubernetes:
                 )
             if not count:
                 self.watch_resource.stop()
+                end_time =  datetime.datetime.now()
+                change_time = end_time - start_time
+                
+        return change_time
 
     #
     # TODO: Implement this with a watcher instead of polling

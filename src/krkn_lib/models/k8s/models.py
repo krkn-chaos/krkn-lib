@@ -264,20 +264,20 @@ class AffectedNode:
     """
     Name of the node
     """
-    node_rescheduling_time: float
+    node_unknown_time: float
     """
     The time that the cluster took to reschedule
     the node after the kill scenario
 
     creationTimestamp: "2024-12-05T15:16:21Z"
     """
-    kubelet_readiness_time: float
+    node_ready_time: float
     """
     The time the node took for the kubelet to become ready after the node was created
     condition[reason=KubeletReady].lastTransitionTime
 
     """
-    total_recovery_time: float
+    node_not_ready_time: float
     """
     Total amount of time the node took to get recreated and ready
     """
@@ -285,15 +285,26 @@ class AffectedNode:
     def __init__(
         self,
         node_name: str,
-        total_recovery_time: float = None,
-        kubelet_readiness_time: float = None,
-        node_rescheduling_time: float = None,
+        status: str,
+        total_time: float
     ):
         self.node_name = node_name
-        self.total_recovery_time = total_recovery_time
-        self.kubelet_readiness_time = kubelet_readiness_time
-        self.node_rescheduling_time = node_rescheduling_time
+        if status == "Unknown":
+            self.set_unknown_time(total_time)
+        elif status:
+            self.set_ready_time(total_time)
+        elif not status:
+            self.set_not_ready_time(total_time)
+        
 
+    def set_not_ready_time(not_ready_time):
+        self.node_not_ready_time = not_ready_time 
+    
+    def set_ready_time(node_ready_time):
+        self.node_ready_time = ready_time
+    
+    def set_unknown_time(node_unknown_time):
+        self.node_unknown_time = node_unknown_time
 
 
 class NodesStatus:
@@ -306,13 +317,9 @@ class NodesStatus:
     """
 
     recovered: list[AffectedNode]
-    unrecovered: list[AffectedNode]
-    error: Optional[str]
 
     def __init__(self, json_object: str = None):
         self.recovered = []
-        self.unrecovered = []
-        self.error = None
 
         if json_object:
             for recovered in json_object["recovered"]:
@@ -324,18 +331,10 @@ class NodesStatus:
                         float(recovered["node_rescheduling_time"]),
                     )
                 )
-            for unrecovered in json_object["unrecovered"]:
-                self.unrecovered.append(
-                    AffectedNode(
-                        unrecovered["node_name"],
-                    )
-                )
-            if "error" in json_object:
-                self.error = json_object["error"]
+          
 
     def merge(self, nodes_status: "NodesStatus"):
         for recovered in nodes_status.recovered:
             self.recovered.append(recovered)
-        for unrecovered in nodes_status.unrecovered:
-            self.unrecovered.append(unrecovered)
+
 
