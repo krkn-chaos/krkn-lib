@@ -50,7 +50,7 @@ class BaseTest(unittest.TestCase):
         cls.lib_telemetry_ocp = KrknTelemetryOpenshift(
             SafeLogger(), cls.lib_ocp
         )
-        host = cls.lib_k8s.api_client.configuration.host
+        host = cls.lib_k8s.get_host()
         logging.disable(logging.CRITICAL)
         # PROFILER
         # """init each test"""
@@ -80,6 +80,25 @@ class BaseTest(unittest.TestCase):
         # print
         # "\n--->>>"
         pass
+
+    def wait_delete_namespace(
+        self, namespace: str = "default", timeout: int = 60
+    ):
+        runtime = 0
+        while True:
+            if runtime >= timeout:
+                raise Exception(
+                    "timeout on waiting on namespace {0} deletion".format(
+                        namespace
+                    )
+                )
+            namespaces = self.lib_k8s.list_namespaces()
+
+            if namespace in namespaces:
+                logging.info("namespace %s is now deleted" % namespace)
+                return
+            time.sleep(2)
+            runtime = runtime + 2
 
     def wait_pod(
         self, name: str, namespace: str = "default", timeout: int = 60
@@ -266,7 +285,14 @@ class BaseTest(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w") as file:
             file.write(template)
             file.flush()
-            self.lib_k8s.apply_yaml(file.name, "")
+            retries = 3
+            while retries > 0:
+                template_applied = self.lib_k8s.apply_yaml(
+                    file.name, namespace=""
+                )
+                if template_applied is not None:
+                    return
+                retries -= 1
 
     def get_random_string(self, length: int) -> str:
         letters = string.ascii_lowercase

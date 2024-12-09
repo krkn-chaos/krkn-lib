@@ -15,10 +15,10 @@ from krkn_lib.utils import (
     filter_dictionary,
     filter_log_line,
     find_executable_in_path,
-    get_junit_test_case,
     get_random_string,
     get_yaml_item_value,
     is_host_reachable,
+    get_junit_test_case,
 )
 
 
