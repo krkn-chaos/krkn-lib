@@ -1,10 +1,11 @@
 import base64
-import json
+import datetime
 import os
 import re
 import tempfile
 
 import yaml
+from dateutil.tz import tzutc
 
 import krkn_lib.utils as utils
 from krkn_lib.tests import BaseTest
@@ -14,10 +15,10 @@ from krkn_lib.utils import (
     filter_dictionary,
     filter_log_line,
     find_executable_in_path,
+    get_junit_test_case,
     get_random_string,
     get_yaml_item_value,
     is_host_reachable,
-    get_junit_test_case,
 )
 
 
@@ -254,72 +255,68 @@ class UtilFunctionTests(BaseTest):
             )
 
     def test_filter_dictionary(self):
-        event = """
-                {
+        event = {
             "apiVersion": "v1",
             "count": 1,
-            "eventTime": null,
-            "firstTimestamp": "2023-10-04T09:51:06Z",
+            "eventTime": "null",
+            "firstTimestamp": datetime.datetime(
+                2023, 10, 4, 9, 51, 6, tzinfo=tzutc()
+            ),
             "involvedObject": {
                 "kind": "Node",
                 "name": "ip-10-0-143-127.us-west-2.compute.internal",
-                "uid": "ip-10-0-143-127.us-west-2.compute.internal"
+                "uid": "ip-10-0-143-127.us-west-2.compute.internal",
             },
             "kind": "Event",
             "lastTimestamp": "2023-10-04T09:51:06Z",
             "message": "Starting kubelet.",
             "metadata": {
                 "creationTimestamp": "2023-10-04T09:51:07Z",
-                "name": "ip-10-0-143-127.us-west-2.compute.internal.178adeb2335c61fe",
+                "name": "ip-10-0-143-127.us-west-2.compute.internal",
                 "namespace": "default",
                 "resourceVersion": "13109",
-                "uid": "e119423c-a5af-4bdc-b8ea-042d01390387"
+                "uid": "e119423c-a5af-4bdc-b8ea-042d01390387",
             },
             "reason": "Starting",
             "reportingComponent": "",
             "reportingInstance": "",
             "source": {
                 "component": "kubelet",
-                "host": "ip-10-0-143-127.us-west-2.compute.internal"
+                "host": "ip-10-0-143-127.us-west-2.compute.internal",
             },
-            "type": "Normal"
+            "type": "Normal",
         }
-        """  # NOQA
+
         ten_minutes_ago = 1696412513  # Wednesday, October 4, 2023 9:41:53 AM
         in_ten_minutes = 1696413713  # Wednesday, October 4, 2023 10:01:53 AM
 
-        event_dict = json.loads(event)
-
         result = filter_dictionary(
-            event_dict,
-            "firstTimestamp",
+            event["firstTimestamp"],
             ten_minutes_ago,
             in_ten_minutes,
             "UTC",
             "UTC",
         )
-        self.assertEqual(result, event_dict)
+        self.assertTrue(result)
 
         result = filter_dictionary(
-            event_dict,
-            "firstTimestamp",
+            event["firstTimestamp"],
             in_ten_minutes,
             None,
             "UTC",
             "UTC",
         )
 
-        self.assertIsNone(result)
+        self.assertFalse(result)
 
         result = filter_dictionary(
-            event_dict,
-            "apiVersion",
+            event["apiVersion"],
             in_ten_minutes,
             None,
             "UTC",
             "UTC",
         )
-        self.assertIsNone(result)
+        self.assertFalse(result)
 
     def test_get_yaml_item_value(self):
         cont = {"n_int": 1, "n_str": "value", "d_int": None, "d_str": None}

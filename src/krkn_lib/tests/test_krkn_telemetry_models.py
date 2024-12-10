@@ -1,10 +1,17 @@
 import json
 import unittest
 
+from kubernetes import client
+from kubernetes.client.models import (
+    V1EventSource,
+    V1ObjectMeta,
+    V1ObjectReference,
+)
+
 from krkn_lib.models.telemetry import (
     ChaosRunTelemetry,
-    ScenarioTelemetry,
     ClusterEvent,
+    ScenarioTelemetry,
 )
 
 
@@ -348,6 +355,48 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(event.type, "Normal")
 
         event = ClusterEvent(json_dict=json.loads(krkn_json))
+        self.assertEqual(event.name, "test")
+        self.assertEqual(event.creation, "2024-09-02T14:00:53Z")
+        self.assertEqual(event.reason, "Failed")
+        self.assertEqual(
+            event.message,
+            "message",
+        )
+        self.assertEqual(event.namespace, "default")
+        self.assertEqual(event.source_component, "kubelet")
+        self.assertEqual(event.involved_object_kind, "Pod")
+        self.assertEqual(event.involved_object_name, "test")
+        self.assertEqual(event.involved_object_namespace, "default")
+        self.assertEqual(event.type, "Normal")
+
+        json_dict = json.loads(krkn_json)
+
+        v1_object_reference = V1ObjectReference(
+            api_version="v1",
+            kind=json_dict["involved_object_kind"],
+            name=json_dict["involved_object_name"],
+            namespace=json_dict["involved_object_namespace"],
+            uid="2222666",  # Optional
+        )
+
+        event_source = V1EventSource(json_dict["source_component"])
+        metadata = V1ObjectMeta(
+            name=json_dict["involved_object_name"],
+            namespace=json_dict["involved_object_namespace"],
+            creation_timestamp=json_dict["creation"],
+        )
+        core_event = client.CoreV1Event(
+            message=json_dict["message"],
+            reason=json_dict["reason"],
+            type=json_dict["type"],
+            first_timestamp=json_dict["creation"],
+            involved_object=v1_object_reference,
+            source=event_source,
+            metadata=metadata,
+        )  # CoreV1Event
+
+        event = ClusterEvent(k8s_obj=core_event)
+
         self.assertEqual(event.name, "test")
         self.assertEqual(event.creation, "2024-09-02T14:00:53Z")
         self.assertEqual(event.reason, "Failed")
