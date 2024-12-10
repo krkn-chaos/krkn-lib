@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 import base64
 import json
-import yaml
 from dataclasses import dataclass
 from datetime import datetime, timezone
+
+import yaml
+
 from krkn_lib.models.k8s import PodsStatus
 
 relevant_event_reasons: frozenset[str] = frozenset(
