@@ -150,7 +150,7 @@ class KrknKubernetes:
 
             client_config = client.Configuration().get_default_copy()
             http_proxy = os.getenv("http_proxy", None)
-            if http_proxy is not None: 
+            if http_proxy is not None:
                 os.environ["HTTP_PROXY"] = http_proxy
                 client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
@@ -158,19 +158,9 @@ class KrknKubernetes:
                 client_config.proxy_headers = urllib3.util.make_headers(
                     proxy_basic_auth=auth_string
                 )
-                # if http_proxy and "@" in http_proxy:
-                
-            #     # client_config.username = proxy_auth.username
-            #     # client_config.password = proxy_auth.password
-            #     
-            
-            print('set default')
-            # config.load_kube_config(
-            #     kubeconfig_path
-            # )
+
             client.Configuration.set_default(client_config)
-            print('load config')
-            
+
             self.api_client = client.ApiClient(client_config)
 
             self.cli = client.CoreV1Api(self.api_client)
