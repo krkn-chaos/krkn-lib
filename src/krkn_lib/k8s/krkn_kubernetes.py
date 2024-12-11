@@ -7,6 +7,8 @@ import re
 import tempfile
 import threading
 import time
+from urllib.parse import urlparse
+
 import warnings
 from concurrent.futures import ThreadPoolExecutor, wait
 from functools import partial
@@ -145,20 +147,31 @@ class KrknKubernetes:
 
         try:
             config.load_kube_config(kubeconfig_path)
-            self.api_client = client.ApiClient()
-            self.k8s_client = config.new_client_from_config(
-                config_file=kubeconfig_path
-            )
-            self.cli = client.CoreV1Api(self.k8s_client)
 
+            client_config = client.Configuration().get_default_copy()
+            http_proxy = os.getenv("http_proxy", None)
+            if http_proxy is not None:
+                os.environ["HTTP_PROXY"] = http_proxy
+                client_config.proxy = http_proxy
+                proxy_auth = urlparse(http_proxy)
+                auth_string = proxy_auth.username + ":" + proxy_auth.password
+                client_config.proxy_headers = urllib3.util.make_headers(
+                    proxy_basic_auth=auth_string
+                )
+
+            client.Configuration.set_default(client_config)
+
+            self.api_client = client.ApiClient(client_config)
+
+            self.cli = client.CoreV1Api(self.api_client)
             self.version_client = client.VersionApi(self.api_client)
             self.apps_api = client.AppsV1Api(self.api_client)
-            self.batch_cli = client.BatchV1Api(self.k8s_client)
+            self.batch_cli = client.BatchV1Api(self.api_client)
             self.net_cli = client.NetworkingV1Api(self.api_client)
             self.custom_object_client = client.CustomObjectsApi(
-                self.k8s_client
+                self.api_client
             )
-            self.dyn_client = DynamicClient(self.k8s_client)
+            self.dyn_client = DynamicClient(self.api_client)
             self.watch_resource = watch.Watch()
 
         except OSError:
@@ -1128,11 +1141,12 @@ class KrknKubernetes:
         pod_body = yaml.safe_load(
             pod_template.render(nodename=node_name, podname=exec_pod_name)
         )
+
         logging.info(
             f"Creating pod to exec command {command} on node {node_name}"
         )
         try:
-            self.create_pod(pod_body, exec_pod_namespace, 300)
+            self.create_pod(pod_body, exec_pod_namespace, 500)
         except Exception as e:
             logging.error(
                 f"failed to create pod {exec_pod_name} on node {node_name},"
@@ -1499,10 +1513,12 @@ class KrknKubernetes:
             the resource (optional default `default`)
         :return: the list of names of created objects
         """
-
-        return utils.create_from_yaml(
-            self.api_client, yaml_file=path, namespace=namespace
-        )
+        try:
+            return utils.create_from_yaml(
+                self.api_client, yaml_file=path, namespace=namespace
+            )
+        except Exception as e:
+            logging.error("Error trying to apply_yaml" + str(e))
 
     def get_pod_info(self, name: str, namespace: str = "default") -> Pod:
         """
