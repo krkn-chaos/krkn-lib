@@ -378,10 +378,16 @@ class SloAlert:
     description of the alert
     """
 
-    def __init__(self, timestamp: int, severity: str, description: str):
-            self.timestamp = timestamp
-            self.severity = severity
-            self.description = description
+    # def __init__(self, timestamp: int, severity: str, description: str):
+    #         self.timestamp = timestamp
+    #         self.severity = severity
+    #         self.description = description
+
+    def __init__(self, json_list: list = None):
+        if json_list is not None:
+            self.timestamp = json_list[0] if len(json_list) > 0 else None
+            self.severity = json_list[1] if len(json_list) > 1 else None
+            self.description = json_list[2] if len(json_list) > 2 else None
     
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
