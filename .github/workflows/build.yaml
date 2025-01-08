@@ -226,13 +226,3 @@ jobs:
           TWINE_PASSWORD: ${{secrets.PYPI_TOKEN}}
           TWINE_NON_INTERACTIVE: true
         run: twine upload dist/*
-  build_krkn:
-    name: Build Krkn Image 
-    runs-on: ubuntu-latest
-    steps:
-      - name: Rebuild krkn
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: redhat-chaos/actions/krkn@main
-        with:
-          QUAY_USER: ${{ secrets.RH_USERNAME }}
-          QUAY_TOKEN: ${{ secrets.RH_PASSWORD }}
