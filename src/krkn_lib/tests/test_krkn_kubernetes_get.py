@@ -235,6 +235,17 @@ class KrknKubernetesTestsGet(BaseTest):
         except Exception:
             self.fail("failed to deserialize NodeInfo")
 
+    def test_get_node_cpu_count(self):
+        nodes = self.lib_k8s.list_nodes()
+        node_cpus = self.lib_k8s.get_node_cpu_count(nodes[0])
+        self.assertGreater(node_cpus, 0)
+
+        node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist", "v1")
+        self.assertEqual(node_cpus, 0)
+
+        node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist", "v3")
+        self.assertEqual(node_cpus, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
