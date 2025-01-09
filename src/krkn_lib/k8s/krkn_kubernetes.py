@@ -2020,6 +2020,44 @@ class KrknKubernetes:
 
         return None
 
+    def get_node_cpu_count(
+        self, node_name: str, api_version: str = "v1"
+    ) -> int:
+        """
+        Returns the number of cpus of a specified node
+
+        :param node_name: the name of the node
+        :param api_version: the kubernetes api version
+        :return: the number of cpus or 0 if any exception is raised
+        """
+        api_client = self.api_client
+
+        if api_client:
+            try:
+                path_params: Dict[str, str] = {}
+                query_params: List[str] = []
+                header_params: Dict[str, str] = {}
+                auth_settings = ["BearerToken"]
+                header_params["Accept"] = api_client.select_header_accept(
+                    ["application/json"]
+                )
+
+                path = f"/api/{api_version}/nodes/{node_name}"
+                (data) = api_client.call_api(
+                    path,
+                    "GET",
+                    path_params,
+                    query_params,
+                    header_params,
+                    response_type="str",
+                    auth_settings=auth_settings,
+                )
+
+                json_obj = ast.literal_eval(data[0])
+                return int(json_obj["status"]["capacity"]["cpu"])
+            except Exception:
+                return 0
+
     def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
         Returns a list of NodeInfo objects
