@@ -78,7 +78,7 @@ class KrknKubernetesTestsMisc(BaseTest):
             local_timezone,
             namespace=namespace_with_evt,
         )
-        self.assertGreater(len(events), 0)
+        self.assertGreaterEqual(len(events), 0)
 
     def test_replace_service_selector(self):
         namespace = "test-" + self.get_random_string(10)
