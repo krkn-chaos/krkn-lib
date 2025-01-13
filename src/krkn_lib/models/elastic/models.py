@@ -118,13 +118,13 @@ class ElasticChaosRunTelemetry(Document):
                 exit_status=sc.exit_status,
                 parameters_base64=sc.parameters_base64,
                 parameters=sc.parameters,
-                affected_pods=sc.affected_pods.to_json(),
+                affected_pods=sc.affected_pods,
             )
             for sc in chaos_run_telemetry.scenarios
         ]
 
-        self.node_summary_infos = [info.to_json() for info in chaos_run_telemetry.node_summary_infos]
-        self.node_taints = [taint.to_json() for taint in chaos_run_telemetry.node_taints]
+        self.node_summary_infos = [info.__dict__ for info in chaos_run_telemetry.node_summary_infos]
+        self.node_taints = [taint.__dict__ for taint in chaos_run_telemetry.node_taints]
         self.kubernetes_objects_count = (
             chaos_run_telemetry.kubernetes_objects_count
         )
@@ -136,4 +136,6 @@ class ElasticChaosRunTelemetry(Document):
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
 
+    def to_json(self):
+        return self.__dict__
 
