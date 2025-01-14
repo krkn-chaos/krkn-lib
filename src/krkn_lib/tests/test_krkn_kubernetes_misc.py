@@ -309,7 +309,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         # deallocated after the test
 
         config.type = HogType.IO
-        config.io_write_bytes = "512m"
+        config.io_write_bytes = "128m"
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
         self.lib_k8s.deploy_hog(
@@ -323,7 +323,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         print(f"DISK SPACE ALLOCATED (MB): {disk_delta/1024/1024}")
 
         # testing that at least 300MB on 512 are written
-        self.assertGreaterEqual(disk_delta / 1024 / 1024, 300)
+        self.assertGreaterEqual(disk_delta / 1024 / 1024, 400)
 
         # test that after the test the disk space is deallocated
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
