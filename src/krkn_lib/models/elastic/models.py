@@ -12,8 +12,8 @@ from elasticsearch_dsl import (
     Text,
 )
 
-from krkn_lib.models.telemetry.models import *
-from krkn_lib.models.k8s.models import *
+from krkn_lib.models.telemetry.models import ChaosRunTelemetry
+
 
 class ElasticAlert(Document):
     run_uuid = Keyword()
@@ -123,8 +123,12 @@ class ElasticChaosRunTelemetry(Document):
             for sc in chaos_run_telemetry.scenarios
         ]
 
-        self.node_summary_infos = [info.__dict__ for info in chaos_run_telemetry.node_summary_infos]
-        self.node_taints = [taint.__dict__ for taint in chaos_run_telemetry.node_taints]
+        self.node_summary_infos = [
+            info.__dict__ for info in chaos_run_telemetry.node_summary_infos
+        ]
+        self.node_taints = [
+            taint.__dict__ for taint in chaos_run_telemetry.node_taints
+        ]
         self.kubernetes_objects_count = (
             chaos_run_telemetry.kubernetes_objects_count
         )
@@ -138,4 +142,3 @@ class ElasticChaosRunTelemetry(Document):
 
     def to_json(self):
         return self.__dict__
-
