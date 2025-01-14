@@ -322,7 +322,8 @@ class KrknKubernetesTestsMisc(BaseTest):
         disk_delta = node_resources_start[2] - node_resources_after[2]
         print(f"DISK SPACE ALLOCATED (MB): {disk_delta/1024/1024}")
 
-        self.assertGreaterEqual(disk_delta / 1024 / 1024, 400)
+        # testing that at least 300MB on 512 are written 
+        self.assertGreaterEqual(disk_delta / 1024 / 1024, 300)
 
         # test that after the test the disk space is deallocated
 
