@@ -328,6 +328,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         # test that after the test the disk space is deallocated
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
+        time.sleep(10)
         node_resources_end = self.get_node_resources_info(nodes[0])
         disk_delta = node_resources_start[2] - node_resources_end[2]
         print(
