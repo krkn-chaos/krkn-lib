@@ -39,6 +39,7 @@ from krkn_lib.models.k8s import (
     Volume,
     VolumeMount,
 )
+from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -2020,41 +2021,21 @@ class KrknKubernetes:
 
         return None
 
-    def get_node_cpu_count(
-        self, node_name: str, api_version: str = "v1"
-    ) -> int:
+    def get_node_cpu_count(self, node_name: str) -> int:
         """
         Returns the number of cpus of a specified node
 
         :param node_name: the name of the node
-        :param api_version: the kubernetes api version
         :return: the number of cpus or 0 if any exception is raised
         """
         api_client = self.api_client
 
         if api_client:
             try:
-                path_params: Dict[str, str] = {}
-                query_params: List[str] = []
-                header_params: Dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
-                )
-
-                path = f"/api/{api_version}/nodes/{node_name}"
-                (data) = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="str",
-                    auth_settings=auth_settings,
-                )
-
-                json_obj = ast.literal_eval(data[0])
-                return int(json_obj["status"]["capacity"]["cpu"])
+                v1 = self.cli
+                node = v1.read_node(node_name)
+                cpu_capacity = node.status.capacity.get("cpu")
+                return int(cpu_capacity)
             except Exception:
                 return 0
 
@@ -3292,6 +3273,61 @@ class KrknKubernetes:
                 target_port=target_port,
                 packet_size=packet_size,
                 window_size=window_size,
+            )
+        )
+
+        self.create_pod(namespace=namespace, body=pod_body)
+
+    def deploy_hog(
+        self,
+        pod_name: str,
+        namespace: str,
+        image: str,
+        hog_config: HogConfig,
+    ):
+        """
+        Deploys a Pod to run the Syn Flood scenario
+
+        :param pod_name: The name of the pod that will be deployed
+        :param namespace: The namespace where the pod will be deployed
+        :param image: the syn flood scenario container image
+        :param hog_config: Hog Configuration
+        """
+        has_selector = len(hog_config.node_selector.keys()) > 0
+        if has_selector:
+            node_selector_key = list(hog_config.node_selector.keys())[0]
+            node_selector_value = hog_config.node_selector[
+                list(hog_config.node_selector.keys())[0]
+            ]
+        else:
+            node_selector_key = ""
+            node_selector_value = ""
+
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        io_volume = {"volumes": [hog_config.io_target_pod_volume]}
+        yaml_data = yaml.dump(io_volume, default_flow_style=False, indent=2)
+        pod_template = env.get_template("hog_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=namespace,
+                hog_type=hog_config.type.value,
+                hog_type_io=HogType.IO.value,
+                has_selector=has_selector,
+                node_selector_key=node_selector_key,
+                node_selector_value=node_selector_value,
+                image=image,
+                duration=hog_config.duration,
+                cpu_load_percentage=hog_config.cpu_load_percentage,
+                cpu_method=hog_config.cpu_method,
+                io_block_size=hog_config.io_block_size,
+                io_write_bytes=hog_config.io_write_bytes,
+                io_target_pod_folder=hog_config.io_target_pod_folder,
+                io_volume_mount=yaml_data,
+                memory_vm_bytes=hog_config.memory_vm_bytes,
+                workers=hog_config.workers,
+                target_pod_folder=hog_config.io_target_pod_folder,
             )
         )
 

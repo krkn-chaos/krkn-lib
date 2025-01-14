@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ name }}
+  namespace: {{ namespace }}
+spec:
+    {% if has_selector == true %}
+    nodeSelector:
+        {{ node_selector_key }}: {{ node_selector_value }}
+    {% endif %}
+    {% if hog_type == hog_type_io %}
+    {{ io_volume_mount | safe | indent(4)}}
+    {% endif %}
+    restartPolicy: Never
+    imagePullPolicy: IfNotPresent
+    containers:
+      - name: krkn-hog
+        image: {{ image }}
+        securityContext:
+            privileged: true
+        {% if hog_type == hog_type_io %}
+        volumeMounts:
+            - name: node-volume
+              mountPath: {{ target_pod_folder }}
+        {% endif %}
+        env:
+            - name: HOG_TYPE
+              value: '{{ hog_type }}'
+            - name: LOAD_PERCENTAGE
+              value: '{{ cpu_load_percentage }}'
+            - name: CPU_METHOD
+              value: '{{ cpu_method }}'
+            - name: HDD_WRITE_SIZE
+              value: '{{ io_block_size }}'
+            - name: HDD_BYTES
+              value: '{{ io_write_bytes }}'
+            - name: STRESS_PATH
+              value: '{{ target_pod_folder }}'
+            - name: VM_BYTES
+              value: '{{ memory_vm_bytes }}'
+            - name: WORKERS
+              value: '{{ workers }}'
+            - name: DURATION
+              value: '{{ duration }}'

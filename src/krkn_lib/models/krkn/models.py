@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from enum import Enum
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 
@@ -95,3 +96,49 @@ class ChaosRunOutput:
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
+
+
+class HogType(Enum):
+    CPU = "cpu"
+    MEMORY = "memory"
+    IO = "io"
+
+
+class HogConfig:
+    type: HogType
+    image: str
+    # cpu hog
+    cpu_load_percentage: int
+    cpu_method: str
+
+    # io hog
+    io_block_size: str
+    io_write_bytes: str
+    io_target_pod_folder: str
+    io_target_pod_volume: dict[str, any]
+
+    # memory hog
+    memory_vm_bytes: str
+
+    workers: int
+    duration: int
+    namespace: str
+    node_selector: dict[str, str]
+
+    def __init__(self):
+        self.type = HogType.CPU
+        self.image = "quay.io/krkn-chaos/krkn-hog"
+        self.cpu_load_percentage = 80
+        self.cpu_method = "all"
+        self.io_block_size = "1m"
+        self.io_write_bytes = "10m"
+        self.io_target_pod_folder = "/hog-data"
+        self.io_target_pod_volume = {
+            "hostPath": {"path": "/tmp"},
+            "name": "node-volume",
+        }
+        self.memory_vm_bytes = "10%"
+        self.workers = 1
+        self.duration = 30
+        self.namespace = "default"
+        self.node_selector = {}
