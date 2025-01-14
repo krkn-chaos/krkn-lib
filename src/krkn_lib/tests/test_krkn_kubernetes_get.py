@@ -240,10 +240,7 @@ class KrknKubernetesTestsGet(BaseTest):
         node_cpus = self.lib_k8s.get_node_cpu_count(nodes[0])
         self.assertGreater(node_cpus, 0)
 
-        node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist", "v1")
-        self.assertEqual(node_cpus, 0)
-
-        node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist", "v3")
+        node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist")
         self.assertEqual(node_cpus, 0)
 
 
