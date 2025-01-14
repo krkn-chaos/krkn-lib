@@ -14,7 +14,7 @@ class KrknOpenshiftTest(BaseTest):
     def test_get_cluster_network_plugins(self):
         resp = self.lib_ocp.get_cluster_network_plugins()
         self.assertTrue(len(resp) > 0)
-        self.assertEqual(resp[0], "Unknown")
+        self.assertEqual(resp, "Unknown")
 
     def test_get_cluster_type(self):
         resp = self.lib_ocp.get_cluster_type()

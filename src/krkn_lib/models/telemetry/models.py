@@ -143,7 +143,6 @@ class ScenarioTelemetry:
             self.parameters_base64 = ""
             self.parameters = {}
             self.affected_pods = PodsStatus()
-            self.affected_nodes = AffectedNodeStatus()
             self.cluster_events = []
 
     def to_json(self) -> str:

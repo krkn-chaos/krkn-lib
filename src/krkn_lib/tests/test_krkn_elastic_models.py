@@ -141,9 +141,7 @@ class TestKrknElasticModels(BaseTest):
         )
 
         # network_plugins
-
-        self.assertEqual(len(elastic_telemetry.network_plugins), 1)
-        self.assertEqual(elastic_telemetry.network_plugins[0], "Calico")
+        self.assertEqual(elastic_telemetry.network_plugins, "Calico")
 
         # obejct properties
         self.assertEqual(elastic_telemetry.timestamp, "2023-05-22T14:55:02Z")
