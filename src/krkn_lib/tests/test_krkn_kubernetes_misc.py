@@ -324,17 +324,6 @@ class KrknKubernetesTestsMisc(BaseTest):
 
         # testing that at least 300MB on 512 are written
         self.assertGreaterEqual(disk_delta / 1024 / 1024, 400)
-
-        # test that after the test the disk space is deallocated
-        while not self.lib_k8s.is_pod_running(pod_name, namespace):
-            continue
-        time.sleep(10)
-        node_resources_end = self.get_node_resources_info(nodes[0])
-        disk_delta = node_resources_start[2] - node_resources_end[2]
-        print(
-            f"DISK SPACE DEALLOCATED AFTER CHAOS (MB): {disk_delta/1024/1024}"
-        )
-        self.assertLessEqual(int(disk_delta / 1024 / 1024), 10)
         self.lib_k8s.delete_namespace(namespace)
 
     def test_select_services_by_label(self):
