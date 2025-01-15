@@ -38,6 +38,7 @@ from krkn_lib.models.k8s import (
     ServiceHijacking,
     Volume,
     VolumeMount,
+    NodeResources,
 )
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
@@ -3363,3 +3364,29 @@ class KrknKubernetes:
         )
 
         self.create_pod(namespace=namespace, body=pod_body)
+
+    def get_node_resources_info(self, node_name: str) -> NodeResources:
+        resources = NodeResources()
+        path_params: dict[str, str] = {}
+        query_params: list[str] = []
+        header_params: dict[str, str] = {}
+        auth_settings = ["BearerToken"]
+        header_params["Accept"] = self.api_client.select_header_accept(
+            ["application/json"]
+        )
+        path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
+        (data) = self.api_client.call_api(
+            path,
+            "GET",
+            path_params,
+            query_params,
+            header_params,
+            response_type="str",
+            auth_settings=auth_settings,
+        )
+
+        json_obj = ast.literal_eval(data[0])
+        resources.cpu = json_obj["node"]["cpu"]["usageNanoCores"]
+        resources.memory = json_obj["node"]["memory"]["availableBytes"]
+        resources.disk_space = json_obj["node"]["fs"]["availableBytes"]
+        return resources

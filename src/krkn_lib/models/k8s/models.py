@@ -381,3 +381,14 @@ class ServiceHijacking:
         self.namespace = namespace
         self.selector = selector
         self.config_map_name = config_map_name
+
+
+class NodeResources:
+    memory: int
+    cpu: int
+    disk_space: int
+
+    def __init__(self):
+        self.memory = 0
+        self.cpu = 0
+        self.disk_space = 0
