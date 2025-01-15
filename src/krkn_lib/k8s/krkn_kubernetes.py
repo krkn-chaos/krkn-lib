@@ -1861,6 +1861,37 @@ class KrknKubernetes:
 
         return nodes
 
+    def list_schedulable_nodes(self, label_selector: str = None) -> list[str]:
+        """
+        Lists all the nodes that do not have `NoSchedule` or `NoExecute` taints
+        and where pods can be scheduled
+        :param label_selector: a label selector to filter the nodes
+        :return: a list of node names
+        """
+        nodes = []
+        try:
+            if label_selector:
+                ret = self.cli.list_node(
+                    pretty=True, label_selector=label_selector
+                )
+            else:
+                ret = self.cli.list_node(pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->list_node: %s\n", str(e)
+            )
+            raise e
+        for node in ret.items:
+            if node.spec.taints:
+                try:
+                    for taint in node.spec.taints:
+                        if taint.effect in ["NoSchedule", "NoExecute"]:
+                            raise Exception
+                except Exception:
+                    continue
+            nodes.append(node.metadata.name)
+        return nodes
+
     # TODO: is the signature correct? the method
     #  returns a list of nodes and the signature name is `get_node`
     def get_node(
@@ -3313,7 +3344,7 @@ class KrknKubernetes:
                 name=pod_name,
                 namespace=namespace,
                 hog_type=hog_config.type.value,
-                hog_type_io=HogType.IO.value,
+                hog_type_io=HogType.io.value,
                 has_selector=has_selector,
                 node_selector_key=node_selector_key,
                 node_selector_value=node_selector_value,

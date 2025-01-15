@@ -268,7 +268,7 @@ class KrknKubernetesTestsMisc(BaseTest):
             "hostPath": {"path": "/"},
             "name": "node-volume",
         }
-        config.type = HogType.CPU
+        config.type = HogType.cpu
         config.cpu_load_percentage = 90
         config.workers = node_cpus
         config.node_selector["kubernetes.io/hostname"] = nodes[0]
@@ -288,7 +288,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         # tests memory Hog detecting a memory increase of
         # 80% minimum
 
-        config.type = HogType.MEMORY
+        config.type = HogType.memory
         config.memory_vm_bytes = "90%"
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
@@ -308,7 +308,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         # 400MB minimum and checks that the space is
         # deallocated after the test
 
-        config.type = HogType.IO
+        config.type = HogType.io
         config.io_write_bytes = "128m"
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"

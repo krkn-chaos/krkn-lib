@@ -98,10 +98,10 @@ class ChaosRunOutput:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
 
-class HogType(Enum):
-    CPU = "cpu"
-    MEMORY = "memory"
-    IO = "io"
+class HogType(str, Enum):
+    cpu = "cpu"
+    memory = "memory"
+    io = "io"
 
 
 class HogConfig:
@@ -126,7 +126,7 @@ class HogConfig:
     node_selector: dict[str, str]
 
     def __init__(self):
-        self.type = HogType.CPU
+        self.type = HogType.cpu
         self.image = "quay.io/krkn-chaos/krkn-hog"
         self.cpu_load_percentage = 80
         self.cpu_method = "all"
@@ -142,3 +142,70 @@ class HogConfig:
         self.duration = 30
         self.namespace = "default"
         self.node_selector = {}
+
+    @staticmethod
+    def from_yaml_dict(yaml_dict: dict[str, str]) -> HogConfig:
+        config = HogConfig()
+        missing_fields = []
+        if "hog-type" not in yaml_dict.keys() or not yaml_dict["hog-type"]:
+            missing_fields.append("hog-type")
+        if (
+            "node-selector" not in yaml_dict.keys()
+            or not yaml_dict["node-selector"]
+        ):
+            missing_fields.append("node-selector")
+        if len(missing_fields) > 0:
+            missing = ",".join(missing_fields)
+            raise Exception(
+                f"missing mandatory fields on hog config file: {missing}"
+            )
+
+        config.type = HogType[yaml_dict["hog-type"]]
+        config.node_selector = yaml_dict["node-selector"]
+
+        if "duration" in yaml_dict.keys() and yaml_dict["duration"]:
+            config.duration = yaml_dict["duration"]
+        if "namespace" in yaml_dict.keys() and yaml_dict["namespace"]:
+            config.namespace = yaml_dict["namespace"]
+        if "workers" in yaml_dict.keys() and yaml_dict["workers"]:
+            config.workers = yaml_dict["workers"]
+        if "image" in yaml_dict.keys() and yaml_dict["image"]:
+            config.image = yaml_dict["image"]
+
+        if config.type == HogType.cpu:
+            if (
+                "cpu-load-percentage" in yaml_dict.keys()
+                and yaml_dict["cpu-load-percentage"]
+            ):
+                config.cpu_load_percentage = yaml_dict["cpu-load-percentage"]
+            if "cpu-method" in yaml_dict.keys() and yaml_dict["cpu-method"]:
+                config.cpu_method = yaml_dict["cpu-method"]
+        elif config.type == HogType.io:
+            if (
+                "io-block-size" in yaml_dict.keys()
+                and yaml_dict["io-block-size"]
+            ):
+                config.io_block_size = yaml_dict["io-block-size"]
+            if (
+                "io-write-bytes" in yaml_dict.keys()
+                and yaml_dict["io-write-bytes"]
+            ):
+                config.io_write_bytes = yaml_dict["io-write-bytes"]
+            if (
+                "io-target-pod-folder" in yaml_dict.keys()
+                and yaml_dict["io-target-pod-folder"]
+            ):
+                config.io_target_pod_folder = yaml_dict["io-target-pod-folder"]
+            if (
+                "io-target-pod-volume" in yaml_dict.keys()
+                and yaml_dict["io-target-pod-volume"]
+            ):
+                config.io_target_pod_volume = yaml_dict["io-target-pod-volume"]
+        elif config.type == HogType.memory:
+            if (
+                "memory-vm-bytes" in yaml_dict.keys()
+                and yaml_dict["memory-vm-bytes"]
+            ):
+                config.memory_vm_bytes = yaml_dict["memory-vm-bytes"]
+
+        return config
