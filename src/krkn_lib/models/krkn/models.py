@@ -149,11 +149,7 @@ class HogConfig:
         missing_fields = []
         if "hog-type" not in yaml_dict.keys() or not yaml_dict["hog-type"]:
             missing_fields.append("hog-type")
-        if (
-            "node-selector" not in yaml_dict.keys()
-            or not yaml_dict["node-selector"]
-        ):
-            missing_fields.append("node-selector")
+
         if len(missing_fields) > 0:
             missing = ",".join(missing_fields)
             raise Exception(
