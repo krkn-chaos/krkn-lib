@@ -272,9 +272,9 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.cpu_load_percentage = 90
         config.workers = node_cpus
         config.node_selector["kubernetes.io/hostname"] = nodes[0]
-        self.lib_k8s.deploy_hog(
-            pod_name, namespace, "quay.io/krkn-chaos/krkn-hog", config
-        )
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
 
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
@@ -292,9 +292,9 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.memory_vm_bytes = "90%"
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
-        self.lib_k8s.deploy_hog(
-            pod_name, namespace, "quay.io/krkn-chaos/krkn-hog", config
-        )
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
         # grabbing the peak during the 20s chaos run
@@ -312,9 +312,9 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.io_write_bytes = "128m"
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
-        self.lib_k8s.deploy_hog(
-            pod_name, namespace, "quay.io/krkn-chaos/krkn-hog", config
-        )
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
         time.sleep(29)

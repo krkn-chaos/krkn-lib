@@ -3313,16 +3313,12 @@ class KrknKubernetes:
     def deploy_hog(
         self,
         pod_name: str,
-        namespace: str,
-        image: str,
         hog_config: HogConfig,
     ):
         """
         Deploys a Pod to run the Syn Flood scenario
 
         :param pod_name: The name of the pod that will be deployed
-        :param namespace: The namespace where the pod will be deployed
-        :param image: the syn flood scenario container image
         :param hog_config: Hog Configuration
         """
         has_selector = len(hog_config.node_selector.keys()) > 0
@@ -3343,13 +3339,13 @@ class KrknKubernetes:
         pod_body = yaml.safe_load(
             pod_template.render(
                 name=pod_name,
-                namespace=namespace,
+                namespace=hog_config.namespace,
                 hog_type=hog_config.type.value,
                 hog_type_io=HogType.io.value,
                 has_selector=has_selector,
                 node_selector_key=node_selector_key,
                 node_selector_value=node_selector_value,
-                image=image,
+                image=hog_config.image,
                 duration=hog_config.duration,
                 cpu_load_percentage=hog_config.cpu_load_percentage,
                 cpu_method=hog_config.cpu_method,
@@ -3363,7 +3359,7 @@ class KrknKubernetes:
             )
         )
 
-        self.create_pod(namespace=namespace, body=pod_body)
+        self.create_pod(namespace=hog_config.namespace, body=pod_body)
 
     def get_node_resources_info(self, node_name: str) -> NodeResources:
         resources = NodeResources()
