@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 
@@ -120,7 +121,7 @@ class HogConfig:
     # memory hog
     memory_vm_bytes: str
 
-    workers: int
+    workers: Optional[int]
     duration: int
     namespace: str
     node_selector: dict[str, str]
@@ -138,7 +139,7 @@ class HogConfig:
             "name": "node-volume",
         }
         self.memory_vm_bytes = "10%"
-        self.workers = 1
+        self.workers = None
         self.duration = 30
         self.namespace = "default"
         self.node_selector = {}
