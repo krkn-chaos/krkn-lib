@@ -1183,7 +1183,7 @@ class KrknKubernetes:
                 time.sleep(1)
         except ApiException as e:
             if e.status == 404:
-                logging.info("Pod already deleted")
+                return
             else:
                 logging.error("Failed to delete pod %s", str(e))
                 raise e
