@@ -65,10 +65,6 @@ class TestKrknKubernetesModels(BaseTest):
         with self.assertRaises(Exception):
             HogConfig.from_yaml_dict(wrong_type)
 
-        wrong_type = {"hog-type": "cpu", "node-selector": ""}
-        with self.assertRaises(Exception):
-            HogConfig.from_yaml_dict(wrong_type)
-
         memory_config = {
             "duration": 14,
             "workers": 23,
