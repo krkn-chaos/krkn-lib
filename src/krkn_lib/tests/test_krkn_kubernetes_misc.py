@@ -271,7 +271,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.type = HogType.cpu
         config.cpu_load_percentage = 90
         config.workers = node_cpus
-        config.node_selector["kubernetes.io/hostname"] = nodes[0]
+        config.node_selector = f"kubernetes.io/hostname={nodes[0]}"
         config.namespace = namespace
         config.image = "quay.io/krkn-chaos/krkn-hog"
         self.lib_k8s.deploy_hog(pod_name, config)
