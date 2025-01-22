@@ -124,7 +124,7 @@ class HogConfig:
     workers: Optional[int]
     duration: int
     namespace: str
-    node_selector: dict[str, str]
+    node_selector: str
 
     def __init__(self):
         self.type = HogType.cpu
@@ -142,7 +142,7 @@ class HogConfig:
         self.workers = None
         self.duration = 30
         self.namespace = "default"
-        self.node_selector = {}
+        self.node_selector = ""
 
     @staticmethod
     def from_yaml_dict(yaml_dict: dict[str, str]) -> HogConfig:
