@@ -3311,19 +3311,16 @@ class KrknKubernetes:
 
         self.create_pod(namespace=namespace, body=pod_body)
 
-    def deploy_hog(
-        self,
-        pod_name: str,
-        hog_config: HogConfig,
-    ):
+    def deploy_hog(self, pod_name: str, hog_config: HogConfig, regex=None):
         """
         Deploys a Pod to run the Syn Flood scenario
 
         :param pod_name: The name of the pod that will be deployed
         :param hog_config: Hog Configuration
         """
-        has_selector = hog_config.node_selector is not None and regex.match(
-            "^.+=.*$", hog_config.node_selector
+        compiled_regex = re.compile(r"^.+=.*$")
+        has_selector = hog_config.node_selector is not None and bool(
+            compiled_regex.match(hog_config.node_selector)
         )
         if has_selector:
             node_selector = hog_config.node_selector.split("=")
