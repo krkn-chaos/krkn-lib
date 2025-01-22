@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
+import regex
 import urllib3
 import yaml
 from jinja2 import Environment, PackageLoader
@@ -3321,16 +3322,13 @@ class KrknKubernetes:
         :param pod_name: The name of the pod that will be deployed
         :param hog_config: Hog Configuration
         """
-        has_selector = len(hog_config.node_selector.keys()) > 0
+        has_selector = hog_config.node_selector is not None and regex.match(
+            "^.+=.*$", hog_config.node_selector
+        )
         if has_selector:
-            node_selector_key = list(hog_config.node_selector.keys())[0]
-            node_selector_value = hog_config.node_selector[
-                list(hog_config.node_selector.keys())[0]
-            ]
+            node_selector = hog_config.node_selector.split("=")
         else:
-            node_selector_key = ""
-            node_selector_value = ""
-
+            node_selector = {"", ""}
         file_loader = PackageLoader("krkn_lib.k8s", "templates")
         env = Environment(loader=file_loader, autoescape=True)
         io_volume = {"volumes": [hog_config.io_target_pod_volume]}
@@ -3343,8 +3341,8 @@ class KrknKubernetes:
                 hog_type=hog_config.type.value,
                 hog_type_io=HogType.io.value,
                 has_selector=has_selector,
-                node_selector_key=node_selector_key,
-                node_selector_value=node_selector_value,
+                node_selector_key=node_selector[0],
+                node_selector_value=node_selector[1],
                 image=hog_config.image,
                 duration=hog_config.duration,
                 cpu_load_percentage=hog_config.cpu_load_percentage,
