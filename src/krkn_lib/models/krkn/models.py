@@ -122,6 +122,7 @@ class HogConfig:
     memory_vm_bytes: str
 
     workers: Optional[int]
+    number_of_nodes: Optional[int]
     duration: int
     namespace: str
     node_selector: str
@@ -140,6 +141,7 @@ class HogConfig:
         }
         self.memory_vm_bytes = "10%"
         self.workers = None
+        self.number_of_nodes = None
         self.duration = 30
         self.namespace = "default"
         self.node_selector = ""
@@ -166,6 +168,11 @@ class HogConfig:
             config.namespace = yaml_dict["namespace"]
         if "workers" in yaml_dict.keys() and yaml_dict["workers"]:
             config.workers = yaml_dict["workers"]
+        if (
+            "number-of-nodes" in yaml_dict.keys()
+            and yaml_dict["number-of-nodes"]
+        ):
+            config.number_of_nodes = yaml_dict["number-of-nodes"]
         if "image" in yaml_dict.keys() and yaml_dict["image"]:
             config.image = yaml_dict["image"]
 
