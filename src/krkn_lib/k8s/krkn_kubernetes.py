@@ -3311,7 +3311,7 @@ class KrknKubernetes:
 
         self.create_pod(namespace=namespace, body=pod_body)
 
-    def deploy_hog(self, pod_name: str, hog_config: HogConfig, regex=None):
+    def deploy_hog(self, pod_name: str, hog_config: HogConfig):
         """
         Deploys a Pod to run the Syn Flood scenario
 
