@@ -16,7 +16,6 @@ from urllib.parse import urlparse
 
 import arcaflow_lib_kubernetes
 import kubernetes
-import regex
 import urllib3
 import yaml
 from jinja2 import Environment, PackageLoader
