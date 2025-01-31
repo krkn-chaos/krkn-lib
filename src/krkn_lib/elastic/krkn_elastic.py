@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import logging
 import math
 import time
@@ -118,19 +117,10 @@ class KrknElastic:
         time_start = time.time()
         try:
             for metric in raw_data:
-                if (
-                    isinstance(metric["timestamp"], int)
-                    and isinstance(metric["value"], float)
-                    and isinstance(metric["name"], str)
-                ):
-
                     result = self.push_metric(
                         ElasticMetric(
                             run_uuid=run_uuid,
-                            name=metric["name"],
-                            created_at=datetime.datetime.now(),
-                            timestamp=int(metric["timestamp"]),
-                            value=float(metric["value"]),
+                            **metric
                         ),
                         index,
                     )
@@ -141,7 +131,8 @@ class KrknElastic:
                         )
 
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            self.safe_logger.error(f'Upload metric exception: {e}')
             return -1
 
     def push_alert(self, alert: ElasticAlert, index: str) -> int:
@@ -159,7 +150,8 @@ class KrknElastic:
             time_start = time.time()
             alert.save(using=self.es, index=index)
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            self.safe_logger.error(f"Push alert exception: {e}")
             return -1
 
     def push_metric(self, metric: ElasticMetric, index: str) -> int:
@@ -177,8 +169,11 @@ class KrknElastic:
             time_start = time.time()
             metric.save(using=self.es, index=index)
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            print('error' +str(e))
+            self.safe_logger.error(f'Exception pushing metric: {e}')
             return -1
+
 
     def push_telemetry(self, telemetry: ChaosRunTelemetry, index: str):
         if not index:
@@ -189,7 +184,7 @@ class KrknElastic:
             elastic_chaos.save(using=self.es, index=index)
             return int(time.time() - time_start)
         except Exception as e:
-            self.safe_logger.info("Elastic push telemetry error: " + str(e))
+            self.safe_logger.info(f"Elastic push telemetry error: {e}")
             return -1
 
     def search_telemetry(self, run_uuid: str, index: str):
@@ -210,6 +205,7 @@ class KrknElastic:
                 ElasticChaosRunTelemetry(**hit.to_dict()) for hit in result
             ]
         except NotFoundError:
+            self.safe_logger.error("Search telemetry not found")
             return []
         return documents
 
@@ -229,6 +225,7 @@ class KrknElastic:
             result = search.execute()
             documents = [ElasticAlert(**hit.to_dict()) for hit in result]
         except NotFoundError:
+            self.safe_logger.error("Search alert not found")
             return []
         return documents
 
@@ -248,5 +245,6 @@ class KrknElastic:
             result = search.execute()
             documents = [ElasticMetric(**hit.to_dict()) for hit in result]
         except NotFoundError:
+            self.safe_logger.error("Search metric not found")
             return []
         return documents

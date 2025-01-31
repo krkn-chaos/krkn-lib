@@ -72,7 +72,7 @@ class KrknPrometheus:
         granularity = math.ceil(
             (end_time - start_time).total_seconds() / 11000
         )
-        granularity = granularity if granularity > 0 else 1
+        granularity = granularity if granularity > 10 else 10
         if self.prom_cli:
             try:
                 return self.prom_cli.custom_query_range(
