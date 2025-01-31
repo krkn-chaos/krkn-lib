@@ -41,6 +41,7 @@ class ElasticMetric(Document):
     name = Text()
     code = Float()
     resource = Text()
+    sub_resource = Text()
     verb = Text()
     instance = Text()
     timestamp = Date()
@@ -58,6 +59,7 @@ class ElasticMetric(Document):
         resource,
         instance,
         query,
+        sub_resource,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -68,6 +70,7 @@ class ElasticMetric(Document):
         self.code = code
         self.verb = verb
         self.resource = resource
+        self.sub_resource = sub_resource
         self.instance = instance
         self.query = query
 

@@ -79,7 +79,7 @@ class KrknPrometheus:
                     query=query,
                     start_time=start_time,
                     end_time=end_time,
-                    step=f"{granularity}s",
+                    step=f"10s",
                 )
             except Exception as e:
                 logging.error("Failed to get the metrics: %s" % e)

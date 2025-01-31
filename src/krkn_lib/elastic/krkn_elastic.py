@@ -9,6 +9,7 @@ import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch_dsl import Search
 
+from krkn_lib.utils.functions import get_yaml_item_value
 from krkn_lib.models.elastic.models import (
     ElasticAlert,
     ElasticChaosRunTelemetry,
@@ -118,16 +119,17 @@ class KrknElastic:
         time_start = time.time()
         try:
             for metric in raw_data:
-
+                    print('metric ' + str(metric))
                     result = self.push_metric(
                         ElasticMetric(
                             run_uuid=run_uuid,
-                            name=metric["name"],
+                            name=metric['name'],
                             timestamp=metric['timestamp'],
                             value=metric["value"],
-                            code=metric["code"],
+                            code=get_yaml_item_value(metric, "code", ""),
                             verb=metric["verb"],
-                            resource=metric["resource"],
+                            resource=get_yaml_item_value(metric, "resource", ""),
+                            sub_resource=get_yaml_item_value(metric, "sub_resource", ""),
                             instance=metric["instance"],
                             query=metric["query"]
                         ),
