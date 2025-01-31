@@ -118,19 +118,18 @@ class KrknElastic:
         time_start = time.time()
         try:
             for metric in raw_data:
-                if (
-                    isinstance(metric["timestamp"], int)
-                    and isinstance(metric["value"], float)
-                    and isinstance(metric["name"], str)
-                ):
 
                     result = self.push_metric(
                         ElasticMetric(
                             run_uuid=run_uuid,
                             name=metric["name"],
-                            created_at=datetime.datetime.now(),
-                            timestamp=int(metric["timestamp"]),
-                            value=float(metric["value"]),
+                            timestamp=metric['timestamp'],
+                            value=metric["value"],
+                            code=metric["code"],
+                            verb=metric["verb"],
+                            resource=metric["resource"],
+                            instance=metric["instance"],
+                            query=metric["query"]
                         ),
                         index,
                     )
@@ -141,7 +140,8 @@ class KrknElastic:
                         )
 
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            print('upload exception ' + str(e))
             return -1
 
     def push_alert(self, alert: ElasticAlert, index: str) -> int:
