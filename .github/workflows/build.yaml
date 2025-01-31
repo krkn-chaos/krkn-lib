@@ -127,19 +127,19 @@ jobs:
       - name: Build
         run: poetry build
       - name: Upload json coverage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage.json
           path: coverage.json
           if-no-files-found: error
       - name: Upload dist artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist
           if-no-files-found: error
       - name: Upload coverage HTML artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: htmlcov
@@ -160,7 +160,7 @@ jobs:
             path: krkn-lib-docs
             ssh-key: ${{ secrets.KRKN_LIB_DOCS_PRIV_KEY }}
         - name: Download json coverage
-          uses: actions/download-artifact@v3
+          uses: actions/download-artifact@v4
           with:
             name: coverage.json
         - name: Update version number
@@ -214,7 +214,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
