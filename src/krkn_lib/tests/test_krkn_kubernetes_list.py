@@ -117,6 +117,16 @@ class KrknKubernetesTestsList(BaseTest):
         self.assertEqual(len(filtered_ns_ok), 2)
         self.assertEqual(len(filtered_ns_fail), 0)
 
+    def test_list_schedulable_nodes(self):
+        schedulable_nodes = self.lib_k8s.list_schedulable_nodes()
+        self.assertGreater(len(schedulable_nodes), 0)
+        schedulable_nodes_empty_selector = self.lib_k8s.list_schedulable_nodes(
+            label_selector=""
+        )
+        self.assertEqual(
+            len(schedulable_nodes), len(schedulable_nodes_empty_selector)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

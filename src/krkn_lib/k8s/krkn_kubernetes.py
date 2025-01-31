@@ -38,7 +38,9 @@ from krkn_lib.models.k8s import (
     ServiceHijacking,
     Volume,
     VolumeMount,
+    NodeResources,
 )
+from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -1181,7 +1183,7 @@ class KrknKubernetes:
                 time.sleep(1)
         except ApiException as e:
             if e.status == 404:
-                logging.info("Pod already deleted")
+                return
             else:
                 logging.error("Failed to delete pod %s", str(e))
                 raise e
@@ -1860,6 +1862,37 @@ class KrknKubernetes:
 
         return nodes
 
+    def list_schedulable_nodes(self, label_selector: str = None) -> list[str]:
+        """
+        Lists all the nodes that do not have `NoSchedule` or `NoExecute` taints
+        and where pods can be scheduled
+        :param label_selector: a label selector to filter the nodes
+        :return: a list of node names
+        """
+        nodes = []
+        try:
+            if label_selector:
+                ret = self.cli.list_node(
+                    pretty=True, label_selector=label_selector
+                )
+            else:
+                ret = self.cli.list_node(pretty=True)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling CoreV1Api->list_node: %s\n", str(e)
+            )
+            raise e
+        for node in ret.items:
+            if node.spec.taints:
+                try:
+                    for taint in node.spec.taints:
+                        if taint.effect in ["NoSchedule", "NoExecute"]:
+                            raise Exception
+                except Exception:
+                    continue
+            nodes.append(node.metadata.name)
+        return nodes
+
     # TODO: is the signature correct? the method
     #  returns a list of nodes and the signature name is `get_node`
     def get_node(
@@ -2019,6 +2052,24 @@ class KrknKubernetes:
             pass
 
         return None
+
+    def get_node_cpu_count(self, node_name: str) -> int:
+        """
+        Returns the number of cpus of a specified node
+
+        :param node_name: the name of the node
+        :return: the number of cpus or 0 if any exception is raised
+        """
+        api_client = self.api_client
+
+        if api_client:
+            try:
+                v1 = self.cli
+                node = v1.read_node(node_name)
+                cpu_capacity = node.status.capacity.get("cpu")
+                return int(cpu_capacity)
+            except Exception:
+                return 0
 
     def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
@@ -3258,3 +3309,74 @@ class KrknKubernetes:
         )
 
         self.create_pod(namespace=namespace, body=pod_body)
+
+    def deploy_hog(self, pod_name: str, hog_config: HogConfig):
+        """
+        Deploys a Pod to run the Syn Flood scenario
+
+        :param pod_name: The name of the pod that will be deployed
+        :param hog_config: Hog Configuration
+        """
+        compiled_regex = re.compile(r"^.+=.*$")
+        has_selector = hog_config.node_selector is not None and bool(
+            compiled_regex.match(hog_config.node_selector)
+        )
+        if has_selector:
+            node_selector = hog_config.node_selector.split("=")
+        else:
+            node_selector = {"", ""}
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        io_volume = {"volumes": [hog_config.io_target_pod_volume]}
+        yaml_data = yaml.dump(io_volume, default_flow_style=False, indent=2)
+        pod_template = env.get_template("hog_pod.j2")
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=pod_name,
+                namespace=hog_config.namespace,
+                hog_type=hog_config.type.value,
+                hog_type_io=HogType.io.value,
+                has_selector=has_selector,
+                node_selector_key=node_selector[0],
+                node_selector_value=node_selector[1],
+                image=hog_config.image,
+                duration=hog_config.duration,
+                cpu_load_percentage=hog_config.cpu_load_percentage,
+                cpu_method=hog_config.cpu_method,
+                io_block_size=hog_config.io_block_size,
+                io_write_bytes=hog_config.io_write_bytes,
+                io_target_pod_folder=hog_config.io_target_pod_folder,
+                io_volume_mount=yaml_data,
+                memory_vm_bytes=hog_config.memory_vm_bytes,
+                workers=hog_config.workers,
+                target_pod_folder=hog_config.io_target_pod_folder,
+            )
+        )
+
+        self.create_pod(namespace=hog_config.namespace, body=pod_body)
+
+    def get_node_resources_info(self, node_name: str) -> NodeResources:
+        resources = NodeResources()
+        path_params: dict[str, str] = {}
+        query_params: list[str] = []
+        header_params: dict[str, str] = {}
+        auth_settings = ["BearerToken"]
+        header_params["Accept"] = self.api_client.select_header_accept(
+            ["application/json"]
+        )
+        path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
+        (data) = self.api_client.call_api(
+            path,
+            "GET",
+            path_params,
+            query_params,
+            header_params,
+            response_type="str",
+            auth_settings=auth_settings,
+        )
+
+        json_obj = ast.literal_eval(data[0])
+        resources.cpu = json_obj["node"]["cpu"]["usageNanoCores"]
+        resources.memory = json_obj["node"]["memory"]["availableBytes"]
+        resources.disk_space = json_obj["node"]["fs"]["availableBytes"]
+        return resources

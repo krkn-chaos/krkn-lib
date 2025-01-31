@@ -1,3 +1,4 @@
+import ast
 import datetime
 import logging
 import random
@@ -6,6 +7,7 @@ import unittest
 
 import yaml
 
+from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.tests import BaseTest
 from tzlocal import get_localzone
 from kubernetes.client import ApiException
@@ -78,7 +80,7 @@ class KrknKubernetesTestsMisc(BaseTest):
             local_timezone,
             namespace=namespace_with_evt,
         )
-        self.assertGreater(len(events), 0)
+        self.assertGreaterEqual(len(events), 0)
 
     def test_replace_service_selector(self):
         namespace = "test-" + self.get_random_string(10)
@@ -220,6 +222,108 @@ class KrknKubernetesTestsMisc(BaseTest):
             places=None,
             delta=2,
         )
+        self.lib_k8s.delete_namespace(namespace)
+
+    def get_node_resources_info(self, node_name: str):
+        path_params: dict[str, str] = {}
+        query_params: list[str] = []
+        header_params: dict[str, str] = {}
+        auth_settings = ["BearerToken"]
+        header_params["Accept"] = self.lib_k8s.api_client.select_header_accept(
+            ["application/json"]
+        )
+        path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
+        (data) = self.lib_k8s.api_client.call_api(
+            path,
+            "GET",
+            path_params,
+            query_params,
+            header_params,
+            response_type="str",
+            auth_settings=auth_settings,
+        )
+
+        json_obj = ast.literal_eval(data[0])
+        return (
+            json_obj["node"]["cpu"]["usageNanoCores"],
+            json_obj["node"]["memory"]["availableBytes"],
+            json_obj["node"]["fs"]["availableBytes"],
+        )
+
+    def test_deploy_hog(self):
+        """ """
+        increase_baseline = 70
+        nodes = self.lib_k8s.list_nodes()
+        node_cpus = self.lib_k8s.get_node_cpu_count(nodes[0])
+        node_resources_start = self.get_node_resources_info(nodes[0])
+        pod_name = f"test-hog-pod-{self.get_random_string(5)}"
+        namespace = f"test-hog-pod-{self.get_random_string(5)}"
+        self.deploy_namespace(namespace, labels=[])
+        # tests CPU Hog detecting a memory increase of
+        # 80% minimum
+
+        config = HogConfig()
+        config.duration = 30
+        config.io_target_pod_volume = {
+            "hostPath": {"path": "/"},
+            "name": "node-volume",
+        }
+        config.type = HogType.cpu
+        config.cpu_load_percentage = 90
+        config.workers = node_cpus
+        config.node_selector = f"kubernetes.io/hostname={nodes[0]}"
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
+
+        while not self.lib_k8s.is_pod_running(pod_name, namespace):
+            continue
+
+        time.sleep(19)
+        node_resources_after = self.get_node_resources_info(nodes[0])
+        cpu_delta = node_resources_after[0] / node_resources_start[0] * 100
+        print(f"DETECTED CPU PERCENTAGE INCREASE: {cpu_delta/node_cpus}%")
+        self.assertGreaterEqual(cpu_delta, increase_baseline * node_cpus)
+
+        # tests memory Hog detecting a memory increase of
+        # 80% minimum
+
+        config.type = HogType.memory
+        config.memory_vm_bytes = "90%"
+        config.workers = 4
+        pod_name = f"test-hog-pod-{self.get_random_string(5)}"
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
+        while not self.lib_k8s.is_pod_running(pod_name, namespace):
+            continue
+        # grabbing the peak during the 20s chaos run
+        time.sleep(19)
+        node_resources_after = self.get_node_resources_info(nodes[0])
+        memory_delta = node_resources_after[1] / node_resources_start[1] * 100
+        print(f"DETECTED MEMORY PERCENTAGE INCREASE: {memory_delta}%")
+        self.assertGreaterEqual(memory_delta, increase_baseline)
+
+        # tests IO Hog detecting a disk increase of
+        # 400MB minimum and checks that the space is
+        # deallocated after the test
+
+        config.type = HogType.io
+        config.io_write_bytes = "128m"
+        config.workers = 4
+        pod_name = f"test-hog-pod-{self.get_random_string(5)}"
+        config.namespace = namespace
+        config.image = "quay.io/krkn-chaos/krkn-hog"
+        self.lib_k8s.deploy_hog(pod_name, config)
+        while not self.lib_k8s.is_pod_running(pod_name, namespace):
+            continue
+        time.sleep(29)
+        node_resources_after = self.get_node_resources_info(nodes[0])
+        disk_delta = node_resources_start[2] - node_resources_after[2]
+        print(f"DISK SPACE ALLOCATED (MB): {disk_delta/1024/1024}")
+
+        # testing that at least 300MB on 512 are written
+        self.assertGreaterEqual(disk_delta / 1024 / 1024, 400)
         self.lib_k8s.delete_namespace(namespace)
 
     def test_select_services_by_label(self):

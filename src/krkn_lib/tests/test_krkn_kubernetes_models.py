@@ -1,3 +1,4 @@
+from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.k8s import (
     AffectedNode,
     AffectedNodeStatus,
@@ -8,6 +9,7 @@ from krkn_lib.tests import BaseTest
 
 
 class TestKrknKubernetesModels(BaseTest):
+
     def test_pods_status(self):
         pods_status_1 = PodsStatus()
         pods_status_2 = PodsStatus()
@@ -53,6 +55,81 @@ class TestKrknKubernetesModels(BaseTest):
                 f"test_{index+1}_unrecovered"
                 in [p.pod_name for p in pods_status_merge.unrecovered]
             )
+
+    def test_hog_config(self):
+        wrong_type = {"hog-type": "io_wrong", "node-selector": "test"}
+        with self.assertRaises(KeyError):
+            HogConfig.from_yaml_dict(wrong_type)
+
+        wrong_type = {"hog-type": "", "node-selector": "test"}
+        with self.assertRaises(Exception):
+            HogConfig.from_yaml_dict(wrong_type)
+
+        memory_config = {
+            "duration": 14,
+            "workers": 23,
+            "hog-type": "memory",
+            "image": "testimage",
+            "namespace": "testnamespace",
+            "memory-vm-bytes": "99%",
+            "node-selector": "test-selector",
+        }
+
+        config = HogConfig.from_yaml_dict(memory_config)
+        self.assertEqual(config.duration, 14)
+        self.assertEqual(config.workers, 23)
+        self.assertEqual(config.type, HogType.memory)
+        self.assertEqual(config.image, "testimage")
+        self.assertEqual(config.namespace, "testnamespace")
+        self.assertEqual(config.memory_vm_bytes, "99%")
+        self.assertEqual(config.node_selector, "test-selector")
+        io_config_volume = {
+            "name": "test-volume",
+            "hostPath": {"path": "/test-path"},
+        }
+        io_config = {
+            "duration": 15,
+            "workers": 24,
+            "hog-type": "io",
+            "image": "testimage",
+            "namespace": "testnamespace",
+            "io-block-size": "15m",
+            "io-write-bytes": "16m",
+            "io-target-pod-folder": "/test-path",
+            "io-target-pod-volume": io_config_volume,
+            "node-selector": "test-selector",
+        }
+
+        config = HogConfig.from_yaml_dict(io_config)
+        self.assertEqual(config.duration, 15)
+        self.assertEqual(config.workers, 24)
+        self.assertEqual(config.type, HogType.io)
+        self.assertEqual(config.image, "testimage")
+        self.assertEqual(config.namespace, "testnamespace")
+        self.assertEqual(config.io_block_size, "15m")
+        self.assertEqual(config.io_write_bytes, "16m")
+        self.assertEqual(config.io_target_pod_folder, "/test-path")
+        self.assertEqual(config.io_target_pod_volume, io_config_volume)
+        self.assertEqual(config.node_selector, "test-selector")
+
+        memory_config = {
+            "duration": 44,
+            "workers": 45,
+            "hog-type": "memory",
+            "image": "testimage",
+            "namespace": "testnamespace",
+            "memory-vm-bytes": "95%",
+            "node-selector": "test-selector",
+        }
+
+        config = HogConfig.from_yaml_dict(memory_config)
+        self.assertEqual(config.duration, 44)
+        self.assertEqual(config.workers, 45)
+        self.assertEqual(config.type, HogType.memory)
+        self.assertEqual(config.image, "testimage")
+        self.assertEqual(config.namespace, "testnamespace")
+        self.assertEqual(config.memory_vm_bytes, "95%")
+        self.assertEqual(config.node_selector, "test-selector")
 
     def test_nodes_status(self):
         nodes_status_1 = AffectedNodeStatus()
