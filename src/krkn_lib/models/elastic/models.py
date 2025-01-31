@@ -38,41 +38,15 @@ class ElasticAlert(Document):
 
 class ElasticMetric(Document):
     run_uuid = Keyword()
-    name = Text()
-    code = Float()
-    resource = Text()
-    sub_resource = Text()
-    verb = Text()
-    instance = Text()
     timestamp = Date()
-    value = Float()
-    query = Text()
 
     def __init__(
         self,
         run_uuid: str,
-        name: str,
-        timestamp: datetime,
-        value: float,
-        code,
-        verb,
-        resource,
-        instance,
-        query,
-        sub_resource,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.run_uuid = run_uuid
-        self.name = name
-        self.timestamp = timestamp
-        self.value = value
-        self.code = code
-        self.verb = verb
-        self.resource = resource
-        self.sub_resource = sub_resource
-        self.instance = instance
-        self.query = query
 
 
 # Telemetry models

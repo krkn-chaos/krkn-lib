@@ -123,15 +123,7 @@ class KrknElastic:
                     result = self.push_metric(
                         ElasticMetric(
                             run_uuid=run_uuid,
-                            name=metric['name'],
-                            timestamp=metric['timestamp'],
-                            value=metric["value"],
-                            code=get_yaml_item_value(metric, "code", ""),
-                            verb=metric["verb"],
-                            resource=get_yaml_item_value(metric, "resource", ""),
-                            sub_resource=get_yaml_item_value(metric, "sub_resource", ""),
-                            instance=metric["instance"],
-                            query=metric["query"]
+                            **metric
                         ),
                         index,
                     )
@@ -176,10 +168,12 @@ class KrknElastic:
         if not index:
             raise Exception("index cannot be None or empty")
         try:
+            print('push metric' + str(metric.name))
             time_start = time.time()
             metric.save(using=self.es, index=index)
             return int(time.time() - time_start)
-        except Exception:
+        except Exception as e:
+            print('exception pushing metric' + str(e))
             return -1
 
     def push_telemetry(self, telemetry: ChaosRunTelemetry, index: str):
