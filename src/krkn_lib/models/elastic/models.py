@@ -7,7 +7,6 @@ from elasticsearch_dsl import (
     InnerDoc,
     Integer,
     Keyword,
-    Long,
     Nested,
     Text,
 )
@@ -36,38 +35,17 @@ class ElasticAlert(Document):
         self.created_at = created_at
 
 
-class ElasticMetricValue(InnerDoc):
-    timestamp = Long()
-    value = Float()
-
-    def __init__(self, timestamp: int, value: float, **kwargs):
-        super().__init__(**kwargs)
-        self.timestamp = timestamp
-        self.value = value
-
-
 class ElasticMetric(Document):
     run_uuid = Keyword()
-    name = Text()
-    created_at = Date()
-    timestamp = Long()
-    value = Float()
+    timestamp = Date()
 
     def __init__(
         self,
         run_uuid: str,
-        name: str,
-        created_at: datetime,
-        timestamp: int,
-        value: float,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.run_uuid = run_uuid
-        self.name = name
-        self.created_at = created_at
-        self.timestamp = timestamp
-        self.value = value
 
 
 # Telemetry models
