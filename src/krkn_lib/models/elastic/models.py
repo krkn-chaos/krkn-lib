@@ -87,6 +87,7 @@ class ElasticPodsStatus(InnerDoc):
 
 class ElasticAffectedNodes(InnerDoc):
     node_name = Text(fields={"keyword": Keyword()})
+    node_id = Text()
     not_ready_time = Float()
     ready_time = Float()
     stopped_time = Float()
@@ -178,6 +179,7 @@ class ElasticChaosRunTelemetry(Document):
                 affected_nodes=[
                     ElasticAffectedNodes(
                         node_name=node.node_name,
+                        node_id=node.node_id,
                         not_ready_time=node.not_ready_time,
                         ready_time=node.ready_time,
                         stopped_time=node.stopped_time,

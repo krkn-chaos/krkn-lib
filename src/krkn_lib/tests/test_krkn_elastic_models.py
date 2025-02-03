@@ -105,6 +105,13 @@ class TestKrknElasticModels(BaseTest):
 
         self.assertEqual(
             elastic_telemetry.scenarios[0]
+            .affected_nodes[0]
+            .node_id,
+            "test",
+        )
+
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
             .affected_nodes[0].ready_time,
             2.71,
         )

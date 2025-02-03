@@ -523,6 +523,7 @@ class BaseTest(unittest.TestCase):
                     "affected_nodes": [
                         {
                             "node_name": "kind-control-plane",
+                            "node_id": "test",
                             "ready_time": 2.71,
                             "not_ready_time": 3.14,
                             "stopped_time": 0,
