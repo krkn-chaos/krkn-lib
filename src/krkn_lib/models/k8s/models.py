@@ -244,6 +244,10 @@ class AffectedNode:
     """
     Name of the node
     """
+    node_id: str
+    """
+    Id of the node
+    """
     ready_time: float
     """
     Amount of time the node took to get to a ready state
@@ -265,6 +269,7 @@ class AffectedNode:
     def __init__(
         self,
         node_name: str = "",
+        node_id: str = "",
         not_ready_time: float = 0,
         ready_time: float = 0,
         stopped_time: float = 0,
@@ -273,6 +278,7 @@ class AffectedNode:
         json_object: str = None,
     ):
         self.node_name = node_name
+        self.node_id = node_id
         self.not_ready_time = float(not_ready_time)
         self.ready_time = float(ready_time)
         self.stopped_time = float(stopped_time)
@@ -280,8 +286,8 @@ class AffectedNode:
         self.terminating_time = float(terminating_time)
 
         if json_object:
-            print("json object" + str(json_object))
             self.node_name = json_object["node_name"]
+            self.node_id = json_object["node_id"]
             self.set_not_ready_time(json_object["not_ready_time"])
             self.set_ready_time(json_object["ready_time"])
             self.set_cloud_stopping_time(json_object["stopped_time"])
@@ -289,7 +295,6 @@ class AffectedNode:
             self.set_terminating_time(json_object["terminating_time"])
 
     def set_affected_node_status(self, status: str, total_time: float):
-        print("affected node status" + str(status))
         if status == "Unknown":
             self.set_not_ready_time(total_time)
         elif status == "True":
@@ -355,11 +360,11 @@ class AffectedNodeStatus:
         for item in reversed(match_found):
             self.affected_nodes.pop(item)
 
-    def get_affected_node_index(self, node_name):
+    def get_affected_node_index(self, node_id):
         counter = 0
 
         for affected_node in self.affected_nodes:
-            if affected_node.node_name == node_name:
+            if affected_node.node_id == node_id:
                 return self.affected_nodes[counter]
             counter += 1
 

@@ -62,6 +62,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "affected_nodes":[
                 {
                     "node_name":"kind-control-plane",
+                    "node_id":"test",
                     "ready_time":2.71,
                     "not_ready_time":3.14,
                     "stopped_time":0.0,
@@ -114,6 +115,18 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             self.assertIsNone(unrecovered.pod_readiness_time)
             self.assertIsNone(unrecovered.pod_rescheduling_time)
             self.assertIsNone(unrecovered.total_recovery_time)
+
+        self.assertEqual(len(telemetry.affected_nodes), 1)
+
+        self.assertEqual((telemetry.affected_nodes[0].node_id), "test")
+        self.assertEqual((telemetry.affected_nodes[0].node_name), "kind-control-plane")
+
+        self.assertEqual((telemetry.affected_nodes[0].not_ready_time), 3.14)
+        self.assertEqual((telemetry.affected_nodes[0].ready_time), 2.71)
+        self.assertEqual((telemetry.affected_nodes[0].running_time), 0)
+        self.assertEqual((telemetry.affected_nodes[0].stopped_time), 0)
+        self.assertEqual((telemetry.affected_nodes[0].terminating_time), 0)
+            
         self.assertIsNotNone(telemetry.parameters)
         self.assertEqual(telemetry.parameters_base64, "")
         self.assertEqual(telemetry.parameters["property"]["unit"], "unit")
