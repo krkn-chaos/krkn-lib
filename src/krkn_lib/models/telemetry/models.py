@@ -61,6 +61,10 @@ class ScenarioTelemetry:
     """
     Scenario filename
     """
+    scenario_type: str
+    """
+    Scenario type
+    """
     exit_status: int
     """
     Exit Status of the Scenario Run
@@ -102,6 +106,7 @@ class ScenarioTelemetry:
             self.start_timestamp = int(json_object.get("start_timestamp"))
             self.end_timestamp = int(json_object.get("end_timestamp"))
             self.scenario = json_object.get("scenario")
+            self.scenario_type = json_object.get("scenario_type")
             self.exit_status = json_object.get("exit_status")
             self.parameters_base64 = json_object.get("parameters_base64")
             self.parameters = json_object.get("parameters")
@@ -153,6 +158,7 @@ class ScenarioTelemetry:
             self.start_timestamp = 0
             self.end_timestamp = 0
             self.scenario = ""
+            self.scenario_type = ""
             self.exit_status = 0
             self.parameters_base64 = ""
             self.parameters = {}
@@ -456,6 +462,10 @@ class ChaosRunTelemetry:
     """
     K8s or OCP version
     """
+    major_version: float = 0.0
+    """
+    Major cluster version to group similar results
+    """
     cloud_type: str = "self-managed"
     """
     Cloud Type (if available) of the target cluster: self-managed, rosa, etc
@@ -471,6 +481,10 @@ class ChaosRunTelemetry:
     health_checks: list[HealthCheck] = None
     """
     Health checks of application endpoint
+    """
+    job_status: bool = True
+    """
+    Overall job status, will take all scenario's exit status
     """
 
     def __init__(self, json_dict: any = None):
@@ -498,6 +512,7 @@ class ChaosRunTelemetry:
             self.cloud_infrastructure = json_dict.get("cloud_infrastructure")
             self.cloud_type = json_dict.get("cloud_type")
             self.cluster_version = json_dict.get("cluster_version")
+            self.major_version = json_dict.get("major_version")
             self.kubernetes_objects_count = json_dict.get(
                 "kubernetes_objects_count"
             )
@@ -505,6 +520,8 @@ class ChaosRunTelemetry:
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
             self.health_checks = [HealthCheck(k) for k in json_dict.get("health_checks")] if json_dict.get("health_checks") else None
+            self.job_status = json_dict.get("job_status")
+
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 

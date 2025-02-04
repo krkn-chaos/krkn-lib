@@ -9,7 +9,9 @@ class TestKrknElasticModels(BaseTest):
 
     def check_test_ElasticChaosRunTelemetry(
         self, elastic_telemetry: ElasticChaosRunTelemetry, run_uuid: str
-    ):
+    ):  
+        
+        self.assertTrue(elastic_telemetry.job_status)
         self.assertEqual(len(elastic_telemetry.scenarios), 1)
         # scenarios
         self.assertEqual(
