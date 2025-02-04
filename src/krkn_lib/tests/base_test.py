@@ -498,6 +498,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": 1628493021.0,
                     "end_timestamp": 1628496621.0,
                     "scenario": "example_scenario.yaml",
+                    "scenario_type": "pod_disruption_scenarios",
                     "exit_status": 0,
                     "parameters_base64": "",
                     "parameters": {
@@ -557,5 +558,9 @@ class BaseTest(unittest.TestCase):
             "cloud_infrastructure": "AWS",
             "cloud_type": "EC2",
             "run_uuid": run_uuid,
+            "cluster_version": "4.18.0-0.nightly-202491014",
+            "major_verison": "4.18",
+            "job_status":True
+
         }
         return example_data
