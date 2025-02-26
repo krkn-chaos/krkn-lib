@@ -430,6 +430,10 @@ class ChaosRunTelemetry:
     """
     Current time stamp of run
     """
+    health_checks: list[dict[str,str]] = None
+    """
+    Health checks of application endpoint
+    """
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
@@ -440,6 +444,7 @@ class ChaosRunTelemetry:
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
+        self.health_checks = list[dict[str,str]]()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -461,7 +466,7 @@ class ChaosRunTelemetry:
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
-
+            self.health_checks = json_dict.get("health_checks")
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
