@@ -22,6 +22,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "start_timestamp": 1686141432,
             "end_timestamp": 1686141435,
             "scenario": "test",
+            "scenario_type": "pod_disruption_scenarios",
             "exit_status": 0,
             "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0",
             "cluster_events":[
@@ -78,6 +79,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "start_timestamp": 1686141432,
             "end_timestamp": 1686141435,
             "scenario": "test",
+            "scenario_type": "pod_disruption_scenarios",
             "exit_status": 0,
             "parameters_base64": "I'm a wrong base64"
         }
@@ -88,6 +90,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "start_timestamp": 1686141432,
             "end_timestamp": 1686141435,
             "scenario": "test",
+            "scenario_type": "pod_disruption_scenarios",
             "exit_status": 0,
             "parameters_base64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
         }
@@ -99,6 +102,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(telemetry.start_timestamp, 1686141432)
         self.assertEqual(telemetry.end_timestamp, 1686141435)
         self.assertEqual(telemetry.scenario, "test")
+        self.assertEqual(telemetry.scenario_type, "pod_disruption_scenarios")
         self.assertEqual(telemetry.exit_status, 0)
         self.assertIsNotNone(telemetry.affected_pods)
         self.assertEqual(len(telemetry.affected_pods.recovered), 1)
@@ -169,6 +173,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                             "start_timestamp": 1686141432,
                             "end_timestamp": 1686141435,
                             "scenario": "test",
+                            "scenario_type": "pod_disruption_scenarios",
                             "exit_status": 0,
                             "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         },
@@ -176,6 +181,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                             "start_timestamp": 1686141432,
                             "end_timestamp": 1686141435,
                             "scenario": "test",
+                            "scenario_type": "pod_disruption_scenarios",
                             "exit_status": 0,
                             "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }],
@@ -198,6 +204,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                         "start_timestamp": 1686141432,
                         "end_timestamp": 1686141435,
                         "scenario": "test",
+                        "scenario_type": "pod_disruption_scenarios",
                         "exit_status": 0,
                         "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         }
@@ -210,6 +217,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                             "start_timestamp": 1686141432,
                             "end_timestamp": 1686141435,
                             "scenario": "test",
+                            "scenario_type": "pod_disruption_scenarios",
                             "exit_status": 0,
                             "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
                         },
@@ -217,6 +225,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                             "start_timestamp": 1686141432,
                             "end_timestamp": 1686141435,
                             "scenario": "test",
+                            "scenario_type": "pod_disruption_scenarios",
                             "exit_status": 0,
                             "parameters_base64": "SSdtIG5vdCBhIGdvb2Qgc3RyaW5nIDstXA=="
                         }
