@@ -206,7 +206,7 @@ class KrknKubernetesTestsCheck(BaseTest):
         self.deploy_delayed_readiness_pod(terminated, namespace, 0)
         self.background_delete_pod(terminated, namespace)
 
-        time.sleep(3)
+        time.sleep(1)
         self.assertTrue(self.lib_k8s.is_pod_terminating(terminated, namespace))
         self.deploy_delayed_readiness_pod(not_terminated, namespace, 10)
         self.assertFalse(
