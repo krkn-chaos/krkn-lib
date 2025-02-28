@@ -138,7 +138,8 @@ class ElasticChaosRunTelemetry(Document):
     cloud_type = Text()
     cluster_version = Text()
     run_uuid = Text(fields={"keyword": Keyword()})
-
+    health_checks = Text()
+    
     class Index:
         name = "chaos_run_telemetry"
 
@@ -217,3 +218,4 @@ class ElasticChaosRunTelemetry(Document):
         self.cloud_type = chaos_run_telemetry.cloud_type
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
+        self.health_checks = chaos_run_telemetry.health_checks
