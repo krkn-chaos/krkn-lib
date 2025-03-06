@@ -553,6 +553,16 @@ class BaseTest(unittest.TestCase):
             "kubernetes_objects_count": {"Pod": 5, "Service": 2},
             "network_plugins": ["Calico"],
             "timestamp": "2023-05-22T14:55:02Z",
+            "health_checks": [
+                {
+                    "url": "http://nginx-default.apps.mkatta.aws.rhperfscale.org",
+                    "status": False,
+                    "status_code": "503",
+                    "start_timestamp": "2025-03-05 12:47:59",
+                    "end_timestamp": "2025-03-05 12:48:02",
+                    "duration": "0:00:03"
+                }
+            ],
             "total_node_count": 3,
             "cloud_infrastructure": "AWS",
             "cloud_type": "EC2",
