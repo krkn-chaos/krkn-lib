@@ -188,6 +188,16 @@ class TestKrknElasticModels(BaseTest):
 
         # obejct properties
         self.assertEqual(elastic_telemetry.timestamp, "2023-05-22T14:55:02Z")
+
+        #health_check
+        self.assertEqual(len(elastic_telemetry.health_checks), 1)
+        self.assertEqual(elastic_telemetry.health_checks[0].url, "http://nginx-default.apps.mkatta.aws.rhperfscale.org")
+        self.assertEqual(elastic_telemetry.health_checks[0].status, False)
+        self.assertEqual(elastic_telemetry.health_checks[0].status_code, "503")
+        self.assertEqual(elastic_telemetry.health_checks[0].start_timestamp, "2025-03-05 12:47:59")
+        self.assertEqual(elastic_telemetry.health_checks[0].end_timestamp, "2025-03-05 12:48:02")
+        self.assertEqual(elastic_telemetry.health_checks[0].duration, "0:00:03")
+
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")

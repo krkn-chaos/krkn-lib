@@ -374,6 +374,44 @@ class ClusterEvent:
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
+@dataclass(order=False)
+class HealthCheck:
+    """
+    Health checks Response for application endpoints
+    """
+
+    url: str
+    """
+    URL of application endpoint
+    """
+    status: bool
+    """
+    Status of application
+    """
+    status_code: str
+    """
+    Status code of application
+    """
+    start_timestamp: str
+    """
+    start time stamp of health check
+    """
+    end_timestamp: str
+    """
+    end time stamp of health check
+    """
+    duration: str
+    """
+    Denotes the time between start time and end time
+    """
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.url = json_dict["url"]
+            self.status = json_dict["status"]
+            self.status_code = json_dict["status_code"]
+            self.start_timestamp = json_dict["start_timestamp"]
+            self.end_timestamp = json_dict["end_timestamp"]
+            self.duration = json_dict["duration"]
 
 @dataclass(order=False)
 class ChaosRunTelemetry:
@@ -430,7 +468,7 @@ class ChaosRunTelemetry:
     """
     Current time stamp of run
     """
-    health_checks: list[dict[str,str]] = None
+    health_checks: list[HealthCheck] = None
     """
     Health checks of application endpoint
     """
@@ -444,7 +482,7 @@ class ChaosRunTelemetry:
         self.timestamp = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
-        self.health_checks = list[dict[str,str]]()
+        self.health_checks = list[HealthCheck]()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -466,7 +504,7 @@ class ChaosRunTelemetry:
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
-            self.health_checks = json_dict.get("health_checks")
+            self.health_checks = [HealthCheck(k) for k in json_dict.get("health_checks")] if json_dict.get("health_checks")  else None
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
