@@ -4,7 +4,6 @@ import logging
 import os
 import random
 import re
-import tempfile
 import threading
 import time
 import warnings
@@ -229,13 +228,6 @@ class KrknKubernetes:
         """
         if self.__kubeconfig_path:
             return self.__kubeconfig_path
-
-        with tempfile.NamedTemporaryFile(delete=False) as kubeconfig:
-            kubeconfig.write(bytes(self.__kubeconfig_string, "utf-8"))
-            kubeconfig.flush()
-            kubeconfig_path = kubeconfig.name
-            kubeconfig.close()
-        return kubeconfig_path
 
     def get_version(self) -> str:
         try:
