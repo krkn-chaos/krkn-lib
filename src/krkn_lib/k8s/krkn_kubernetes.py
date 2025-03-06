@@ -116,7 +116,7 @@ class KrknKubernetes:
         self.request_chunk_size = request_chunk_size
 
         if kubeconfig_path is not None:
-            self.__initialize_clients(kubeconfig_path)
+            self.__initialize_config(kubeconfig_path)
             self.__kubeconfig_path = kubeconfig_path
 
     def __del__(self):
@@ -124,7 +124,7 @@ class KrknKubernetes:
         self.api_client.close()
 
     # Load kubeconfig and initialize k8s python client
-    def __initialize_clients(self, kubeconfig_path: str = None):
+    def __initialize_config(self, kubeconfig_path: str = None):
         """
         Initialize all clients from kubeconfig path
 
