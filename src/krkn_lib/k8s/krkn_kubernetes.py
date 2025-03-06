@@ -14,7 +14,6 @@ from queue import Queue
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-import arcaflow_lib_kubernetes
 import kubernetes
 import urllib3
 import yaml
@@ -53,22 +52,46 @@ class KrknKubernetes:
     """ """
 
     request_chunk_size: int = 250
-    api_client: client.ApiClient = None
-    version_client: client.VersionApi = None
-    cli: client.CoreV1Api = None
-    batch_cli: client.BatchV1Api = None
     watch_resource: watch.Watch = None
-    custom_object_client: client.CustomObjectsApi = None
-    dyn_client: kubernetes.dynamic.client.DynamicClient = None
     __kubeconfig_string: str = None
     __kubeconfig_path: str = None
-    apps_api: client.AppsV1Api = None
+    client_config: kubernetes.client.Configuration = None
+
+    @property
+    def api_client(self) -> client.ApiClient:
+        return client.ApiClient(self.client_config)
+
+    @property
+    def cli(self) -> client.CoreV1Api:
+        return client.CoreV1Api(self.api_client)
+
+    @property
+    def version_client(self) -> client.VersionApi:
+        return client.VersionApi(self.api_client)
+
+    @property
+    def batch_cli(self) -> client.BatchV1Api:
+        return client.BatchV1Api(self.api_client)
+
+    @property
+    def apps_api(self) -> client.AppsV1Api:
+        return client.AppsV1Api(self.api_client)
+
+    @property
+    def net_cli(self) -> client.NetworkingV1Api:
+        return client.NetworkingV1Api(self.api_client)
+
+    @property
+    def dyn_client(cls) -> DynamicClient:
+        return DynamicClient(cls.api_client)
+
+    @property
+    def custom_object_client(cls) -> client.CustomObjectsApi:
+        return client.CustomObjectsApi(cls.api_client)
 
     def __init__(
         self,
-        kubeconfig_path: str = None,
-        *,
-        kubeconfig_string: str = None,
+        kubeconfig_path: str,
         request_chunk_size: int = 250,
     ):
         """
@@ -77,18 +100,12 @@ class KrknKubernetes:
         format using the keyword argument
 
         :param kubeconfig_path: kubeconfig path
-        :param kubeconfig_string: (keyword argument)
-            kubeconfig in string format
         :param: request_chunk_size: int of chunk size to limit requests to
 
         Initialization with kubeconfig path:
 
         >>> KrknKubernetes(log_writer, "/home/test/.kube/config")
 
-        Initialization with kubeconfig string:
-
-        >>> kubeconfig_string="apiVersion: v1 ....."
-        >>> KrknKubernetes(log_writer, kubeconfig_string=kubeconfig_string)
         """
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         urllib3.disable_warnings(DeprecationWarning)
@@ -96,16 +113,7 @@ class KrknKubernetes:
             action="ignore", message="unclosed", category=ResourceWarning
         )
 
-        if kubeconfig_string is not None and kubeconfig_path is not None:
-            raise Exception(
-                "please use either a kubeconfig path "
-                "or a valid kubeconfig string"
-            )
-
         self.request_chunk_size = request_chunk_size
-        if kubeconfig_string is not None:
-            self.__kubeconfig_string = kubeconfig_string
-            self.__initialize_clients_from_kconfig_string(kubeconfig_string)
 
         if kubeconfig_path is not None:
             self.__initialize_clients(kubeconfig_path)
@@ -146,34 +154,23 @@ class KrknKubernetes:
                     name="krkn-context", cluster="krkn-cluster", user="user"
                 )
                 conf.use_context("krkn-context")
+                self.client_config = client.Configuration().get_default_copy()
 
         try:
             config.load_kube_config(kubeconfig_path)
 
-            client_config = client.Configuration().get_default_copy()
+            self.client_config = client.Configuration().get_default_copy()
             http_proxy = os.getenv("http_proxy", None)
             if http_proxy is not None:
                 os.environ["HTTP_PROXY"] = http_proxy
-                client_config.proxy = http_proxy
+                self.client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
                 auth_string = proxy_auth.username + ":" + proxy_auth.password
-                client_config.proxy_headers = urllib3.util.make_headers(
+                self.client_config.proxy_headers = urllib3.util.make_headers(
                     proxy_basic_auth=auth_string
                 )
 
-            client.Configuration.set_default(client_config)
-
-            self.api_client = client.ApiClient(client_config)
-
-            self.cli = client.CoreV1Api(self.api_client)
-            self.version_client = client.VersionApi(self.api_client)
-            self.apps_api = client.AppsV1Api(self.api_client)
-            self.batch_cli = client.BatchV1Api(self.api_client)
-            self.net_cli = client.NetworkingV1Api(self.api_client)
-            self.custom_object_client = client.CustomObjectsApi(
-                self.api_client
-            )
-            self.dyn_client = DynamicClient(self.api_client)
+            client.Configuration.set_default(self.client_config)
             self.watch_resource = watch.Watch()
 
         except OSError:
@@ -181,36 +178,6 @@ class KrknKubernetes:
                 "Invalid kube-config file: {0}. "
                 "No configuration found.".format(kubeconfig_path)
             )
-
-    def __initialize_clients_from_kconfig_string(self, kubeconfig_str: str):
-        """
-        Initialize all clients from kubeconfig yaml string
-
-        :param kubeconfig_str: kubeconfig in string format
-        """
-
-        try:
-            kubeconfig = arcaflow_lib_kubernetes.parse_kubeconfig(
-                kubeconfig_str
-            )
-            connection = arcaflow_lib_kubernetes.kubeconfig_to_connection(
-                kubeconfig, True
-            )
-            self.api_client = arcaflow_lib_kubernetes.connect(connection)
-            self.cli = client.CoreV1Api(self.api_client)
-            self.batch_cli = client.BatchV1Api(self.api_client)
-            self.apps_api = client.AppsV1Api(self.api_client)
-            self.watch_resource = watch.Watch()
-            self.custom_object_client = client.CustomObjectsApi(
-                self.api_client
-            )
-            self.dyn_client = DynamicClient(self.api_client)
-        except ApiException as e:
-            logging.error("Failed to initialize k8s client: %s\n", str(e))
-            raise e
-        except Exception as e:
-            logging.error("failed to validate kubeconfig: %s\n", str(e))
-            raise e
 
     def _get_clusterversion_string(self) -> str:
         """
