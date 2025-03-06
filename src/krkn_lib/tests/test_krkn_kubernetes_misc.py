@@ -70,7 +70,6 @@ class KrknKubernetesTestsMisc(BaseTest):
             self.assertTrue(False)
         finally:
             self.pod_delete_queue.put([pod_name, namespace_with_evt])
-        
         time.sleep(10)
         local_timezone = f"{get_localzone()}"
         end__time = datetime.datetime.now()

@@ -212,7 +212,6 @@ class PodsStatus:
             self.unrecovered.append(unrecovered)
 
 
-
 class PodsMonitorThread:
     executor: ThreadPoolExecutor
     future: Future

@@ -142,19 +142,14 @@ class TestKrknKubernetesModels(BaseTest):
         affected_node2 = AffectedNode(node_name="test_1")
         affected_node2.set_affected_node_status("True", 0.12)
         affected_node2.set_affected_node_status("running", 0.11)
-        
         nodes_status_1.affected_nodes.append(affected_node2)
         self.assertEqual(len(nodes_status_1.affected_nodes), 2)
         nodes_status_1.merge_affected_nodes()
 
         self.assertEqual(len(nodes_status_1.affected_nodes), 1)
         self.assertEqual(nodes_status_1.affected_nodes[0].node_name, "test_1")
-        self.assertEqual(
-            nodes_status_1.affected_nodes[0].ready_time, 0.24
-        )
+        self.assertEqual(nodes_status_1.affected_nodes[0].ready_time, 0.24)
         self.assertEqual(
             nodes_status_1.affected_nodes[0].not_ready_time, 0.737
         )
-        self.assertEqual(
-            nodes_status_1.affected_nodes[0].running_time, 0.11
-        )
+        self.assertEqual(nodes_status_1.affected_nodes[0].running_time, 0.11)
