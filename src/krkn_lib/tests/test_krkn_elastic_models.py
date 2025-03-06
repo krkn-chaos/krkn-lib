@@ -94,55 +94,47 @@ class TestKrknElasticModels(BaseTest):
             .namespace,
             "default",
         )
-        print('elastic affected nodes' + str(elastic_telemetry.scenarios[0].affected_nodes[0].not_ready_time))
-        # affected_nodes 
+        print(
+            "elastic affected nodes"
+            + str(
+                elastic_telemetry.scenarios[0].affected_nodes[0].not_ready_time
+            )
+        )
+        # affected_nodes
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0]
-            .node_name,
+            elastic_telemetry.scenarios[0].affected_nodes[0].node_name,
             "kind-control-plane",
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0]
-            .node_id,
+            elastic_telemetry.scenarios[0].affected_nodes[0].node_id,
             "test",
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0].ready_time,
+            elastic_telemetry.scenarios[0].affected_nodes[0].ready_time,
             2.71,
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0].not_ready_time,
+            elastic_telemetry.scenarios[0].affected_nodes[0].not_ready_time,
             3.14,
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0]
-            .stopped_time,
+            elastic_telemetry.scenarios[0].affected_nodes[0].stopped_time,
             0,
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0]
-            .running_time,
+            elastic_telemetry.scenarios[0].affected_nodes[0].running_time,
             0,
         )
 
         self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .affected_nodes[0]
-            .terminating_time,
+            elastic_telemetry.scenarios[0].affected_nodes[0].terminating_time,
             0,
         )
-
 
         # node_summary_infos
         self.assertEqual(len(elastic_telemetry.node_summary_infos), 1)
