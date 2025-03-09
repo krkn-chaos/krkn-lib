@@ -504,7 +504,7 @@ class ChaosRunTelemetry:
             self.network_plugins = json_dict.get("network_plugins")
             self.run_uuid = json_dict.get("run_uuid")
             self.timestamp = json_dict.get("timestamp")
-            self.health_checks = [HealthCheck(k) for k in json_dict.get("health_checks")] if json_dict.get("health_checks")  else None
+            self.health_checks = [HealthCheck(k) for k in json_dict.get("health_checks")] if json_dict.get("health_checks") else None
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
