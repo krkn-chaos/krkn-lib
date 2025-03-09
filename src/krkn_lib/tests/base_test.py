@@ -555,7 +555,7 @@ class BaseTest(unittest.TestCase):
             "timestamp": "2023-05-22T14:55:02Z",
             "health_checks": [
                 {
-                    "url": "http://nginx-default.apps.mkatta.aws.rhperfscale.org",
+                    "url": "http://example.com",
                     "status": False,
                     "status_code": "503",
                     "start_timestamp": "2025-03-05 12:47:59",
