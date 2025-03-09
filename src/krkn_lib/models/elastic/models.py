@@ -220,11 +220,12 @@ class ElasticChaosRunTelemetry(Document):
             chaos_run_telemetry.kubernetes_objects_count
         )
         self.network_plugins = chaos_run_telemetry.network_plugins
+
         if chaos_run_telemetry.health_checks:
             self.health_checks = [
                 ElasticHealthChecks(
                     url=info.url,
-                    statue=info.status,
+                    status=info.status,
                     status_code=info.status_code,
                     start_timestamp=info.start_timestamp,
                     end_timestamp=info.end_timestamp,
@@ -241,4 +242,3 @@ class ElasticChaosRunTelemetry(Document):
         self.cloud_type = chaos_run_telemetry.cloud_type
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
-        self.health_checks = chaos_run_telemetry.health_checks
