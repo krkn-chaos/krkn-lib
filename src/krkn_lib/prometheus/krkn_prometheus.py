@@ -51,6 +51,7 @@ class KrknPrometheus:
         query: str,
         start_time: datetime = None,
         end_time: datetime = None,
+        granularity: int = 10
     ) -> list[dict[str:any]]:
         """
         Executes a query to the Prometheus API in PromQL languag,
@@ -69,10 +70,6 @@ class KrknPrometheus:
         )
         end_time = datetime.now() if end_time is None else end_time
 
-        granularity = math.ceil(
-            (end_time - start_time).total_seconds() / 11000
-        )
-        granularity = granularity if granularity > 10 else 10
         if self.prom_cli:
             try:
                 return self.prom_cli.custom_query_range(
