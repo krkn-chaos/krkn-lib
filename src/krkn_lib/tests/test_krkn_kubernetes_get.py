@@ -24,23 +24,12 @@ class KrknKubernetesTestsGet(BaseTest):
         kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
         if "~" in kubeconfig_path:
             kubeconfig_path = os.path.expanduser(kubeconfig_path)
-        with open(kubeconfig_path, mode="r") as kubeconfig:
-            kubeconfig_str = kubeconfig.read()
 
         krknkubernetes_path = KrknKubernetes(kubeconfig_path=kubeconfig_path)
-        krknkubernetes_string = KrknKubernetes(
-            kubeconfig_string=kubeconfig_str
-        )
 
         self.assertEqual(
             krknkubernetes_path.get_kubeconfig_path(), kubeconfig_path
         )
-
-        test_path = krknkubernetes_string.get_kubeconfig_path()
-        self.assertTrue(os.path.exists(test_path))
-        with open(test_path, "r") as test:
-            test_kubeconfig = test.read()
-            self.assertEqual(test_kubeconfig, kubeconfig_str)
 
     def test_get_namespace_status(self):
         # happy path

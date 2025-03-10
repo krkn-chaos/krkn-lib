@@ -116,9 +116,8 @@ class ScenarioTelemetry:
                     AffectedNode(json_object=node)
                     for node in json_object.get("affected_nodes")
                 ]
-            else: 
+            else:
                 self.affected_nodes = []
-
             if json_object.get("cluster_events") and isinstance(
                 json_object.get("cluster_events"), list
             ):
