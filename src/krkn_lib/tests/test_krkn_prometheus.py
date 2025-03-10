@@ -11,7 +11,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_prom_query(self):
         prom_cli = KrknPrometheus(self.url)
         query = "node_boot_time_seconds"
-        start_time = datetime.datetime.now() - datetime.timedelta(days=10)
+        start_time = datetime.datetime.now() - datetime.timedelta(hours=1)
 
         end_time = datetime.datetime.now()
         res = prom_cli.process_prom_query_in_range(query, start_time, end_time)
