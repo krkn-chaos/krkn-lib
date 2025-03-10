@@ -191,7 +191,7 @@ class TestKrknElasticModels(BaseTest):
 
         #health_check
         self.assertEqual(len(elastic_telemetry.health_checks), 1)
-        self.assertEqual(elastic_telemetry.health_checks[0].url, "http://nginx-default.apps.mkatta.aws.rhperfscale.org")
+        self.assertEqual(elastic_telemetry.health_checks[0].url, "http://example.com")
         self.assertEqual(elastic_telemetry.health_checks[0].status, False)
         self.assertEqual(elastic_telemetry.health_checks[0].status_code, "503")
         self.assertEqual(elastic_telemetry.health_checks[0].start_timestamp, "2025-03-05 12:47:59")
