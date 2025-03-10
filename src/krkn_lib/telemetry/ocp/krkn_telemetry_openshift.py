@@ -73,6 +73,8 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         chaos_telemetry.cluster_version = (
             self.__ocpcli.get_clusterversion_string()
         )
+        chaos_telemetry.major_version = chaos_telemetry.cluster_version[:4]
+
         chaos_telemetry.network_plugins = (
             self.__ocpcli.get_cluster_network_plugins()
         )
