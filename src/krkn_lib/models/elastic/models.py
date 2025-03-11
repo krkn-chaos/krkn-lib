@@ -130,9 +130,9 @@ class ElasticHealthChecks(InnerDoc):
     url = Text()
     status= Boolean()
     status_code= Text()
-    start_timestamp= Text()
-    end_timestamp= Text()
-    duration= Text()
+    start_timestamp= Date()
+    end_timestamp= Date()
+    duration= Float()
 
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
@@ -227,8 +227,8 @@ class ElasticChaosRunTelemetry(Document):
                     url=info.url,
                     status=info.status,
                     status_code=info.status_code,
-                    start_timestamp=info.start_timestamp,
-                    end_timestamp=info.end_timestamp,
+                    start_timestamp=datetime.datetime.fromisoformat(str(info.start_timestamp)),
+                    end_timestamp=datetime.datetime.fromisoformat(str(info.end_timestamp)),
                     duration=info.duration
                 )
                 for info in chaos_run_telemetry.health_checks

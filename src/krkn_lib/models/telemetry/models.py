@@ -400,7 +400,7 @@ class HealthCheck:
     """
     end time stamp of health check
     """
-    duration: str
+    duration: float
     """
     Denotes the time between start time and end time
     """
