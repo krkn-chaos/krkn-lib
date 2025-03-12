@@ -556,11 +556,11 @@ class BaseTest(unittest.TestCase):
             "health_checks": [
                 {
                     "url": "http://example.com",
-                    "status": False,
-                    "status_code": "503",
-                    "start_timestamp": "2025-03-05 12:47:59",
-                    "end_timestamp": "2025-03-05 12:48:02",
-                    "duration": "0:00:03"
+                    "status": True,
+                    "status_code": 200,
+                    "start_timestamp": "2025-03-12T14:57:54.706000",
+                    "end_timestamp": "2025-03-12T15:02:13.819742",
+                    "duration": 259.113742
                 }
             ],
             "total_node_count": 3,

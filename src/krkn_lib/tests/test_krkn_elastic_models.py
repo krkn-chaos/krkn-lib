@@ -192,11 +192,11 @@ class TestKrknElasticModels(BaseTest):
         #health_check
         self.assertEqual(len(elastic_telemetry.health_checks), 1)
         self.assertEqual(elastic_telemetry.health_checks[0].url, "http://example.com")
-        self.assertEqual(elastic_telemetry.health_checks[0].status, False)
-        self.assertEqual(elastic_telemetry.health_checks[0].status_code, "503")
-        self.assertEqual(elastic_telemetry.health_checks[0].start_timestamp, "2025-03-05 12:47:59")
-        self.assertEqual(elastic_telemetry.health_checks[0].end_timestamp, "2025-03-05 12:48:02")
-        self.assertEqual(elastic_telemetry.health_checks[0].duration, "0:00:03")
+        self.assertEqual(elastic_telemetry.health_checks[0].status, True)
+        self.assertEqual(elastic_telemetry.health_checks[0].status_code, "200")
+        self.assertEqual(elastic_telemetry.health_checks[0].start_timestamp, "2025-03-12T14:57:54.706000")
+        self.assertEqual(elastic_telemetry.health_checks[0].end_timestamp, "2025-03-12T15:02:13.819742")
+        self.assertEqual(elastic_telemetry.health_checks[0].duration, 259.113742)
 
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
