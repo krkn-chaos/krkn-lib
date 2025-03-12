@@ -557,7 +557,7 @@ class BaseTest(unittest.TestCase):
                 {
                     "url": "http://example.com",
                     "status": True,
-                    "status_code": 200,
+                    "status_code": "200",
                     "start_timestamp": "2025-03-12T14:57:54.706000",
                     "end_timestamp": "2025-03-12T15:02:13.819742",
                     "duration": 259.113742
