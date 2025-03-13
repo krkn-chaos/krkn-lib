@@ -553,6 +553,16 @@ class BaseTest(unittest.TestCase):
             "kubernetes_objects_count": {"Pod": 5, "Service": 2},
             "network_plugins": ["Calico"],
             "timestamp": "2023-05-22T14:55:02Z",
+            "health_checks": [
+                {
+                    "url": "http://example.com",
+                    "status": True,
+                    "status_code": "200",
+                    "start_timestamp": "2025-03-12T14:57:54.706000",
+                    "end_timestamp": "2025-03-12T15:02:13.819742",
+                    "duration": 259.113742
+                }
+            ],
             "total_node_count": 3,
             "cloud_infrastructure": "AWS",
             "cloud_type": "EC2",

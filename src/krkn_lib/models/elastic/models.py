@@ -10,6 +10,7 @@ from elasticsearch_dsl import (
     Long,
     Nested,
     Text,
+    Boolean
 )
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
@@ -125,6 +126,13 @@ class ElasticTaint(InnerDoc):
     value = Text()
     effect = Text()
 
+class ElasticHealthChecks(InnerDoc):
+    url = Text()
+    status= Boolean()
+    status_code= Text()
+    start_timestamp= Date()
+    end_timestamp= Date()
+    duration= Float()
 
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
@@ -138,6 +146,7 @@ class ElasticChaosRunTelemetry(Document):
     cloud_type = Text()
     cluster_version = Text()
     run_uuid = Text(fields={"keyword": Keyword()})
+    health_checks = Nested(ElasticHealthChecks, multi=True)
 
     class Index:
         name = "chaos_run_telemetry"
@@ -211,6 +220,22 @@ class ElasticChaosRunTelemetry(Document):
             chaos_run_telemetry.kubernetes_objects_count
         )
         self.network_plugins = chaos_run_telemetry.network_plugins
+
+        if chaos_run_telemetry.health_checks:
+            self.health_checks = [
+                ElasticHealthChecks(
+                    url=info.url,
+                    status=info.status,
+                    status_code=info.status_code,
+                    start_timestamp=datetime.datetime.fromisoformat(str(info.start_timestamp)),
+                    end_timestamp=datetime.datetime.fromisoformat(str(info.end_timestamp)),
+                    duration=info.duration
+                )
+                for info in chaos_run_telemetry.health_checks
+            ]
+        else:
+            self.health_checks = None
+
         self.timestamp = chaos_run_telemetry.timestamp
         self.total_node_count = chaos_run_telemetry.total_node_count
         self.cloud_infrastructure = chaos_run_telemetry.cloud_infrastructure

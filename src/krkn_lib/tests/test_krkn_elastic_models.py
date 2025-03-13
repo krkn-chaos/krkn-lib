@@ -3,7 +3,7 @@ import uuid
 from krkn_lib.models.elastic.models import ElasticChaosRunTelemetry
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
-
+import datetime
 
 class TestKrknElasticModels(BaseTest):
 
@@ -188,6 +188,16 @@ class TestKrknElasticModels(BaseTest):
 
         # obejct properties
         self.assertEqual(elastic_telemetry.timestamp, "2023-05-22T14:55:02Z")
+
+        #health_check
+        self.assertEqual(len(elastic_telemetry.health_checks), 1)
+        self.assertEqual(elastic_telemetry.health_checks[0].url, "http://example.com")
+        self.assertEqual(elastic_telemetry.health_checks[0].status, True)
+        self.assertEqual(elastic_telemetry.health_checks[0].status_code, "200")
+        self.assertEqual(elastic_telemetry.health_checks[0].start_timestamp, datetime.datetime.fromisoformat("2025-03-12T14:57:54.706000"))
+        self.assertEqual(elastic_telemetry.health_checks[0].end_timestamp, datetime.datetime.fromisoformat("2025-03-12T15:02:13.819742"))
+        self.assertEqual(elastic_telemetry.health_checks[0].duration, 259.113742)
+
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")
