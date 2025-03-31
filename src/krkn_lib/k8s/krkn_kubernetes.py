@@ -158,7 +158,8 @@ class KrknKubernetes:
         try:
             config.load_kube_config(kubeconfig_path)
 
-            self.client_config = client.Configuration().get_default_copy()
+            client_config = client.Configuration().get_default_copy()
+            client_config.verify_ssl = False
             http_proxy = os.getenv("http_proxy", None)
             if http_proxy is not None:
                 os.environ["HTTP_PROXY"] = http_proxy
