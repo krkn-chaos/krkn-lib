@@ -3309,6 +3309,7 @@ class KrknKubernetes:
                 memory_vm_bytes=hog_config.memory_vm_bytes,
                 workers=hog_config.workers,
                 target_pod_folder=hog_config.io_target_pod_folder,
+                tolerations=hog_config.tolerations,
             )
         )
 
