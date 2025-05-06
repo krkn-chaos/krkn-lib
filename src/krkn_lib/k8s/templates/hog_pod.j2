@@ -4,6 +4,17 @@ metadata:
   name: {{ name }}
   namespace: {{ namespace }}
 spec:
+    {% if tolerations %}
+    tolerations:
+    {% for toleration in tolerations %}
+    - key: "{{ toleration.key }}"
+      operator: "{{ toleration.operator }}"
+      {% if toleration.value %}
+      value: "{{ toleration.value }}"
+      {% endif %}
+      effect: "{{ toleration.effect }}"
+    {% endfor %}
+    {% endif %}
     {% if has_selector == true %}
     nodeSelector:
         {{ node_selector_key }}: {{ node_selector_value }}
