@@ -73,6 +73,7 @@ class TestKrknKubernetesModels(BaseTest):
             "namespace": "testnamespace",
             "memory-vm-bytes": "99%",
             "node-selector": "test-selector",
+            "taints": ["example-key:NoSchedule"],
         }
 
         config = HogConfig.from_yaml_dict(memory_config)
@@ -83,6 +84,7 @@ class TestKrknKubernetesModels(BaseTest):
         self.assertEqual(config.namespace, "testnamespace")
         self.assertEqual(config.memory_vm_bytes, "99%")
         self.assertEqual(config.node_selector, "test-selector")
+        self.assertEqual(config.tolerations, [{'key': 'example-key', 'operator': 'Exists', 'effect': 'NoSchedule'}])
         io_config_volume = {
             "name": "test-volume",
             "hostPath": {"path": "/test-path"},
@@ -98,6 +100,7 @@ class TestKrknKubernetesModels(BaseTest):
             "io-target-pod-folder": "/test-path",
             "io-target-pod-volume": io_config_volume,
             "node-selector": "test-selector",
+            "taints": [],
         }
 
         config = HogConfig.from_yaml_dict(io_config)
@@ -111,6 +114,7 @@ class TestKrknKubernetesModels(BaseTest):
         self.assertEqual(config.io_target_pod_folder, "/test-path")
         self.assertEqual(config.io_target_pod_volume, io_config_volume)
         self.assertEqual(config.node_selector, "test-selector")
+        self.assertEqual(config.tolerations, [])
 
         memory_config = {
             "duration": 44,
@@ -130,6 +134,7 @@ class TestKrknKubernetesModels(BaseTest):
         self.assertEqual(config.namespace, "testnamespace")
         self.assertEqual(config.memory_vm_bytes, "95%")
         self.assertEqual(config.node_selector, "test-selector")
+        self.assertEqual(config.tolerations, [])
 
     def test_nodes_status(self):
         nodes_status_1 = AffectedNodeStatus()

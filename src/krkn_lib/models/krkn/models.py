@@ -126,6 +126,7 @@ class HogConfig:
     duration: int
     namespace: str
     node_selector: str
+    tolerations: list[str]
 
     def __init__(self):
         self.type = HogType.cpu
@@ -145,6 +146,7 @@ class HogConfig:
         self.duration = 30
         self.namespace = "default"
         self.node_selector = ""
+        self.tolerations = []
 
     @staticmethod
     def from_yaml_dict(yaml_dict: dict[str, str]) -> HogConfig:
@@ -175,6 +177,25 @@ class HogConfig:
             config.number_of_nodes = yaml_dict["number-of-nodes"]
         if "image" in yaml_dict.keys() and yaml_dict["image"]:
             config.image = yaml_dict["image"]
+
+        if "taints" in yaml_dict.keys() and yaml_dict["taints"]:
+            for taint in yaml_dict["taints"]:
+                key_value_part, effect = taint.split(":", 1)
+                if '=' in key_value_part:
+                    key, value = key_value_part.split("=", 1)
+                    operator = "Equal"
+                else:
+                    key = key_value_part
+                    value = None
+                    operator = "Exists"
+                toleration = {
+                    "key": key,
+                    "operator": operator,
+                    "effect": effect
+                }
+                if value is not None:
+                    toleration["value"] = value
+                config.tolerations.append(toleration)            
 
         if config.type == HogType.cpu:
             if (
