@@ -2030,6 +2030,29 @@ class KrknKubernetes:
             except Exception:
                 return 0
 
+    def get_node_ip(self, node_name: str):
+        """
+        Returns the ip address of a node
+
+        :param node_name: the name of the node
+        :return: the ip address or None if not found
+        """
+        api_client = self.api_client
+        try:
+            if api_client:
+                v1 = self.cli
+                node = v1.read_node(node_name)
+                for address in node.status.addresses:
+                    if address.type == "InternalIP":
+                        return address.address
+                return None
+            else:
+                return None
+        except Exception:
+            raise Exception("failed to get node ip address")
+
+
+
     def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
         Returns a list of NodeInfo objects
