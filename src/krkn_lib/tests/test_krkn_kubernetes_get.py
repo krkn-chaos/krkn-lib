@@ -239,6 +239,14 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertGreater(infos.memory, 0)
         self.assertGreater(infos.cpu, 0)
 
+    def test_get_node_ip(self):
+        nodes = self.lib_k8s.list_nodes()
+        ip_address = self.lib_k8s.get_node_ip(nodes[0])
+        self.assertIsNotNone(ip_address)
+        with self.assertRaises(Exception):
+            ip_address = self.lib_k8s.get_node_ip("not_existing")
+
+
 
 if __name__ == "__main__":
     unittest.main()
