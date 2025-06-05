@@ -30,13 +30,13 @@ from krkn_lib.models.k8s import (
     AffectedPod,
     ApiRequestException,
     Container,
+    NodeResources,
     Pod,
     PodsMonitorThread,
     PodsStatus,
     ServiceHijacking,
     Volume,
     VolumeMount,
-    NodeResources,
 )
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
@@ -851,7 +851,9 @@ class KrknKubernetes:
 
     # Outputs a json blob with informataion about all pods in a given namespace
     def get_all_pod_info(
-        self, namespace: str = "default", label_selector: str = None
+        self,
+        namespace: str = "default",
+        label_selector: str = None,
     ) -> list[str]:
         """
         Get details of all pods in a namespace
@@ -1137,8 +1139,18 @@ class KrknKubernetes:
         :param namespace: namespace (optional default `default`)
         """
         try:
+            starting_creation_timestamp = self.cli.read_namespaced_pod(
+                name=name, namespace=namespace
+            ).metadata.creation_timestamp
             self.cli.delete_namespaced_pod(name=name, namespace=namespace)
+
             while self.cli.read_namespaced_pod(name=name, namespace=namespace):
+
+                ending_creation_timestamp = self.cli.read_namespaced_pod(
+                    name=name, namespace=namespace
+                ).metadata.creation_timestamp
+                if starting_creation_timestamp != ending_creation_timestamp:
+                    break
                 time.sleep(1)
         except ApiException as e:
             if e.status == 404:
@@ -1540,6 +1552,7 @@ class KrknKubernetes:
                 nodeName=response.spec.node_name,
                 volumes=volume_list,
                 status=response.status.phase,
+                creation_timestamp=response.metadata.creation_timestamp,
             )
             return pod_info
         else:
@@ -2699,12 +2712,14 @@ class KrknKubernetes:
         pods_and_namespaces = [
             pod for pod in pods_and_namespaces if namespace_re.match(pod[1])
         ]
+
         # select only running pods
         pods_and_namespaces = [
             (pod[0], pod[1])
             for pod in pods_and_namespaces
             if not self.is_pod_terminating(pod[0], pod[1])
         ]
+
         return pods_and_namespaces
 
     def monitor_pods_by_label(
@@ -2951,12 +2966,20 @@ class KrknKubernetes:
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
-                    if not self.is_pod_running(pod[0], pod[1]):
+                    pod_info = self.get_pod_info(pod[0], pod[1])
+                    if pod_info is not None:
+                        pod_creation_timestamp = (
+                            pod_info.creation_timestamp.timestamp()
+                        )
+                    else:
+                        continue
+                    if (
+                        pod_info.status
+                        and start_time < pod_creation_timestamp
+                    ):
+                        # in this case the pods to wait have been respawn
+                        # with the same name
                         missing_pods.add(pod)
-                if len(missing_pods) == 0:
-                    continue
-                # in this case the pods to wait have been respawn
-                # with the same name
                 pods_to_wait.update(missing_pods)
 
             # pods have been killed but respawned with different names
@@ -2992,6 +3015,8 @@ class KrknKubernetes:
             with ThreadPoolExecutor() as executor:
                 for pod_and_namespace in pods_to_wait:
                     if pod_and_namespace not in pods_already_watching:
+
+                        # need name of new pod
                         future = executor.submit(
                             self.__wait_until_pod_is_ready_worker,
                             pod_name=pod_and_namespace[0],

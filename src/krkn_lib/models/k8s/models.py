@@ -1,6 +1,6 @@
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 
 @dataclass(frozen=True, order=False)
@@ -93,6 +93,10 @@ class Pod:
     status: str
     """
     Status of the Pod
+    """
+    creation_timestamp: Any
+    """
+    Creation timestamp of the Pod
     """
     podIP: str
     """
