@@ -854,6 +854,7 @@ class KrknKubernetes:
         self,
         namespace: str = "default",
         label_selector: str = None,
+        field_selector: str = None,
     ) -> list[str]:
         """
         Get details of all pods in a namespace
@@ -869,12 +870,14 @@ class KrknKubernetes:
                     pretty=True,
                     label_selector=label_selector,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector
                 )
             else:
                 ret = self.list_continue_helper(
                     self.cli.list_namespaced_pod,
                     namespace,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector
                 )
         except ApiException as e:
             logging.error(
@@ -2966,20 +2969,17 @@ class KrknKubernetes:
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
-                    pod_info = self.get_pod_info(pod[0], pod[1])
+                    # getting each individual pod info was timely and causing errors
+                    pod_info = self.get_all_pod_info(namespace_pattern, label_selector, "status.phase=Running")
                     if pod_info is not None:
-                        pod_creation_timestamp = (
-                            pod_info.creation_timestamp.timestamp()
-                        )
-                    else:
-                        continue
-                    if (
-                        pod_info.status
-                        and start_time < pod_creation_timestamp
-                    ):
-                        # in this case the pods to wait have been respawn
-                        # with the same name
-                        missing_pods.add(pod)
+                         for ret_list in pod_info:
+                            for pod in ret_list.items:
+                                pod_creation_timestamp = pod.metadata.creation_timestamp
+                                # list of pods will only show running pods
+                                if start_time < pod_creation_timestamp:
+                                    # in this case the pods to wait have been respawn
+                                    # with the same name
+                                    missing_pods.add(pod)
                 pods_to_wait.update(missing_pods)
 
             # pods have been killed but respawned with different names
@@ -3064,7 +3064,7 @@ class KrknKubernetes:
         self, pod_name: str, namespace: str, event: threading.Event
     ) -> AffectedPod:
         start_time = time.time()
-        ready = False
+        ready = self.is_pod_running(pod_name, namespace)
 
         while not ready and not event.is_set():
             ready = self.is_pod_running(pod_name, namespace)
