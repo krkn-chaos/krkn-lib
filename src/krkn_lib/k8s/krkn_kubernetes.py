@@ -2979,6 +2979,7 @@ class KrknKubernetes:
                     ):
                         # in this case the pods to wait have been respawn
                         # with the same name
+                        start_time = time.time()
                         missing_pods.add(pod)
                 pods_to_wait.update(missing_pods)
 
@@ -3064,7 +3065,7 @@ class KrknKubernetes:
         self, pod_name: str, namespace: str, event: threading.Event
     ) -> AffectedPod:
         start_time = time.time()
-        ready = False
+        ready = self.is_pod_running(pod_name, namespace)
 
         while not ready and not event.is_set():
             ready = self.is_pod_running(pod_name, namespace)
