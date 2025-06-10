@@ -47,7 +47,8 @@ jobs:
           --set alertmanager.service.nodePort=32000 \
           --set alertmanager.service.type=NodePort \
           --set prometheus-node-exporter.service.nodePort=32001 \
-          --set prometheus-node-exporter.service.type=NodePort
+          --set prometheus-node-exporter.service.type=NodePort \
+          --set prometheus.prometheusSpec.maximumStartupDurationSeconds=300
       - name: Deploy Elasticsearch
 
         env:
