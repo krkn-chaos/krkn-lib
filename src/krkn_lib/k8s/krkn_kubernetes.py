@@ -3388,3 +3388,84 @@ class KrknKubernetes:
         resources.memory = json_obj["node"]["memory"]["availableBytes"]
         resources.disk_space = json_obj["node"]["fs"]["availableBytes"]
         return resources
+
+    def simulate_disk_failure(self, node_name: str, disk_path: str, timeout: int = 300) -> bool:
+        """
+        Simulates a disk failure on a specific node by offlining the disk.
+        This is done by creating a privileged pod on the target node and using
+        sysfs to offline the disk.
+
+        :param node_name: The name of the node where the disk failure should be simulated
+        :param disk_path: The path of the disk to be failed (e.g., /dev/sdb)
+        :param timeout: Timeout in seconds for the operation (default 300)
+        :return: True if the operation was successful, False otherwise
+        """
+        try:
+            # Validate disk path
+            if not disk_path or not disk_path.startswith('/dev/'):
+                raise ValueError("Invalid disk path. Must start with /dev/")
+
+            # Create a unique pod name
+            pod_name = f"disk-failure-{get_random_string(5)}"
+            namespace = "default"
+
+            # Create a privileged pod on the target node
+            file_loader = PackageLoader("krkn_lib.k8s", "templates")
+            env = Environment(loader=file_loader, autoescape=True)
+            pod_template = env.get_template("node_exec_pod.j2")
+            pod_body = yaml.safe_load(
+                pod_template.render(nodename=node_name, podname=pod_name)
+            )
+
+            # Add host path volume for sysfs
+            pod_body["spec"]["volumes"].append({
+                "name": "sysfs",
+                "hostPath": {
+                    "path": "/sys",
+                    "type": "Directory"
+                }
+            })
+
+            # Add volume mount to container
+            pod_body["spec"]["containers"][0]["volumeMounts"].append({
+                "name": "sysfs",
+                "mountPath": "/sys",
+                "readOnly": True
+            })
+
+            # Create the pod
+            self.create_pod(pod_body, namespace, timeout)
+
+            # Wait for pod to be running
+            while not self.is_pod_running(pod_name, namespace):
+                time.sleep(5)
+                continue
+
+            # Get the disk name from the path
+            disk_name = disk_path.split('/')[-1]
+
+            # Offline the disk using sysfs
+            offline_command = [
+                "sh", "-c",
+                f"echo 1 > /sys/block/{disk_name}/device/delete"
+            ]
+
+            try:
+                self.exec_cmd_in_pod(
+                    offline_command,
+                    pod_name,
+                    namespace,
+                    None
+                )
+                logging.info(f"Successfully simulated disk failure on {disk_path} for node {node_name}")
+                return True
+            except Exception as e:
+                logging.error(f"Failed to simulate disk failure: {str(e)}")
+                return False
+            finally:
+                # Clean up the pod
+                self.delete_pod(pod_name, namespace)
+
+        except Exception as e:
+            logging.error(f"Error in simulate_disk_failure: {str(e)}")
+            return False
