@@ -32,7 +32,9 @@ jobs:
           helm repo add stable https://charts.helm.sh/stable
           helm repo update
       - name: Deploy prometheus
+      
         uses: paigerube14/actions/prometheus@prom_elastic
+
       - name: Deploy Elasticsearch
 
         with:
