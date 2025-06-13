@@ -54,8 +54,18 @@ class KrknKubernetesTestsGet(BaseTest):
         # test with label_selector filter
         results = self.lib_k8s.get_all_pods("random=%s" % random_label)
         self.assertTrue(len(results) == 1)
-        self.assertEqual(results[0][0], "kraken-deployment")
         self.assertEqual(results[0][1], namespace)
+        self.assertEqual(results[0][0], "kraken-deployment")
+        self.wait_pod("kraken-deployment",namespace)
+        results = self.lib_k8s.get_all_pods("random=%s" % random_label, field_selector="status.phase=Running")
+        print('resuls' + str(results))
+        self.assertTrue(len(results) == 1)
+        self.assertEqual(results[0][1], namespace)
+        self.assertEqual(results[0][0], "kraken-deployment")
+
+        results = self.lib_k8s.get_all_pods(field_selector="status.phase=Running")
+        self.assertTrue(len(results) >= 1)
+        
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 
     def test_get_pod_log(self):
@@ -134,6 +144,9 @@ class KrknKubernetesTestsGet(BaseTest):
             self.assertIsNotNone(info.podIP)
             self.assertIsNotNone(info.nodeName)
             self.assertIsNotNone(info.containers)
+
+            info = self.lib_k8s.get_pod_info("test1", namespace)
+            self.assertIsNone(info)
         except Exception as e:
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
