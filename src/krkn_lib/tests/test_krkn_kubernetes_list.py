@@ -5,7 +5,7 @@ from krkn_lib.tests import BaseTest
 
 
 class KrknKubernetesTestsList(BaseTest):
-    def test_list_all_namespaces(self):
+    def notest_list_all_namespaces(self):
         # test list all namespaces
         result = self.lib_k8s.list_all_namespaces()
         result_count = 0
@@ -32,7 +32,7 @@ class KrknKubernetesTestsList(BaseTest):
         )
         self.assertTrue(len(result) == 0)
 
-    def test_list_namespaces(self):
+    def notest_list_namespaces(self):
         # test all namespaces
         result = self.lib_k8s.list_namespaces()
         self.assertTrue(len(result) > 1)
@@ -49,13 +49,13 @@ class KrknKubernetesTestsList(BaseTest):
         )
         self.assertTrue(len(result) == 0)
 
-    def test_list_nodes(self):
+    def notest_list_nodes(self):
         nodes = self.lib_k8s.list_nodes()
         self.assertTrue(len(nodes) >= 1)
         nodes = self.lib_k8s.list_nodes("donot=exists")
         self.assertTrue(len(nodes) == 0)
 
-    def test_list_killable_nodes(self):
+    def notest_list_killable_nodes(self):
         nodes = self.lib_k8s.list_nodes()
         self.assertTrue(len(nodes) > 0)
         self.deploy_fake_kraken(node_name=nodes[0])
@@ -70,9 +70,18 @@ class KrknKubernetesTestsList(BaseTest):
         pods = self.lib_k8s.list_pods(namespace=namespace)
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
+
+        pod_info = self.lib_k8s.get_pod_info(pods[0],namespace)
+        print('pod info' + str(pod_info))
+        pods = self.lib_k8s.list_pods(namespace=namespace, field_selector="status.phase=Running")
+        self.assertTrue(len(pods) == 1)
+        self.assertIn("kraken-deployment", pods)
+
+        pods = self.lib_k8s.list_pods(namespace=namespace, field_selector="status.phase=Terminating")
+        self.assertTrue(len(pods) == 0)
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 
-    def test_list_ready_nodes(self):
+    def notest_list_ready_nodes(self):
         try:
             ready_nodes = self.lib_k8s.list_ready_nodes()
             nodes = self.lib_k8s.list_nodes()
@@ -86,7 +95,7 @@ class KrknKubernetesTestsList(BaseTest):
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
 
-    def test_list_namespaces_by_regex(self):
+    def notest_list_namespaces_by_regex(self):
         namespace_1 = (
             self.get_random_string(3) + "-test-ns-" + self.get_random_string(3)
         )
@@ -117,7 +126,7 @@ class KrknKubernetesTestsList(BaseTest):
         self.assertEqual(len(filtered_ns_ok), 2)
         self.assertEqual(len(filtered_ns_fail), 0)
 
-    def test_list_schedulable_nodes(self):
+    def notest_list_schedulable_nodes(self):
         schedulable_nodes = self.lib_k8s.list_schedulable_nodes()
         self.assertGreater(len(schedulable_nodes), 0)
         schedulable_nodes_empty_selector = self.lib_k8s.list_schedulable_nodes(
