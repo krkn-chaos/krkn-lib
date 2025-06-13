@@ -2619,7 +2619,7 @@ class KrknKubernetes:
             )
             return None
 
-    def select_pods_by_label(self, label_selector: str) -> list[(str, str)]:
+    def select_pods_by_label(self, label_selector: str,field_selector: str = None) -> list[(str, str)]:
         """
         Selects the pods identified by a label_selector
 
@@ -2629,7 +2629,7 @@ class KrknKubernetes:
             to wait before considering the pod "not recovered" after the Chaos
         :return: a list of pod_name and namespace tuples
         """
-        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = self.get_all_pods(label_selector,field_selector)
         pods_and_namespaces = [(pod[0], pod[1]) for pod in pods_and_namespaces]
         # select only running pods
         pods_and_namespaces = [
@@ -2731,6 +2731,7 @@ class KrknKubernetes:
         self,
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout: int = 30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2769,6 +2770,7 @@ class KrknKubernetes:
             max_timeout=max_timeout,
             pods_status=pods_status,
             label_selector=label_selector,
+            field_selector=field_selector,
             event=event,
         )
 
@@ -2777,6 +2779,7 @@ class KrknKubernetes:
         pod_name_pattern: str,
         namespace_pattern: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout=30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2830,6 +2833,7 @@ class KrknKubernetes:
         namespace_pattern: str,
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout=30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2873,6 +2877,7 @@ class KrknKubernetes:
             max_timeout=max_timeout,
             pods_status=pods_status,
             label_selector=label_selector,
+            field_selector=field_selector,
             namespace_pattern=namespace_pattern,
             event=event,
         )
@@ -2883,6 +2888,7 @@ class KrknKubernetes:
         pods_status: PodsStatus,
         max_timeout: int,
         label_selector: str = None,
+        field_selector: str = None,
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
@@ -2895,6 +2901,7 @@ class KrknKubernetes:
             pods_status=pods_status,
             max_timeout=max_timeout,
             label_selector=label_selector,
+            field_selector=field_selector,
             pod_name=pod_name,
             namespace_pattern=namespace_pattern,
             name_pattern=name_pattern,
@@ -2909,6 +2916,7 @@ class KrknKubernetes:
         pods_status: PodsStatus,
         max_timeout: int,
         label_selector: str = None,
+        field_selector: str = None,
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
@@ -2928,6 +2936,7 @@ class KrknKubernetes:
             select_method = partial(
                 self.select_pods_by_label,
                 label_selector=label_selector,
+                field_selector=field_selector
             )
         elif (
             name_pattern
@@ -2939,6 +2948,7 @@ class KrknKubernetes:
                 self.select_pods_by_name_pattern_and_namespace_pattern,
                 pod_name_pattern=name_pattern,
                 namespace_pattern=namespace_pattern,
+                field_selector=field_selector
             )
         elif (
             namespace_pattern
@@ -2950,6 +2960,7 @@ class KrknKubernetes:
                 self.select_pods_by_namespace_pattern_and_label,
                 namespace_pattern=namespace_pattern,
                 label_selector=label_selector,
+                field_selector=field_selector
             )
         else:
             pods_status.error = (
