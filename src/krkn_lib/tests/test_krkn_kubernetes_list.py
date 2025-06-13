@@ -71,8 +71,9 @@ class KrknKubernetesTestsList(BaseTest):
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
 
+        self.wait_pod(pods[0],namespace)
+        
         pod_info = self.lib_k8s.get_pod_info(pods[0],namespace)
-        print('pod info' + str(pod_info))
         pods = self.lib_k8s.list_pods(namespace=namespace, field_selector="status.phase=Running")
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)

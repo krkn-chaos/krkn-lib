@@ -53,10 +53,10 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertTrue(etcd_found)
         # test with label_selector filter
         results = self.lib_k8s.get_all_pods("random=%s" % random_label)
-        print('resuls' + str(results))
         self.assertTrue(len(results) == 1)
         self.assertEqual(results[0][1], namespace)
         self.assertEqual(results[0][0], "kraken-deployment")
+        self.wait_pod("kraken-deployment",namespace)
         results = self.lib_k8s.get_all_pods("random=%s" % random_label, field_selector="status.phase=Running")
         print('resuls' + str(results))
         self.assertTrue(len(results) == 1)
