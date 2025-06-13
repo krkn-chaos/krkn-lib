@@ -2686,7 +2686,7 @@ class KrknKubernetes:
         pods_and_namespaces = []
         for namespace in namespaces:
             if namespace_re.match(namespace):
-                pods = self.list_pods(namespace, field_selector)
+                pods = self.list_pods(namespace, field_selector=field_selector)
                 for pod in pods:
                     if podname_re.match(pod):
                         pods_and_namespaces.append((pod, namespace))
