@@ -529,7 +529,7 @@ class KrknKubernetes:
         return managedclusters
 
     def list_pods(
-        self, namespace: str, label_selector: str = None
+        self, namespace: str, label_selector: str = None, field_selector: str = None
     ) -> list[str]:
         """
         List pods in the given namespace
@@ -541,7 +541,7 @@ class KrknKubernetes:
         """
         pods = []
         try:
-            ret = self.get_all_pod_info(namespace, label_selector)
+            ret = self.get_all_pod_info(namespace, label_selector, field_selector)
         except ApiException as e:
             logging.error(
                 "Exception when calling list_pods: %s\n",
@@ -734,7 +734,7 @@ class KrknKubernetes:
                 logging.error("Failed to get deployment data %s", str(e))
                 raise e
 
-    def get_all_pods(self, label_selector: str = None) -> list[[str, str]]:
+    def get_all_pods(self, label_selector: str = None, field_selector: str = None) -> list[[str, str]]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
 
@@ -749,12 +749,14 @@ class KrknKubernetes:
                 pretty=True,
                 label_selector=label_selector,
                 limit=self.request_chunk_size,
+                field_selector=field_selector
             )
         else:
             ret = self.list_continue_helper(
                 self.cli.list_pod_for_all_namespaces,
                 pretty=True,
                 limit=self.request_chunk_size,
+                field_selector=field_selector
             )
         for ret_list in ret:
             for pod in ret_list.items:
@@ -854,6 +856,7 @@ class KrknKubernetes:
         self,
         namespace: str = "default",
         label_selector: str = None,
+        field_selector: str = None
     ) -> list[str]:
         """
         Get details of all pods in a namespace
@@ -869,12 +872,14 @@ class KrknKubernetes:
                     pretty=True,
                     label_selector=label_selector,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector
                 )
             else:
                 ret = self.list_continue_helper(
                     self.cli.list_namespaced_pod,
                     namespace,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector
                 )
         except ApiException as e:
             logging.error(
@@ -2663,7 +2668,7 @@ class KrknKubernetes:
         return selected_services
 
     def select_pods_by_name_pattern_and_namespace_pattern(
-        self, pod_name_pattern: str, namespace_pattern: str
+        self, pod_name_pattern: str, namespace_pattern: str, field_selector: str = None
     ) -> list[(str, str)]:
         """
         Selects the pods identified by a namespace_pattern
@@ -2681,7 +2686,7 @@ class KrknKubernetes:
         pods_and_namespaces = []
         for namespace in namespaces:
             if namespace_re.match(namespace):
-                pods = self.list_pods(namespace)
+                pods = self.list_pods(namespace, field_selector)
                 for pod in pods:
                     if podname_re.match(pod):
                         pods_and_namespaces.append((pod, namespace))
@@ -2694,7 +2699,7 @@ class KrknKubernetes:
         return pods_and_namespaces
 
     def select_pods_by_namespace_pattern_and_label(
-        self, namespace_pattern: str, label_selector: str
+        self, namespace_pattern: str, label_selector: str, field_selector: str = None
     ) -> list[(str, str)]:
         """
         Selects the pods identified by a label_selector
@@ -2708,7 +2713,7 @@ class KrknKubernetes:
         :return: a list of pod_name and namespace tuples
         """
         namespace_re = re.compile(namespace_pattern)
-        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = self.get_all_pods(label_selector, field_selector)
         pods_and_namespaces = [
             pod for pod in pods_and_namespaces if namespace_re.match(pod[1])
         ]
