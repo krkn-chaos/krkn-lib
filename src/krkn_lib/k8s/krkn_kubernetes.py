@@ -870,14 +870,14 @@ class KrknKubernetes:
                     pretty=True,
                     label_selector=label_selector,
                     limit=self.request_chunk_size,
-                    field_selector=field_selector
+                    field_selector=field_selector,
                 )
             else:
                 ret = self.list_continue_helper(
                     self.cli.list_namespaced_pod,
                     namespace,
                     limit=self.request_chunk_size,
-                    field_selector=field_selector
+                    field_selector=field_selector,
                 )
         except ApiException as e:
             logging.error(
@@ -2067,8 +2067,6 @@ class KrknKubernetes:
         except Exception:
             raise Exception("failed to get node ip address")
 
-
-
     def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
         Returns a list of NodeInfo objects
@@ -2969,16 +2967,23 @@ class KrknKubernetes:
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
-                    # getting each individual pod info was timely and causing errors
-                    pod_info = self.get_all_pod_info(namespace_pattern, label_selector, "status.phase=Running")
+                    # getting each individual pod info was timely
+                    # and causing false positives in unrecovered pods
+                    pod_info = self.get_all_pod_info(
+                        namespace_pattern,
+                        label_selector,
+                        "status.phase=Running",
+                    )
                     if pod_info is not None:
-                         for ret_list in pod_info:
+                        for ret_list in pod_info:
                             for pod in ret_list.items:
-                                pod_creation_timestamp = pod.metadata.creation_timestamp
+                                pod_creation_timestamp = (
+                                    pod.metadata.creation_timestamp
+                                )
                                 # list of pods will only show running pods
+                                # in this case the pods to wait have been
+                                # respawn with the same name
                                 if start_time < pod_creation_timestamp:
-                                    # in this case the pods to wait have been respawn
-                                    # with the same name
                                     missing_pods.add(pod)
                 pods_to_wait.update(missing_pods)
 
