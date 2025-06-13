@@ -529,7 +529,10 @@ class KrknKubernetes:
         return managedclusters
 
     def list_pods(
-        self, namespace: str, label_selector: str = None
+        self,
+        namespace: str,
+        label_selector: str = None,
+        field_selector: str = None,
     ) -> list[str]:
         """
         List pods in the given namespace
@@ -537,11 +540,15 @@ class KrknKubernetes:
         :param namespace: namespace to search for pods
         :param label_selector: filter by label selector
             (optional default `None`)
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :return: a list of pod names
         """
         pods = []
         try:
-            ret = self.get_all_pod_info(namespace, label_selector)
+            ret = self.get_all_pod_info(
+                namespace, label_selector, field_selector
+            )
         except ApiException as e:
             logging.error(
                 "Exception when calling list_pods: %s\n",
@@ -734,12 +741,16 @@ class KrknKubernetes:
                 logging.error("Failed to get deployment data %s", str(e))
                 raise e
 
-    def get_all_pods(self, label_selector: str = None) -> list[[str, str]]:
+    def get_all_pods(
+        self, label_selector: str = None, field_selector: str = None
+    ) -> list[[str, str]]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
 
         :param label_selector: filter by label_selector
             (optional default `None`)
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :return: list of tuples pod,namespace
         """
         pods = []
@@ -749,12 +760,14 @@ class KrknKubernetes:
                 pretty=True,
                 label_selector=label_selector,
                 limit=self.request_chunk_size,
+                field_selector=field_selector,
             )
         else:
             ret = self.list_continue_helper(
                 self.cli.list_pod_for_all_namespaces,
                 pretty=True,
                 limit=self.request_chunk_size,
+                field_selector=field_selector,
             )
         for ret_list in ret:
             for pod in ret_list.items:
@@ -854,11 +867,15 @@ class KrknKubernetes:
         self,
         namespace: str = "default",
         label_selector: str = None,
+        field_selector: str = None,
     ) -> list[str]:
         """
         Get details of all pods in a namespace
 
         :param namespace: namespace (optional default `default`)
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
+
         :return list of pod details
         """
         try:
@@ -869,12 +886,14 @@ class KrknKubernetes:
                     pretty=True,
                     label_selector=label_selector,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector,
                 )
             else:
                 ret = self.list_continue_helper(
                     self.cli.list_namespaced_pod,
                     namespace,
                     limit=self.request_chunk_size,
+                    field_selector=field_selector,
                 )
         except ApiException as e:
             logging.error(
@@ -1503,63 +1522,63 @@ class KrknKubernetes:
             kubectl command in the given format if the pod exists.
             Returns None if the pod doesn't exist
         """
-
-        pod_exists = self.check_if_pod_exists(name=name, namespace=namespace)
-        if pod_exists:
+        try:
             response = self.cli.read_namespaced_pod(
                 name=name, namespace=namespace, pretty="true"
             )
-            container_list = []
+            if response:
+                container_list = []
 
-            # Create a list of containers present in the pod
-            for container in response.spec.containers:
-                volume_mount_list = []
-                for volume_mount in container.volume_mounts:
-                    volume_mount_list.append(
-                        VolumeMount(
-                            name=volume_mount.name,
-                            mountPath=volume_mount.mount_path,
+                # Create a list of containers present in the pod
+                for container in response.spec.containers:
+                    volume_mount_list = []
+                    for volume_mount in container.volume_mounts:
+                        volume_mount_list.append(
+                            VolumeMount(
+                                name=volume_mount.name,
+                                mountPath=volume_mount.mount_path,
+                            )
+                        )
+                    container_list.append(
+                        Container(
+                            name=container.name,
+                            image=container.image,
+                            volumeMounts=volume_mount_list,
                         )
                     )
-                container_list.append(
-                    Container(
-                        name=container.name,
-                        image=container.image,
-                        volumeMounts=volume_mount_list,
+
+                for i, container in enumerate(response.status.container_statuses):
+                    container_list[i].ready = container.ready
+
+                # Create a list of volumes associated with the pod
+                volume_list = []
+                for volume in response.spec.volumes:
+                    volume_name = volume.name
+                    pvc_name = (
+                        volume.persistent_volume_claim.claim_name
+                        if volume.persistent_volume_claim is not None
+                        else None
                     )
+                    volume_list.append(Volume(name=volume_name, pvcName=pvc_name))
+
+                # Create the Pod data class object
+                pod_info = Pod(
+                    name=response.metadata.name,
+                    podIP=response.status.pod_ip,
+                    namespace=response.metadata.namespace,
+                    containers=container_list,
+                    nodeName=response.spec.node_name,
+                    volumes=volume_list,
+                    status=response.status.phase,
+                    creation_timestamp=response.metadata.creation_timestamp,
                 )
-
-            for i, container in enumerate(response.status.container_statuses):
-                container_list[i].ready = container.ready
-
-            # Create a list of volumes associated with the pod
-            volume_list = []
-            for volume in response.spec.volumes:
-                volume_name = volume.name
-                pvc_name = (
-                    volume.persistent_volume_claim.claim_name
-                    if volume.persistent_volume_claim is not None
-                    else None
-                )
-                volume_list.append(Volume(name=volume_name, pvcName=pvc_name))
-
-            # Create the Pod data class object
-            pod_info = Pod(
-                name=response.metadata.name,
-                podIP=response.status.pod_ip,
-                namespace=response.metadata.namespace,
-                containers=container_list,
-                nodeName=response.spec.node_name,
-                volumes=volume_list,
-                status=response.status.phase,
-                creation_timestamp=response.metadata.creation_timestamp,
-            )
-            return pod_info
-        else:
+        except Exception:
             logging.error(
                 "Pod '%s' doesn't exist in namespace '%s'", name, namespace
             )
             return None
+        return pod_info
+
 
     def check_if_namespace_exists(self, name: str) -> bool:
         """
@@ -2063,8 +2082,6 @@ class KrknKubernetes:
                 return None
         except Exception:
             raise Exception("failed to get node ip address")
-
-
 
     def get_nodes_infos(self) -> (list[NodeInfo], list[Taint]):
         """
@@ -2614,24 +2631,21 @@ class KrknKubernetes:
             )
             return None
 
-    def select_pods_by_label(self, label_selector: str) -> list[(str, str)]:
+    def select_pods_by_label(
+        self, label_selector: str, field_selector: str = None
+    ) -> list[(str, str)]:
         """
         Selects the pods identified by a label_selector
 
         :param label_selector: a label selector string
             in the format "key=value"
-        :param max_timeout: the maximum time in seconds
-            to wait before considering the pod "not recovered" after the Chaos
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :return: a list of pod_name and namespace tuples
         """
-        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = self.get_all_pods(label_selector, field_selector)
         pods_and_namespaces = [(pod[0], pod[1]) for pod in pods_and_namespaces]
-        # select only running pods
-        pods_and_namespaces = [
-            pod
-            for pod in pods_and_namespaces
-            if not self.is_pod_terminating(pod[0], pod[1])
-        ]
+
         return pods_and_namespaces
 
     def select_service_by_label(
@@ -2663,7 +2677,10 @@ class KrknKubernetes:
         return selected_services
 
     def select_pods_by_name_pattern_and_namespace_pattern(
-        self, pod_name_pattern: str, namespace_pattern: str
+        self,
+        pod_name_pattern: str,
+        namespace_pattern: str,
+        field_selector: str = None,
     ) -> list[(str, str)]:
         """
         Selects the pods identified by a namespace_pattern
@@ -2673,6 +2690,8 @@ class KrknKubernetes:
         :param namespace_pattern: a namespace pattern to match
         :param max_timeout: the maximum time in seconds to wait
             before considering the pod "not recovered" after the Chaos
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :return: a list of pod_name and namespace tuples
         """
         namespace_re = re.compile(namespace_pattern)
@@ -2681,20 +2700,18 @@ class KrknKubernetes:
         pods_and_namespaces = []
         for namespace in namespaces:
             if namespace_re.match(namespace):
-                pods = self.list_pods(namespace)
+                pods = self.list_pods(namespace, field_selector=field_selector)
                 for pod in pods:
                     if podname_re.match(pod):
                         pods_and_namespaces.append((pod, namespace))
-        # select only running pods
-        pods_and_namespaces = [
-            (pod[0], pod[1])
-            for pod in pods_and_namespaces
-            if not self.is_pod_terminating(pod[0], pod[1])
-        ]
+
         return pods_and_namespaces
 
     def select_pods_by_namespace_pattern_and_label(
-        self, namespace_pattern: str, label_selector: str
+        self,
+        namespace_pattern: str,
+        label_selector: str,
+        field_selector: str = None,
     ) -> list[(str, str)]:
         """
         Selects the pods identified by a label_selector
@@ -2703,29 +2720,22 @@ class KrknKubernetes:
         :param namespace_pattern: a namespace pattern to match
         :param label_selector: a label selector string
             in the format "key=value"
-        :param max_timeout: the maximum time in seconds
-            to wait before considering the pod "not recovered" after the Chaos
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :return: a list of pod_name and namespace tuples
         """
         namespace_re = re.compile(namespace_pattern)
-        pods_and_namespaces = self.get_all_pods(label_selector)
+        pods_and_namespaces = self.get_all_pods(label_selector, field_selector)
         pods_and_namespaces = [
-            pod for pod in pods_and_namespaces if namespace_re.match(pod[1])
+            (pod[0], pod[1]) for pod in pods_and_namespaces if namespace_re.match(pod[1])
         ]
-
-        # select only running pods
-        pods_and_namespaces = [
-            (pod[0], pod[1])
-            for pod in pods_and_namespaces
-            if not self.is_pod_terminating(pod[0], pod[1])
-        ]
-
         return pods_and_namespaces
 
     def monitor_pods_by_label(
         self,
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout: int = 30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2743,6 +2753,8 @@ class KrknKubernetes:
         :param pods_and_namespaces: the list of pods collected
             by `select_pods_by_label` against which the changes
             in the pods state is monitored
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :param max_timeout: the expected time the pods should take
             to recover. If the killed pods are replaced in this time frame,
             but they didn't reach the Ready State, they will be marked as
@@ -2764,6 +2776,7 @@ class KrknKubernetes:
             max_timeout=max_timeout,
             pods_status=pods_status,
             label_selector=label_selector,
+            field_selector=field_selector,
             event=event,
         )
 
@@ -2772,6 +2785,7 @@ class KrknKubernetes:
         pod_name_pattern: str,
         namespace_pattern: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout=30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2795,6 +2809,8 @@ class KrknKubernetes:
         :param pods_and_namespaces: the list of pods collected by
             `select_pods_by_name_pattern_and_namespace_pattern` against
             which the changes in the pods state is monitored
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :param max_timeout: the expected time the pods should take to
             recover. If the killed pods are replaced in this time frame,
             but they didn't reach the Ready State, they will be marked as
@@ -2815,6 +2831,7 @@ class KrknKubernetes:
             pods_and_namespaces=pods_and_namespaces,
             max_timeout=max_timeout,
             pods_status=pods_status,
+            field_selector=field_selector,
             name_pattern=pod_name_pattern,
             namespace_pattern=namespace_pattern,
             event=event,
@@ -2825,6 +2842,7 @@ class KrknKubernetes:
         namespace_pattern: str,
         label_selector: str,
         pods_and_namespaces: list[(str, str)],
+        field_selector: str = None,
         max_timeout=30,
         event: threading.Event = None,
     ) -> PodsMonitorThread:
@@ -2847,6 +2865,8 @@ class KrknKubernetes:
         :param pods_and_namespaces: the list of pods collected by
             `select_pods_by_name_pattern_and_namespace_pattern` against
             which the changes in the pods state is monitored
+        :param field_selector: filter results by config details
+            select only running pods by setting "status.phase=Running"
         :param max_timeout: the expected time the pods should take to recover.
             If the killed pods are replaced in this time frame, but they
             didn't reach the Ready State, they will be marked as unrecovered.
@@ -2868,6 +2888,7 @@ class KrknKubernetes:
             max_timeout=max_timeout,
             pods_status=pods_status,
             label_selector=label_selector,
+            field_selector=field_selector,
             namespace_pattern=namespace_pattern,
             event=event,
         )
@@ -2878,6 +2899,7 @@ class KrknKubernetes:
         pods_status: PodsStatus,
         max_timeout: int,
         label_selector: str = None,
+        field_selector: str = None,
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
@@ -2890,6 +2912,7 @@ class KrknKubernetes:
             pods_status=pods_status,
             max_timeout=max_timeout,
             label_selector=label_selector,
+            field_selector=field_selector,
             pod_name=pod_name,
             namespace_pattern=namespace_pattern,
             name_pattern=name_pattern,
@@ -2904,6 +2927,7 @@ class KrknKubernetes:
         pods_status: PodsStatus,
         max_timeout: int,
         label_selector: str = None,
+        field_selector: str = None,
         pod_name: str = None,
         namespace_pattern: str = None,
         name_pattern: str = None,
@@ -2923,6 +2947,7 @@ class KrknKubernetes:
             select_method = partial(
                 self.select_pods_by_label,
                 label_selector=label_selector,
+                field_selector=field_selector,
             )
         elif (
             name_pattern
@@ -2934,6 +2959,7 @@ class KrknKubernetes:
                 self.select_pods_by_name_pattern_and_namespace_pattern,
                 pod_name_pattern=name_pattern,
                 namespace_pattern=namespace_pattern,
+                field_selector=field_selector,
             )
         elif (
             namespace_pattern
@@ -2945,6 +2971,7 @@ class KrknKubernetes:
                 self.select_pods_by_namespace_pattern_and_label,
                 namespace_pattern=namespace_pattern,
                 label_selector=label_selector,
+                field_selector=field_selector,
             )
         else:
             pods_status.error = (
@@ -2961,25 +2988,19 @@ class KrknKubernetes:
             time_offset = time.time() - start_time
             remaining_time = max_timeout - time_offset
             current_pods_and_namespaces = select_method()
-
             # no pods have been killed or pods have been killed and
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
+                    
                     pod_info = self.get_pod_info(pod[0], pod[1])
-                    if pod_info is not None:
+                    # for pod_info in pod_list_info: 
+                    if pod_info:
                         pod_creation_timestamp = (
                             pod_info.creation_timestamp.timestamp()
                         )
-                    else:
-                        continue
-                    if (
-                        pod_info.status
-                        and start_time < pod_creation_timestamp
-                    ):
-                        # in this case the pods to wait have been respawn
-                        # with the same name
-                        missing_pods.add(pod)
+                        if start_time < pod_creation_timestamp:
+                            missing_pods.add(pod)
                 pods_to_wait.update(missing_pods)
 
             # pods have been killed but respawned with different names
@@ -3009,9 +3030,7 @@ class KrknKubernetes:
             # inject the chaos, let's see the next iteration.
             if len(pods_to_wait) == 0:
                 continue
-
             futures = []
-
             with ThreadPoolExecutor() as executor:
                 for pod_and_namespace in pods_to_wait:
                     if pod_and_namespace not in pods_already_watching:
@@ -3035,20 +3054,22 @@ class KrknKubernetes:
                     # sum the time elapsed waiting before the pod
                     # has been rescheduled (rescheduling time)
                     # to the effective recovery time of the pod
-                    result.pod_rescheduling_time = (
-                        time.time() - start_time - result.pod_readiness_time
-                    )
-                    result.total_recovery_time = (
-                        result.pod_readiness_time
-                        + result.pod_rescheduling_time
-                    )
+                    if result.pod_readiness_time: 
+                        result.pod_rescheduling_time = (
+                            time.time() - start_time - result.pod_readiness_time
+                        )
+                        result.total_recovery_time = (
+                            result.pod_readiness_time
+                            + result.pod_rescheduling_time
+                        )
 
-                    pods_status.recovered.append(result)
+                        pods_status.recovered.append(result)
                 for future in undone:
                     result = future.result()
                     pods_status.unrecovered.append(result)
 
                 missing_pods.clear()
+    
         # if there are missing pods, pods affected
         # by the chaos did not restart after the chaos
         # an exception will be set in the PodsStatus

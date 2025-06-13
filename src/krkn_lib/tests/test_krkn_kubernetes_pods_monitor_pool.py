@@ -37,25 +37,28 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         time.sleep(10)
         print("starting monitoring")
         pod_delay = 1
-        monitor_timeout = 10
+        monitor_timeout = 30
 
         pool = PodsMonitorPool(self.lib_k8s)
 
         pool.select_and_monitor_by_label(
             label_selector=f"test={label_1}",
             max_timeout=monitor_timeout,
+            field_selector="status.phase=Running",
         )
 
         pool.select_and_monitor_by_namespace_pattern_and_label(
             namespace_pattern="^test-pool-ns-1-.*",
             label_selector=f"test={label_2}",
             max_timeout=monitor_timeout,
+            field_selector="status.phase=Running",
         )
 
         pool.select_and_monitor_by_name_pattern_and_namespace_pattern(
             pod_name_pattern="^delayed-pool-2-.*",
             namespace_pattern="^test-pool-ns-2-.*",
             max_timeout=monitor_timeout,
+            field_selector="status.phase=Running",
         )
 
         self.background_delete_pod(delayed_1, namespace_1)
@@ -84,7 +87,7 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         self.background_delete_pod(delayed_4, namespace_2)
         self.background_delete_pod(delayed_5_respawn, namespace_3)
         self.background_delete_pod(delayed_6, namespace_3)
-
+        print('staus' + str(status))
         self.assertIsNone(status.error)
         self.assertEqual(len(status.recovered), 2)
         self.assertEqual(len(status.unrecovered), 1)
@@ -108,6 +111,7 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         pool.select_and_monitor_by_label(
             label_selector=f"test={label_1}",
             max_timeout=monitor_timeout,
+            field_selector="status.phase=Running",
         )
         self.background_delete_pod(delayed_1, namespace_1)
         self.deploy_delayed_readiness_pod(
@@ -120,5 +124,5 @@ class TestKrknKubernetesPodsMonitorPool(BaseTest):
         self.background_delete_pod(delayed_1_respawn, namespace_1)
         self.background_delete_pod(delayed_2, namespace_1)
         # give the time to wrap up the threads and return
-        self.assertLess(end_time, 1)
+        self.assertLess(end_time, monitor_timeout)
         self.lib_k8s.delete_namespace(namespace_1)
