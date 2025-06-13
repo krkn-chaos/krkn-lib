@@ -13,14 +13,14 @@ from kubernetes.client import ApiException
 
 
 class KrknKubernetesTestsGet(BaseTest):
-    def notest_get_version(self):
+    def test_get_version(self):
         try:
             response = self.lib_k8s.get_version()
             self.assertGreater(float(response), 0)
         except Exception as e:
             self.fail(f"exception on getting kubectl version execution: {e}")
 
-    def notest_get_kubeconfig_path(self):
+    def test_get_kubeconfig_path(self):
         kubeconfig_path = config.KUBE_CONFIG_DEFAULT_LOCATION
         if "~" in kubeconfig_path:
             kubeconfig_path = os.path.expanduser(kubeconfig_path)
@@ -31,7 +31,7 @@ class KrknKubernetesTestsGet(BaseTest):
             krknkubernetes_path.get_kubeconfig_path(), kubeconfig_path
         )
 
-    def notest_get_namespace_status(self):
+    def test_get_namespace_status(self):
         # happy path
         result = self.lib_k8s.get_namespace_status("default")
         self.assertEqual("Active", result)
@@ -68,7 +68,7 @@ class KrknKubernetesTestsGet(BaseTest):
         
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 
-    def notest_get_pod_log(self):
+    def test_get_pod_log(self):
         namespace = "test-pl-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
@@ -86,7 +86,7 @@ class KrknKubernetesTestsGet(BaseTest):
         finally:
             self.pod_delete_queue.put([name, namespace])
 
-    def notest_get_containers_in_pod(self):
+    def test_get_containers_in_pod(self):
         namespace = "test-cip-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
@@ -106,7 +106,7 @@ class KrknKubernetesTestsGet(BaseTest):
         finally:
             self.pod_delete_queue.put([name, namespace])
 
-    def notest_get_job_status(self):
+    def test_get_job_status(self):
         namespace = "test-js-" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
@@ -131,7 +131,7 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertTrue(status.metadata.name == name)
         self.lib_k8s.delete_namespace(namespace)
 
-    def notest_get_pod_info(self):
+    def test_get_pod_info(self):
         try:
             namespace = "test-ns-" + self.get_random_string(10)
             name = "test-name-" + self.get_random_string(10)
@@ -150,7 +150,7 @@ class KrknKubernetesTestsGet(BaseTest):
         finally:
             self.pod_delete_queue.put([name, namespace])
 
-    def notest_get_pvc_info(self):
+    def test_get_pvc_info(self):
         try:
             namespace = "test-ns-" + self.get_random_string(10)
             storage_class = "sc-" + self.get_random_string(10)
@@ -175,7 +175,7 @@ class KrknKubernetesTestsGet(BaseTest):
             self.assertTrue(False)
         self.lib_k8s.delete_namespace(namespace)
 
-    def notest_get_node_resource_version(self):
+    def test_get_node_resource_version(self):
         try:
             nodes = self.lib_k8s.list_nodes()
             random_node_index = random.randint(0, len(nodes) - 1)
@@ -187,7 +187,7 @@ class KrknKubernetesTestsGet(BaseTest):
             logging.error("test raised exception {0}".format(str(e)))
             self.assertTrue(False)
 
-    def notest_get_all_kubernetes_object_count(self):
+    def test_get_all_kubernetes_object_count(self):
         objs = self.lib_k8s.get_all_kubernetes_object_count(
             ["Namespace", "Ingress", "ConfigMap", "Unknown"]
         )
@@ -196,7 +196,7 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertTrue("ConfigMap" in objs.keys())
         self.assertFalse("Unknown" in objs.keys())
 
-    def notest_get_kubernetes_core_objects_count(self):
+    def test_get_kubernetes_core_objects_count(self):
         objs = self.lib_k8s.get_kubernetes_core_objects_count(
             "v1",
             [
@@ -209,7 +209,7 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertTrue("ConfigMap" in objs.keys())
         self.assertFalse("Ingress" in objs.keys())
 
-    def notest_get_kubernetes_custom_objects_count(self):
+    def test_get_kubernetes_custom_objects_count(self):
         objs = self.lib_k8s.get_kubernetes_custom_objects_count(
             ["Namespace", "Ingress", "ConfigMap", "Unknown"]
         )
@@ -217,7 +217,7 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertFalse("ConfigMap" in objs.keys())
         self.assertTrue("Ingress" in objs.keys())
 
-    def notest_get_nodes_infos(self):
+    def test_get_nodes_infos(self):
         telemetry = ChaosRunTelemetry()
         nodes, _ = self.lib_k8s.get_nodes_infos()
         for node in nodes:
@@ -234,7 +234,7 @@ class KrknKubernetesTestsGet(BaseTest):
         except Exception:
             self.fail("failed to deserialize NodeInfo")
 
-    def notest_get_node_cpu_count(self):
+    def test_get_node_cpu_count(self):
         nodes = self.lib_k8s.list_nodes()
         node_cpus = self.lib_k8s.get_node_cpu_count(nodes[0])
         self.assertGreater(node_cpus, 0)
@@ -242,14 +242,14 @@ class KrknKubernetesTestsGet(BaseTest):
         node_cpus = self.lib_k8s.get_node_cpu_count("does_not_exist")
         self.assertEqual(node_cpus, 0)
 
-    def notest_get_node_resources_infos(self):
+    def test_get_node_resources_infos(self):
         nodes = self.lib_k8s.list_nodes()
         infos = self.lib_k8s.get_node_resources_info(nodes[0])
         self.assertGreater(infos.disk_space, 0)
         self.assertGreater(infos.memory, 0)
         self.assertGreater(infos.cpu, 0)
 
-    def notest_get_node_ip(self):
+    def test_get_node_ip(self):
         nodes = self.lib_k8s.list_nodes()
         ip_address = self.lib_k8s.get_node_ip(nodes[0])
         self.assertIsNotNone(ip_address)
