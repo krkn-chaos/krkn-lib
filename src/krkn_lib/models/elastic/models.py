@@ -10,7 +10,6 @@ from elasticsearch_dsl import (
     Keyword,
     Nested,
     Text,
-    Boolean
 )
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
@@ -106,13 +105,15 @@ class ElasticTaint(InnerDoc):
     value = Text()
     effect = Text()
 
+
 class ElasticHealthChecks(InnerDoc):
     url = Text()
-    status= Boolean()
-    status_code= Text()
-    start_timestamp= Date()
-    end_timestamp= Date()
-    duration= Float()
+    status = Boolean()
+    status_code = Text()
+    start_timestamp = Date()
+    end_timestamp = Date()
+    duration = Float()
+
 
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
@@ -210,9 +211,13 @@ class ElasticChaosRunTelemetry(Document):
                     url=info.url,
                     status=info.status,
                     status_code=info.status_code,
-                    start_timestamp=datetime.datetime.fromisoformat(str(info.start_timestamp)),
-                    end_timestamp=datetime.datetime.fromisoformat(str(info.end_timestamp)),
-                    duration=info.duration
+                    start_timestamp=datetime.datetime.fromisoformat(
+                        str(info.start_timestamp)
+                    ),
+                    end_timestamp=datetime.datetime.fromisoformat(
+                        str(info.end_timestamp)
+                    ),
+                    duration=info.duration,
                 )
                 for info in chaos_run_telemetry.health_checks
             ]
