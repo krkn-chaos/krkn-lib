@@ -77,6 +77,10 @@ class Container:
     """
     Container Ready status
     """
+    containerId: str = ""
+    """
+    Container Id
+    """
 
 
 @dataclass(frozen=True, order=False)
