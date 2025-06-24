@@ -1529,15 +1529,15 @@ class KrknKubernetes:
             if response:
                 container_list = []
 
-                # Create a list of containers present in the pod
-                for container in response.spec.containers:
-                    volume_mount_list = []
-                    for volume_mount in container.volume_mounts:
-                        volume_mount_list.append(
-                            VolumeMount(
-                                name=volume_mount.name,
-                                mountPath=volume_mount.mount_path,
-                            )
+            # Create a list of containers present in the pod
+            i = 0
+            for container in response.spec.containers:
+                volume_mount_list = []
+                for volume_mount in container.volume_mounts:
+                    volume_mount_list.append(
+                        VolumeMount(
+                            name=volume_mount.name,
+                            mountPath=volume_mount.mount_path,
                         )
                     container_list.append(
                         Container(
@@ -1546,20 +1546,17 @@ class KrknKubernetes:
                             volumeMounts=volume_mount_list,
                         )
                     )
-
-                for i, container in enumerate(response.status.container_statuses):
-                    container_list[i].ready = container.ready
-
-                # Create a list of volumes associated with the pod
-                volume_list = []
-                for volume in response.spec.volumes:
-                    volume_name = volume.name
-                    pvc_name = (
-                        volume.persistent_volume_claim.claim_name
-                        if volume.persistent_volume_claim is not None
-                        else None
+                container_list.append(
+                    Container(
+                        name=container.name,
+                        image=container.image,
+                        volumeMounts=volume_mount_list,
+                        containerId=response.status.container_statuses[
+                            i
+                        ].container_id,
                     )
-                    volume_list.append(Volume(name=volume_name, pvcName=pvc_name))
+                )
+                i += 1
 
                 # Create the Pod data class object
                 pod_info = Pod(
@@ -3409,3 +3406,69 @@ class KrknKubernetes:
         resources.memory = json_obj["node"]["memory"]["availableBytes"]
         resources.disk_space = json_obj["node"]["fs"]["availableBytes"]
         return resources
+
+    def get_container_ids(self, pod_name: str, namespace: str) -> list[str]:
+        """
+        Gets the container ids of the selected pod
+        :param pod_name: name of the pod
+        :param namespace: namespace of the pod
+
+        :return: a list of container id
+        """
+
+        container_ids: list[str] = []
+
+        pod = self.get_pod_info(pod_name, namespace)
+        if pod:
+            for container in pod.containers:
+                container_ids.append(
+                    re.sub(r".*://", "", container.containerId)
+                )
+        return container_ids
+
+    def get_pod_pid(
+        self,
+        base_pod_name: str,
+        base_pod_namespace: str,
+        base_pod_container_name: str,
+        pod_name: str,
+        pod_namespace: str,
+        pod_container_id: str,
+    ) -> str:
+        """
+        Retrieves the Node PID of the container. The command must be executed inside a privileged Pod with
+        `hostPID` set to true
+
+        :param base_pod_name: name of the pod where the command is run
+        :param base_pod_namespace: namespace of the pod where the command is run
+        :param base_pod_container_name: container name of the pod where the command is run
+        :param pod_name: Pod name associated with the PID
+        :param pod_namespace: namespace of the Pod associated with the PID
+        :param pod_container_id: container id of Pod associated with the PID
+
+        :return: The pid if found else None.
+        """
+
+        if not self.check_if_pod_exists(base_pod_name, base_pod_namespace):
+            raise Exception(
+                f"base pod {base_pod_name} does not exist in namespace {base_pod_namespace}"
+            )
+        if not self.check_if_pod_exists(pod_name, pod_namespace):
+            raise Exception(
+                f"target pod {pod_name} does not exist in namespace {pod_namespace}"
+            )
+
+        cmd = (
+            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && echo ${dir/\/proc\//} && break ; done"
+            % pod_container_id
+        )
+
+        pid = self.exec_cmd_in_pod(
+            [cmd],
+            base_pod_name,
+            base_pod_namespace,
+            base_pod_container_name,
+        )
+        if pid:
+            return pid
+        return None
