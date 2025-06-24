@@ -117,22 +117,19 @@ class KrknElastic:
         time_start = time.time()
         try:
             for metric in raw_data:
-                    result = self.push_metric(
-                        ElasticMetric(
-                            run_uuid=run_uuid,
-                            **metric
-                        ),
-                        index,
+                result = self.push_metric(
+                    ElasticMetric(run_uuid=run_uuid, **metric),
+                    index,
+                )
+                if result == -1:
+                    self.safe_logger.error(
+                        f"failed to save metric "
+                        f"to elasticsearch : {metric}"
                     )
-                    if result == -1:
-                        self.safe_logger.error(
-                            f"failed to save metric "
-                            f"to elasticsearch : {metric}"
-                        )
 
             return int(time.time() - time_start)
         except Exception as e:
-            self.safe_logger.error(f'Upload metric exception: {e}')
+            self.safe_logger.error(f"Upload metric exception: {e}")
             return -1
 
     def push_alert(self, alert: ElasticAlert, index: str) -> int:
@@ -170,10 +167,9 @@ class KrknElastic:
             metric.save(using=self.es, index=index)
             return int(time.time() - time_start)
         except Exception as e:
-            print('error' +str(e))
-            self.safe_logger.error(f'Exception pushing metric: {e}')
+            print("error" + str(e))
+            self.safe_logger.error(f"Exception pushing metric: {e}")
             return -1
-
 
     def push_telemetry(self, telemetry: ChaosRunTelemetry, index: str):
         if not index:

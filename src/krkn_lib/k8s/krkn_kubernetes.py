@@ -3436,12 +3436,14 @@ class KrknKubernetes:
         pod_container_id: str,
     ) -> str:
         """
-        Retrieves the Node PID of the container. The command must be executed inside a privileged Pod with
-        `hostPID` set to true
+        Retrieves the Node PID of the container. The command must be
+        executed inside a privileged Pod with `hostPID` set to true
 
         :param base_pod_name: name of the pod where the command is run
-        :param base_pod_namespace: namespace of the pod where the command is run
-        :param base_pod_container_name: container name of the pod where the command is run
+        :param base_pod_namespace: namespace of the pod
+            where the command is run
+        :param base_pod_container_name: container name of the pod
+            where the command is run
         :param pod_name: Pod name associated with the PID
         :param pod_namespace: namespace of the Pod associated with the PID
         :param pod_container_id: container id of Pod associated with the PID
@@ -3451,16 +3453,18 @@ class KrknKubernetes:
 
         if not self.check_if_pod_exists(base_pod_name, base_pod_namespace):
             raise Exception(
-                f"base pod {base_pod_name} does not exist in namespace {base_pod_namespace}"
+                f"base pod {base_pod_name} does not exist in "
+                f"namespace {base_pod_namespace}"
             )
         if not self.check_if_pod_exists(pod_name, pod_namespace):
             raise Exception(
-                f"target pod {pod_name} does not exist in namespace {pod_namespace}"
+                f"target pod {pod_name} does not exist in "
+                f"namespace {pod_namespace}"
             )
 
         cmd = (
-            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && echo ${dir/\/proc\//} && break ; done"
-            % pod_container_id
+            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && "
+            "echo ${dir/\/proc\//} && break ; done" % pod_container_id  # noqa
         )
 
         pid = self.exec_cmd_in_pod(

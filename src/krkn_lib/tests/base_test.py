@@ -568,7 +568,7 @@ class BaseTest(unittest.TestCase):
                     "status_code": "200",
                     "start_timestamp": "2025-03-12T14:57:54.706000",
                     "end_timestamp": "2025-03-12T15:02:13.819742",
-                    "duration": 259.113742
+                    "duration": 259.113742,
                 }
             ],
             "total_node_count": 3,
@@ -577,7 +577,6 @@ class BaseTest(unittest.TestCase):
             "run_uuid": run_uuid,
             "cluster_version": "4.18.0-0.nightly-202491014",
             "major_verison": "4.18",
-            "job_status":True
-
+            "job_status": True,
         }
         return example_data
