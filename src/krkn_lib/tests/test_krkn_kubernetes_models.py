@@ -84,7 +84,16 @@ class TestKrknKubernetesModels(BaseTest):
         self.assertEqual(config.namespace, "testnamespace")
         self.assertEqual(config.memory_vm_bytes, "99%")
         self.assertEqual(config.node_selector, "test-selector")
-        self.assertEqual(config.tolerations, [{'key': 'example-key', 'operator': 'Exists', 'effect': 'NoSchedule'}])
+        self.assertEqual(
+            config.tolerations,
+            [
+                {
+                    "key": "example-key",
+                    "operator": "Exists",
+                    "effect": "NoSchedule",
+                }
+            ],
+        )
         io_config_volume = {
             "name": "test-volume",
             "hostPath": {"path": "/test-path"},

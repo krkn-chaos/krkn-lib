@@ -50,7 +50,7 @@ class TestKrknElastic(BaseTest):
             run_uuid=run_uuid,
             metricName="metric_1",
             timestamp=timestamp,
-            value=1.0
+            value=1.0,
         )
         result = self.lib_elastic.push_metric(metric_1, index)
         self.assertNotEqual(result, -1)
@@ -60,7 +60,9 @@ class TestKrknElastic(BaseTest):
         metric = metrics[0]
 
         self.assertIsNotNone(metric)
-        self.assertEqual(metric.timestamp, timestamp.strftime('%Y-%m-%dT%H:%M:%S.%f'))
+        self.assertEqual(
+            metric.timestamp, timestamp.strftime("%Y-%m-%dT%H:%M:%S.%f")
+        )
         self.assertEqual(metric.run_uuid, run_uuid)
         self.assertEqual(metric["value"], 1.0)
 
@@ -108,7 +110,9 @@ class TestKrknElastic(BaseTest):
         metric = self.lib_elastic.search_metric(good_metric_uuid, index)
         self.assertEqual(len(metric), 1)
         self.assertEqual(metric[0].name, name)
-        self.assertEqual(metric[0].timestamp, time_now.strftime('%Y-%m-%dT%H:%M:%S.%f'))
+        self.assertEqual(
+            metric[0].timestamp, time_now.strftime("%Y-%m-%dT%H:%M:%S.%f")
+        )
         self.assertEqual(metric[0].value, 3.14)
 
     def test_search_alert_not_existing(self):
