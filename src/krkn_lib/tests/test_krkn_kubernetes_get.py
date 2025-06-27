@@ -261,7 +261,7 @@ class KrknKubernetesTestsGet(BaseTest):
         )
         self.assertTrue(len(container_ids) == 0)
 
-    def test_get_pod_pid(self):
+    def test_get_pod_pids(self):
         namespace = "test-cid-" + self.get_random_string(10)
         base_pod_name = "test-name-" + self.get_random_string(10)
         target_pod_name = "test-name-" + self.get_random_string(10)
@@ -276,7 +276,7 @@ class KrknKubernetesTestsGet(BaseTest):
         container_id = self.lib_k8s.get_container_ids(
             pod_name=target_pod_name, namespace=namespace
         )
-        pid = self.lib_k8s.get_pod_pid(
+        pids = self.lib_k8s.get_pod_pids(
             base_pod_name,
             namespace,
             base_pod_name,
@@ -285,10 +285,11 @@ class KrknKubernetesTestsGet(BaseTest):
             container_id[0],
         )
 
-        self.assertIsNotNone(pid)
-        self.assertTrue(len(pid) > 0)
+        self.assertIsNotNone(pids)
+        self.assertTrue(isinstance(pids, list))
+        self.assertTrue(len(pids) > 0)
 
-        pid = self.lib_k8s.get_pod_pid(
+        pids = self.lib_k8s.get_pod_pids(
             base_pod_name,
             namespace,
             base_pod_name,
@@ -296,10 +297,10 @@ class KrknKubernetesTestsGet(BaseTest):
             namespace,
             "does_not_exist",
         )
-        self.assertIsNone(pid)
+        self.assertIsNone(pids)
 
         with self.assertRaises(Exception):
-            _ = self.lib_k8s.get_pod_pid(
+            _ = self.lib_k8s.get_pod_pids(
                 "does_not_exist",
                 namespace,
                 base_pod_name,
@@ -309,7 +310,7 @@ class KrknKubernetesTestsGet(BaseTest):
             )
 
         with self.assertRaises(Exception):
-            _ = self.lib_k8s.get_pod_pid(
+            _ = self.lib_k8s.get_pod_pids(
                 base_pod_name,
                 namespace,
                 base_pod_name,
@@ -319,7 +320,7 @@ class KrknKubernetesTestsGet(BaseTest):
             )
 
         with self.assertRaises(Exception):
-            _ = self.lib_k8s.get_pod_pid(
+            _ = self.lib_k8s.get_pod_pids(
                 base_pod_name,
                 namespace,
                 "does_not_exist",
