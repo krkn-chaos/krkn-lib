@@ -3434,7 +3434,7 @@ class KrknKubernetes:
         pod_name: str,
         pod_namespace: str,
         pod_container_id: str,
-    ) -> list[str] | None:
+    ) -> Optional[list[str]]:
         """
         Retrieves the PIDs assigned to the pod in the node. The command
         must be executed inside a privileged Pod with `hostPID` set to true
