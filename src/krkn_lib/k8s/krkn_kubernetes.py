@@ -3426,7 +3426,7 @@ class KrknKubernetes:
                 )
         return container_ids
 
-    def get_pod_pid(
+    def get_pod_pids(
         self,
         base_pod_name: str,
         base_pod_namespace: str,
@@ -3434,10 +3434,10 @@ class KrknKubernetes:
         pod_name: str,
         pod_namespace: str,
         pod_container_id: str,
-    ) -> str:
+    ) -> list[str] | None:
         """
-        Retrieves the Node PID of the container. The command must be
-        executed inside a privileged Pod with `hostPID` set to true
+        Retrieves the PIDs assigned to the pod in the node. The command
+        must be executed inside a privileged Pod with `hostPID` set to true
 
         :param base_pod_name: name of the pod where the command is run
         :param base_pod_namespace: namespace of the pod
@@ -3448,7 +3448,7 @@ class KrknKubernetes:
         :param pod_namespace: namespace of the Pod associated with the PID
         :param pod_container_id: container id of Pod associated with the PID
 
-        :return: The pid if found else None.
+        :return: list of pids None.
         """
 
         if not self.check_if_pod_exists(base_pod_name, base_pod_namespace):
@@ -3464,15 +3464,17 @@ class KrknKubernetes:
 
         cmd = (
             "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && "
-            "echo ${dir/\/proc\//} && break ; done" % pod_container_id  # noqa
+            "echo ${dir/\/proc\//}; done" % pod_container_id  # noqa
         )
 
-        pid = self.exec_cmd_in_pod(
+        pids = self.exec_cmd_in_pod(
             [cmd],
             base_pod_name,
             base_pod_namespace,
             base_pod_container_name,
         )
-        if pid:
-            return pid
+        if pids:
+            pids_list = pids.split("\n")
+            pids_list = list(filter(None, pids_list))
+            return pids_list
         return None
