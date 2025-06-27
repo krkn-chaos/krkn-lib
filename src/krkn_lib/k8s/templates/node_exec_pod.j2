@@ -19,7 +19,12 @@ spec:
     - mountPath: /run/dbus/system_bus_socket
       name: dbus
       readOnly: true
+    - name: host
+      mountPath: /host      
   volumes:
   - name: dbus
     hostPath:
       path: /run/dbus/system_bus_socket
+  - name: host
+    hostPath:
+      path: /      
