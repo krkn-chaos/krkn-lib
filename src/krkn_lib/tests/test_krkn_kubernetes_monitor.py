@@ -217,7 +217,7 @@ class KrknKubernetesTestsCreate(BaseTest):
         logging.warn("test_pods_by_label_multiple_respawn_one_too_late")
         logging.warn("FLAKY TESTS NEED TO BE REFACTORED AND REENABLED")
 
-    ######## FLAKY TEST NEEDS TO BE REFACTORED
+    ######## FLAKY TEST NEEDS TO BE REFACTORED # NOQA
     # def test_pods_by_label_multiple_respawn(self):
     #     # test pod will never recover
     #     namespace = "test-ns-4-" + self.get_random_string(10)
@@ -272,7 +272,7 @@ class KrknKubernetesTestsCreate(BaseTest):
     #     )
     #     self.background_delete_ns(namespace)
 
-    ######## FLAKY TEST NEEDS TO BE REFACTORED
+    ######## FLAKY TEST NEEDS TO BE REFACTORED # NOQA
     # def test_pods_by_label_multiple_respawn_one_too_late(self):
     #     # test pod will never recover
     #     namespace = "test-ns-4-" + self.get_random_string(10)
