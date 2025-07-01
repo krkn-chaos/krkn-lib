@@ -1512,7 +1512,9 @@ class KrknKubernetes:
         except Exception as e:
             logging.error("Error trying to apply_yaml" + str(e))
 
-    def get_pod_info(self, name: str, namespace: str = "default") -> Pod:
+    def get_pod_info(
+        self, name: str, namespace: str = "default"
+    ) -> Optional[Pod]:
         """
         Retrieve information about a specific pod
 
@@ -1523,6 +1525,7 @@ class KrknKubernetes:
             Returns None if the pod doesn't exist
         """
         try:
+            pod_info = None
             response = self.cli.read_namespaced_pod(
                 name=name, namespace=namespace, pretty="true"
             )
@@ -1547,8 +1550,13 @@ class KrknKubernetes:
                         )
                     )
 
-                for i, container in enumerate(response.status.container_statuses):
+                for i, container in enumerate(
+                    response.status.container_statuses
+                ):
                     container_list[i].ready = container.ready
+                    container_list[i].containerId = (
+                        response.status.container_statuses[i].container_id
+                    )
 
                 # Create a list of volumes associated with the pod
                 volume_list = []
@@ -1559,7 +1567,9 @@ class KrknKubernetes:
                         if volume.persistent_volume_claim is not None
                         else None
                     )
-                    volume_list.append(Volume(name=volume_name, pvcName=pvc_name))
+                    volume_list.append(
+                        Volume(name=volume_name, pvcName=pvc_name)
+                    )
 
                 # Create the Pod data class object
                 pod_info = Pod(
@@ -1578,7 +1588,6 @@ class KrknKubernetes:
             )
             return None
         return pod_info
-
 
     def check_if_namespace_exists(self, name: str) -> bool:
         """
@@ -2727,7 +2736,9 @@ class KrknKubernetes:
         namespace_re = re.compile(namespace_pattern)
         pods_and_namespaces = self.get_all_pods(label_selector, field_selector)
         pods_and_namespaces = [
-            (pod[0], pod[1]) for pod in pods_and_namespaces if namespace_re.match(pod[1])
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if namespace_re.match(pod[1])
         ]
         return pods_and_namespaces
 
@@ -2992,9 +3003,9 @@ class KrknKubernetes:
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
-                    
+
                     pod_info = self.get_pod_info(pod[0], pod[1])
-                    # for pod_info in pod_list_info: 
+                    # for pod_info in pod_list_info:
                     if pod_info:
                         pod_creation_timestamp = (
                             pod_info.creation_timestamp.timestamp()
@@ -3054,9 +3065,11 @@ class KrknKubernetes:
                     # sum the time elapsed waiting before the pod
                     # has been rescheduled (rescheduling time)
                     # to the effective recovery time of the pod
-                    if result.pod_readiness_time: 
+                    if result.pod_readiness_time:
                         result.pod_rescheduling_time = (
-                            time.time() - start_time - result.pod_readiness_time
+                            time.time()
+                            - start_time
+                            - result.pod_readiness_time
                         )
                         result.total_recovery_time = (
                             result.pod_readiness_time
@@ -3069,7 +3082,7 @@ class KrknKubernetes:
                     pods_status.unrecovered.append(result)
 
                 missing_pods.clear()
-    
+
         # if there are missing pods, pods affected
         # by the chaos did not restart after the chaos
         # an exception will be set in the PodsStatus
@@ -3409,3 +3422,75 @@ class KrknKubernetes:
         resources.memory = json_obj["node"]["memory"]["availableBytes"]
         resources.disk_space = json_obj["node"]["fs"]["availableBytes"]
         return resources
+
+    def get_container_ids(self, pod_name: str, namespace: str) -> list[str]:
+        """
+        Gets the container ids of the selected pod
+        :param pod_name: name of the pod
+        :param namespace: namespace of the pod
+
+        :return: a list of container id
+        """
+
+        container_ids: list[str] = []
+
+        pod = self.get_pod_info(pod_name, namespace)
+        if pod:
+            for container in pod.containers:
+                container_ids.append(
+                    re.sub(r".*://", "", container.containerId)
+                )
+        return container_ids
+
+    def get_pod_pids(
+        self,
+        base_pod_name: str,
+        base_pod_namespace: str,
+        base_pod_container_name: str,
+        pod_name: str,
+        pod_namespace: str,
+        pod_container_id: str,
+    ) -> Optional[list[str]]:
+        """
+        Retrieves the PIDs assigned to the pod in the node. The command
+        must be executed inside a privileged Pod with `hostPID` set to true
+
+        :param base_pod_name: name of the pod where the command is run
+        :param base_pod_namespace: namespace of the pod
+            where the command is run
+        :param base_pod_container_name: container name of the pod
+            where the command is run
+        :param pod_name: Pod name associated with the PID
+        :param pod_namespace: namespace of the Pod associated with the PID
+        :param pod_container_id: container id of Pod associated with the PID
+
+        :return: list of pids None.
+        """
+
+        if not self.check_if_pod_exists(base_pod_name, base_pod_namespace):
+            raise Exception(
+                f"base pod {base_pod_name} does not exist in "
+                f"namespace {base_pod_namespace}"
+            )
+        if not self.check_if_pod_exists(pod_name, pod_namespace):
+            raise Exception(
+                f"target pod {pod_name} does not exist in "
+                f"namespace {pod_namespace}"
+            )
+
+        cmd = (
+            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && "
+            "echo ${dir/\/proc\//}; done" % pod_container_id  # noqa
+        )
+
+        pids = self.exec_cmd_in_pod(
+            [cmd],
+            base_pod_name,
+            base_pod_namespace,
+            base_pod_container_name,
+        )
+        if pids:
+            pids_list = pids.split("\n")
+            pids_list = list(filter(None, pids_list))
+            return pids_list
+        return None

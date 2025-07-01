@@ -56,16 +56,20 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertTrue(len(results) == 1)
         self.assertEqual(results[0][1], namespace)
         self.assertEqual(results[0][0], "kraken-deployment")
-        self.wait_pod("kraken-deployment",namespace)
-        results = self.lib_k8s.get_all_pods("random=%s" % random_label, field_selector="status.phase=Running")
-        print('resuls' + str(results))
+        self.wait_pod("kraken-deployment", namespace)
+        results = self.lib_k8s.get_all_pods(
+            "random=%s" % random_label, field_selector="status.phase=Running"
+        )
+        print("resuls" + str(results))
         self.assertTrue(len(results) == 1)
         self.assertEqual(results[0][1], namespace)
         self.assertEqual(results[0][0], "kraken-deployment")
 
-        results = self.lib_k8s.get_all_pods(field_selector="status.phase=Running")
+        results = self.lib_k8s.get_all_pods(
+            field_selector="status.phase=Running"
+        )
         self.assertTrue(len(results) >= 1)
-        
+
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 
     def test_get_pod_log(self):
@@ -259,6 +263,88 @@ class KrknKubernetesTestsGet(BaseTest):
         with self.assertRaises(Exception):
             ip_address = self.lib_k8s.get_node_ip("not_existing")
 
+    def test_get_pod_container_id(self):
+        namespace = "test-cid-" + self.get_random_string(10)
+        name = "test-name-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace, name=name)
+        self.wait_pod(name, namespace)
+        container_ids = self.lib_k8s.get_container_ids(
+            pod_name=name, namespace=namespace
+        )
+        self.assertTrue(len(container_ids) > 0)
+        container_ids = self.lib_k8s.get_container_ids(
+            pod_name="do_not_exists", namespace="do_not_exists"
+        )
+        self.assertTrue(len(container_ids) == 0)
+
+    def test_get_pod_pids(self):
+        namespace = "test-cid-" + self.get_random_string(10)
+        base_pod_name = "test-name-" + self.get_random_string(10)
+        target_pod_name = "test-name-" + self.get_random_string(10)
+
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace, name=base_pod_name)
+        self.deploy_fedtools(namespace=namespace, name=target_pod_name)
+
+        self.wait_pod(base_pod_name, namespace)
+        self.wait_pod(target_pod_name, namespace)
+
+        container_id = self.lib_k8s.get_container_ids(
+            pod_name=target_pod_name, namespace=namespace
+        )
+        pids = self.lib_k8s.get_pod_pids(
+            base_pod_name,
+            namespace,
+            base_pod_name,
+            target_pod_name,
+            namespace,
+            container_id[0],
+        )
+
+        self.assertIsNotNone(pids)
+        self.assertTrue(isinstance(pids, list))
+        self.assertTrue(len(pids) > 0)
+
+        pids = self.lib_k8s.get_pod_pids(
+            base_pod_name,
+            namespace,
+            base_pod_name,
+            target_pod_name,
+            namespace,
+            "does_not_exist",
+        )
+        self.assertIsNone(pids)
+
+        with self.assertRaises(Exception):
+            _ = self.lib_k8s.get_pod_pids(
+                "does_not_exist",
+                namespace,
+                base_pod_name,
+                target_pod_name,
+                namespace,
+                container_id[0],
+            )
+
+        with self.assertRaises(Exception):
+            _ = self.lib_k8s.get_pod_pids(
+                base_pod_name,
+                namespace,
+                base_pod_name,
+                "does_not_exist",
+                namespace,
+                container_id[0],
+            )
+
+        with self.assertRaises(Exception):
+            _ = self.lib_k8s.get_pod_pids(
+                base_pod_name,
+                namespace,
+                "does_not_exist",
+                target_pod_name,
+                namespace,
+                container_id[0],
+            )
 
 
 if __name__ == "__main__":

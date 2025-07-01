@@ -181,7 +181,7 @@ class HogConfig:
         if "taints" in yaml_dict.keys() and yaml_dict["taints"]:
             for taint in yaml_dict["taints"]:
                 key_value_part, effect = taint.split(":", 1)
-                if '=' in key_value_part:
+                if "=" in key_value_part:
                     key, value = key_value_part.split("=", 1)
                     operator = "Equal"
                 else:
@@ -191,11 +191,11 @@ class HogConfig:
                 toleration = {
                     "key": key,
                     "operator": operator,
-                    "effect": effect
+                    "effect": effect,
                 }
                 if value is not None:
                     toleration["value"] = value
-                config.tolerations.append(toleration)            
+                config.tolerations.append(toleration)
 
         if config.type == HogType.cpu:
             if (

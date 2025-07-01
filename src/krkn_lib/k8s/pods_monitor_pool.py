@@ -47,8 +47,7 @@ class PodsMonitorPool:
         event = Event()
         self.events.append(event)
         pods_and_namespaces = self.krkn_lib.select_pods_by_label(
-            label_selector=label_selector,
-            field_selector=field_selector
+            label_selector=label_selector, field_selector=field_selector
         )
         pod_monitor_thread = self.krkn_lib.monitor_pods_by_label(
             label_selector=label_selector,
@@ -60,8 +59,11 @@ class PodsMonitorPool:
         self.pods_monitor_threads.append(pod_monitor_thread)
 
     def select_and_monitor_by_name_pattern_and_namespace_pattern(
-        self, pod_name_pattern: str, namespace_pattern: str, field_selector: str,
-        max_timeout: int
+        self,
+        pod_name_pattern: str,
+        namespace_pattern: str,
+        field_selector: str,
+        max_timeout: int,
     ):
         """
         Pushes into the pool a monitoring thread for all the pods identified
@@ -77,6 +79,7 @@ class PodsMonitorPool:
             pattern used to filter the pods to be monitored
             (must be the same used in
             `select_pods_by_name_pattern_and_namespace_pattern`)
+        :param field_selector: Pod field selector
         :param max_timeout: the expected time the pods should take to
             recover. If the killed pods are replaced in this time frame,
             but they didn't reach the Ready State, they will be marked as
@@ -93,7 +96,7 @@ class PodsMonitorPool:
             self.krkn_lib.select_pods_by_name_pattern_and_namespace_pattern(
                 pod_name_pattern=pod_name_pattern,
                 namespace_pattern=namespace_pattern,
-                field_selector=field_selector
+                field_selector=field_selector,
             )
         )
 
@@ -144,7 +147,7 @@ class PodsMonitorPool:
             self.krkn_lib.select_pods_by_namespace_pattern_and_label(
                 namespace_pattern=namespace_pattern,
                 label_selector=label_selector,
-                field_selector=field_selector
+                field_selector=field_selector,
             )
         )
 
