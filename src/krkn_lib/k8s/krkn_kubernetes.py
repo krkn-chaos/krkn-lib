@@ -1512,7 +1512,9 @@ class KrknKubernetes:
         except Exception as e:
             logging.error("Error trying to apply_yaml" + str(e))
 
-    def get_pod_info(self, name: str, namespace: str = "default") -> Pod:
+    def get_pod_info_(
+        self, name: str, namespace: str = "default"
+    ) -> Optional[Pod]:
         """
         Retrieve information about a specific pod
 
@@ -1523,23 +1525,23 @@ class KrknKubernetes:
             Returns None if the pod doesn't exist
         """
         try:
+            pod_info = None
             response = self.cli.read_namespaced_pod(
                 name=name, namespace=namespace, pretty="true"
             )
             if response:
                 container_list = []
 
-            # Create a list of containers present in the pod
-            i = 0
-            for container in response.spec.containers:
-                volume_mount_list = []
-                for volume_mount in container.volume_mounts:
-                    volume_mount_list.append(
-                        VolumeMount(
-                            name=volume_mount.name,
-                            mountPath=volume_mount.mount_path,
+                # Create a list of containers present in the pod
+                for container in response.spec.containers:
+                    volume_mount_list = []
+                    for volume_mount in container.volume_mounts:
+                        volume_mount_list.append(
+                            VolumeMount(
+                                name=volume_mount.name,
+                                mountPath=volume_mount.mount_path,
+                            )
                         )
-                    )
                     container_list.append(
                         Container(
                             name=container.name,
@@ -1547,17 +1549,27 @@ class KrknKubernetes:
                             volumeMounts=volume_mount_list,
                         )
                     )
-                container_list.append(
-                    Container(
-                        name=container.name,
-                        image=container.image,
-                        volumeMounts=volume_mount_list,
-                        containerId=response.status.container_statuses[
-                            i
-                        ].container_id,
+
+                for i, container in enumerate(
+                    response.status.container_statuses
+                ):
+                    container_list[i].ready = container.ready
+                    container_list[i].containerId = (
+                        response.status.container_statuses[i].container_id
                     )
-                )
-                i += 1
+
+                # Create a list of volumes associated with the pod
+                volume_list = []
+                for volume in response.spec.volumes:
+                    volume_name = volume.name
+                    pvc_name = (
+                        volume.persistent_volume_claim.claim_name
+                        if volume.persistent_volume_claim is not None
+                        else None
+                    )
+                    volume_list.append(
+                        Volume(name=volume_name, pvcName=pvc_name)
+                    )
 
                 # Create the Pod data class object
                 pod_info = Pod(
@@ -1566,7 +1578,7 @@ class KrknKubernetes:
                     namespace=response.metadata.namespace,
                     containers=container_list,
                     nodeName=response.spec.node_name,
-                    volumes=volume_mount_list,
+                    volumes=volume_list,
                     status=response.status.phase,
                     creation_timestamp=response.metadata.creation_timestamp,
                 )

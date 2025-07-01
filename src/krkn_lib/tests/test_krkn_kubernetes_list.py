@@ -71,13 +71,17 @@ class KrknKubernetesTestsList(BaseTest):
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
 
-        self.wait_pod(pods[0],namespace)
+        self.wait_pod(pods[0], namespace)
 
-        pods = self.lib_k8s.list_pods(namespace=namespace, field_selector="status.phase=Running")
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, field_selector="status.phase=Running"
+        )
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
 
-        pods = self.lib_k8s.list_pods(namespace=namespace, field_selector="status.phase=Terminating")
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, field_selector="status.phase=Terminating"
+        )
         self.assertTrue(len(pods) == 0)
         self.pod_delete_queue.put(["kraken-deployment", namespace])
 

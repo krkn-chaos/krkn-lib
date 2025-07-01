@@ -490,7 +490,7 @@ class BaseTest(unittest.TestCase):
         )
         thread.daemon = True
         thread.start()
-    
+
     def background_delete_ns(self, namespace: str):
         thread = threading.Thread(
             target=self.lib_k8s.delete_namespace, args=(namespace,)
