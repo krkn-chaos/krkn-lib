@@ -1539,6 +1539,7 @@ class KrknKubernetes:
                             name=volume_mount.name,
                             mountPath=volume_mount.mount_path,
                         )
+                    )
                     container_list.append(
                         Container(
                             name=container.name,
@@ -1565,7 +1566,7 @@ class KrknKubernetes:
                     namespace=response.metadata.namespace,
                     containers=container_list,
                     nodeName=response.spec.node_name,
-                    volumes=volume_list,
+                    volumes=volume_mount_list,
                     status=response.status.phase,
                     creation_timestamp=response.metadata.creation_timestamp,
                 )
@@ -1575,7 +1576,6 @@ class KrknKubernetes:
             )
             return None
         return pod_info
-
 
     def check_if_namespace_exists(self, name: str) -> bool:
         """
@@ -2724,7 +2724,9 @@ class KrknKubernetes:
         namespace_re = re.compile(namespace_pattern)
         pods_and_namespaces = self.get_all_pods(label_selector, field_selector)
         pods_and_namespaces = [
-            (pod[0], pod[1]) for pod in pods_and_namespaces if namespace_re.match(pod[1])
+            (pod[0], pod[1])
+            for pod in pods_and_namespaces
+            if namespace_re.match(pod[1])
         ]
         return pods_and_namespaces
 
@@ -2989,9 +2991,9 @@ class KrknKubernetes:
             # respawned with the same names
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
-                    
+
                     pod_info = self.get_pod_info(pod[0], pod[1])
-                    # for pod_info in pod_list_info: 
+                    # for pod_info in pod_list_info:
                     if pod_info:
                         pod_creation_timestamp = (
                             pod_info.creation_timestamp.timestamp()
@@ -3051,9 +3053,11 @@ class KrknKubernetes:
                     # sum the time elapsed waiting before the pod
                     # has been rescheduled (rescheduling time)
                     # to the effective recovery time of the pod
-                    if result.pod_readiness_time: 
+                    if result.pod_readiness_time:
                         result.pod_rescheduling_time = (
-                            time.time() - start_time - result.pod_readiness_time
+                            time.time()
+                            - start_time
+                            - result.pod_readiness_time
                         )
                         result.total_recovery_time = (
                             result.pod_readiness_time
@@ -3066,7 +3070,7 @@ class KrknKubernetes:
                     pods_status.unrecovered.append(result)
 
                 missing_pods.clear()
-    
+
         # if there are missing pods, pods affected
         # by the chaos did not restart after the chaos
         # an exception will be set in the PodsStatus
