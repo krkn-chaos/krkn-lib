@@ -1512,7 +1512,7 @@ class KrknKubernetes:
         except Exception as e:
             logging.error("Error trying to apply_yaml" + str(e))
 
-    def get_pod_info_(
+    def get_pod_info(
         self, name: str, namespace: str = "default"
     ) -> Optional[Pod]:
         """
