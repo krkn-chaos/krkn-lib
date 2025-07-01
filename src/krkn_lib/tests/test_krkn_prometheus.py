@@ -38,7 +38,7 @@ class TestKrknPrometheus(BaseTest):
         logging.warn("test_process_alert")
         logging.warn("FLAKY TESTS NEED TO BE REFACTORED AND REENABLED")
 
-    ######## FLAKY TEST NEEDS TO BE REFACTORED #NOQA
+    ######## FLAKY TEST NEEDS TO BE REFACTORED # NOQA
     # def test_process_alert(self):
     #     prom_cli = KrknPrometheus(self.url)
     #     res = prom_cli.process_prom_query_in_range(
@@ -163,7 +163,7 @@ class TestKrknPrometheus(BaseTest):
     #                 self.assertTrue(len(lc.records) == 1)
     #                 self.assertEqual(lc.records[0].levelname, "ERROR")
     #                 self.assertEqual(
-    #                     lc.records[0].msg, "invalid severity level: not_exists"
+    #                     lc.records[0].msg, "invalid severity level: not_exists" # NOQA
     #                 )
     #                 logger_output = str(lc.output[0])
     #                 self.assertTrue(string_value[1] in logger_output)
