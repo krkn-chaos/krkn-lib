@@ -51,7 +51,7 @@ jobs:
         run: | 
           # always replaces the version with the latest tag
           # both for testing and version release
-          sed -i -e "s/0.0.0/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
+          sed -i -e "s/0.0.0-beta/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
