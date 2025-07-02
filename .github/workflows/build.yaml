@@ -140,8 +140,8 @@ jobs:
         - name: Update version number
           if: startsWith(github.ref, 'refs/tags/')
           run: |
-            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
-            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" ./docs/conf.py
+            sed -i -e "s/0.0.0-beta/${GITHUB_REF##*/}/" pyproject.toml
+            sed -i -e "s/0.0.0-beta/${GITHUB_REF##*/}/" ./docs/conf.py
         - name: Set up Python
           uses: actions/setup-python@v4
           with:
