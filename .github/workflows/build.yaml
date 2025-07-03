@@ -47,6 +47,9 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+      - name: Fetch version number
+        run: |
+          echo "NEXT_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> $GITHUB_ENV
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -95,7 +98,7 @@ jobs:
       - name: Update version number
         run: |
           git fetch --tags
-          sed -i -e "s/0.0.0/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
+          sed -i -e "s/0.0.0/${{ env.NEXT_VERSION }}/" pyproject.toml
       - name: Build
         run: |
           cat pyproject.toml
