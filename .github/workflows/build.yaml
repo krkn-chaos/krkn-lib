@@ -97,7 +97,6 @@ jobs:
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Update version number
         run: |
-          git fetch --tags
           sed -i -e "s/0.0.0/${{ env.NEXT_VERSION }}/" pyproject.toml
       - name: Build
         run: |
