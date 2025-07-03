@@ -47,12 +47,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Update version number
-        run: | 
-          # always replaces the version with the latest tag
-          # both for testing and version release
-          sed -i -e "s/0.0.0/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
-          cat pyproject.toml
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -65,15 +59,15 @@ jobs:
       - name: get nodes
         run: |
           kubectl get nodes
-#      - name: Deploy prometheus
-#        uses: redhat-chaos/actions/prometheus@main
-#      - name: Deploy Elasticsearch
-#        with:
-#          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-#          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-#          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-#          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
-#        uses: redhat-chaos/actions/elastic@main
+      - name: Deploy prometheus
+        uses: redhat-chaos/actions/prometheus@main
+      - name: Deploy Elasticsearch
+        with:
+          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
+          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
+          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
+          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+        uses: redhat-chaos/actions/elastic@main
       - name: Install project dependencies
         run: poetry install --no-interaction
       - name: Run tests with coverage
@@ -91,24 +85,26 @@ jobs:
         run: |
           export TEST_WORKDIR=`pwd`/`date +%s`
           mkdir $TEST_WORKDIR
-          # poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
-          # poetry run python3 -m coverage html
-          # poetry run python3 -m coverage json
-
+          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+          poetry run python3 -m coverage html
+          poetry run python3 -m coverage json
       - name: Publish coverage report to job summary
         if: ${{ matrix.python-version == '3.9'}}
         run: |
-         # poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+          poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+      - name: Update version number
+        run: | 
+          sed -i -e "s/0.0.0/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
       - name: Build
         run: |
           cat pyproject.toml
           poetry build
-#      - name: Upload json coverage
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: coverage.json
-#          path: coverage.json
-#          if-no-files-found: error
+      - name: Upload json coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage.json
+          path: coverage.json
+          if-no-files-found: error
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:
@@ -145,7 +141,6 @@ jobs:
           run: |
             sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
             sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" ./docs/conf.py
-            cat pyproject.toml
         - name: Set up Python
           uses: actions/setup-python@v4
           with:
