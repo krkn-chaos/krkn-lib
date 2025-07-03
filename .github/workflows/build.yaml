@@ -47,11 +47,9 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Update version number
-        run: | 
-          # always replaces the version with the latest tag
-          # both for testing and version release
-          sed -i -e "s/0.0.0-beta/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
+      - name: Fetch version number
+        run: |
+          echo "NEXT_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> $GITHUB_ENV
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -93,13 +91,17 @@ jobs:
           poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
           poetry run python3 -m coverage html
           poetry run python3 -m coverage json
-
       - name: Publish coverage report to job summary
         if: ${{ matrix.python-version == '3.9'}}
         run: |
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+      - name: Update version number
+        run: |
+          git fetch --tags
+          sed -i -e "s/0.0.0/${{ env.NEXT_VERSION }}/" pyproject.toml
       - name: Build
-        run: poetry build
+        run: |
+          poetry build
       - name: Upload json coverage
         uses: actions/upload-artifact@v4
         with:
@@ -140,8 +142,8 @@ jobs:
         - name: Update version number
           if: startsWith(github.ref, 'refs/tags/')
           run: |
-            sed -i -e "s/0.0.0-beta/${GITHUB_REF##*/}/" pyproject.toml
-            sed -i -e "s/0.0.0-beta/${GITHUB_REF##*/}/" ./docs/conf.py
+            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" pyproject.toml
+            sed -i -e "s/0.0.0/${GITHUB_REF##*/}/" ./docs/conf.py
         - name: Set up Python
           uses: actions/setup-python@v4
           with:

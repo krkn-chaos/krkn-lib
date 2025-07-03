@@ -28,7 +28,7 @@ add_function_parentheses = True
 project = "Krkn Foundation Library"
 copyright = "Red Hat Chaos Team"
 
-version = "0.0.0-beta"
+version = "0.0.0"
 release = version
 
 # -- Options for HTML output
