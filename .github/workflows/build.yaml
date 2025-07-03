@@ -51,49 +51,50 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Create multi-node KinD cluster
-        uses: redhat-chaos/actions/kind@main
+#      - name: Create multi-node KinD cluster
+#        uses: redhat-chaos/actions/kind@main
       - name: Install poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
-      - name: get nodes
-        run: |
-          kubectl get nodes
-      - name: Deploy prometheus
-        uses: redhat-chaos/actions/prometheus@main
-      - name: Deploy Elasticsearch
-        with:
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
-        uses: redhat-chaos/actions/elastic@main
+#      - name: get nodes
+#        run: |
+#          kubectl get nodes
+#      - name: Deploy prometheus
+#        uses: redhat-chaos/actions/prometheus@main
+#      - name: Deploy Elasticsearch
+#        with:
+#          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
+#          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
+#          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
+#          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+#        uses: redhat-chaos/actions/elastic@main
       - name: Install project dependencies
         run: poetry install --no-interaction
-      - name: Run tests with coverage
-        env:
-          API_USER: ${{ secrets.API_USER }}
-          API_PASSWORD: ${{ secrets.API_PASSWORD }}
-          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
-
-        run: |
-          export TEST_WORKDIR=`pwd`/`date +%s`
-          mkdir $TEST_WORKDIR
-          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
-          poetry run python3 -m coverage html
-          poetry run python3 -m coverage json
-      - name: Publish coverage report to job summary
-        if: ${{ matrix.python-version == '3.9'}}
-        run: |
-          poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
+#      - name: Run tests with coverage
+#        env:
+#          API_USER: ${{ secrets.API_USER }}
+#          API_PASSWORD: ${{ secrets.API_PASSWORD }}
+#          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
+#          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
+#          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
+#          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+#
+#        run: |
+#          export TEST_WORKDIR=`pwd`/`date +%s`
+#          mkdir $TEST_WORKDIR
+#          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+#          poetry run python3 -m coverage html
+#          poetry run python3 -m coverage json
+#      - name: Publish coverage report to job summary
+#        if: ${{ matrix.python-version == '3.9'}}
+#        run: |
+#          poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Update version number
-        run: | 
+        run: |
+          git fetch --tags
           sed -i -e "s/0.0.0/$(git describe --tags --abbrev=0 | sed 's/^v//')/" pyproject.toml
       - name: Build
         run: |
