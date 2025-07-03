@@ -101,7 +101,6 @@ jobs:
           sed -i -e "s/0.0.0/${{ env.NEXT_VERSION }}/" pyproject.toml
       - name: Build
         run: |
-          cat pyproject.toml
           poetry build
       - name: Upload json coverage
         uses: actions/upload-artifact@v4
