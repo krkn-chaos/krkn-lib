@@ -10,7 +10,7 @@ import boto3
 import yaml
 
 from krkn_lib.models.krkn import ChaosRunAlert, ChaosRunAlertSummary
-from krkn_lib.models.telemetry import ChaosRunTelemetry, ScenarioTelemetry
+from krkn_lib.models.telemetry import ScenarioTelemetry
 from krkn_lib.tests import BaseTest
 
 
@@ -239,7 +239,7 @@ class KrknTelemetryKubernetesTests(BaseTest):
     #             telemetry_config, request_id, chaos_telemetry
     #         )
     #     except Exception as e:
-    #         self.assertTrue(False, f"send_telemetry raised exception {str(e)}")
+    #         self.assertTrue(False, f"send_telemetry raised exception {str(e)}") # NOQA
     #     s3 = boto3.client("s3")
     #
     #     bucket_name = os.getenv("BUCKET_NAME")
