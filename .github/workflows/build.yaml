@@ -100,7 +100,9 @@ jobs:
         run: |
          # poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Build
-        run: poetry build
+        run: |
+          cat pyproject.toml
+          poetry build
 #      - name: Upload json coverage
 #        uses: actions/upload-artifact@v4
 #        with:
