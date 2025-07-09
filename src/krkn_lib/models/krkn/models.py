@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -31,15 +31,6 @@ class ChaosRunAlert:
     severity of the alert
     """
 
-    def __init__(
-        self, alertname: str, alertstate: str, namespace: str, severity: str
-    ):
-        self.alertname = alertname
-        self.alertstate = alertstate
-        self.namespace = namespace
-        self.severity = severity
-
-
 @dataclass(order=False)
 class ChaosRunAlertSummary:
     """
@@ -56,19 +47,15 @@ class ChaosRunAlertSummary:
     scenario that caused critical alerts
     """
 
-    chaos_alerts: list[ChaosRunAlert]
+    chaos_alerts: list[ChaosRunAlert] = field(default_factory=list)
     """
     alerts collected during the chaos
     """
 
-    post_chaos_alerts: list[ChaosRunAlert]
+    post_chaos_alerts: list[ChaosRunAlert] = field(default_factory=list)
     """
     alerts collected after the chaos run
     """
-
-    def __init__(self):
-        self.chaos_alerts = []
-        self.post_chaos_alerts = []
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -81,19 +68,15 @@ class ChaosRunOutput:
     into Elastic search to be indexed
     """
 
-    telemetry: ChaosRunTelemetry | None
+    telemetry: ChaosRunTelemetry | None = None
     """
     the cluster telemetry collected by krkn
     """
-    critical_alerts: ChaosRunAlertSummary | None
+    critical_alerts: ChaosRunAlertSummary | None = None
     """
     the prometheus critical alerts collected during and after the chaos
     run
     """
-
-    def __init__(self):
-        self.telemetry = None
-        self.critical_alerts = None
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
