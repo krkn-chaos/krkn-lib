@@ -2384,9 +2384,7 @@ class KrknKubernetes:
             # due to pipes and scripts the command is executed in
 
             if not os.path.isdir(download_path):
-                raise Exception(
-                    f"download path {download_path} does not exist"
-                )
+                os.mkdir(download_path)
             if not self.path_exists_in_pod(
                 pod_name, container_name, namespace, remote_archive_path
             ):
