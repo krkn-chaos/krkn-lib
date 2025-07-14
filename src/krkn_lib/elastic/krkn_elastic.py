@@ -6,7 +6,7 @@ import time
 
 import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
-from elasticsearch_dsl import Search
+from elasticsearch.dsl import Search
 
 from krkn_lib.models.elastic.models import (
     ElasticAlert,

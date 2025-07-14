@@ -1,14 +1,14 @@
 import datetime
 
-from elasticsearch_dsl import (
-    Date,
+from elasticsearch.dsl import (
     Document,
-    Float,
-    InnerDoc,
-    Integer,
     Keyword,
-    Nested,
     Text,
+    Date,
+    InnerDoc,
+    Float,
+    Nested,
+    Integer,
     Boolean,
 )
 

@@ -72,7 +72,15 @@ jobs:
           ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
         uses: redhat-chaos/actions/elastic@main
       - name: Install project dependencies
-        run: poetry install --no-interaction
+        run: |
+          # installs test dependencies with pip
+          python3 -m venv venv_test
+          source venv_test/bin/activate
+          pip install -r requirements-test.txt
+          pip install -e .
+          deactivate
+          # installs build dependencies with poetry
+          poetry install --no-interaction
       - name: Run tests with coverage
         env:
           API_USER: ${{ secrets.API_USER }}
@@ -84,13 +92,13 @@ jobs:
           ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
           ELASTIC_USER: ${{ vars.ELASTIC_USER }}
           ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
-
         run: |
-          export TEST_WORKDIR=`pwd`/`date +%s`
-          mkdir $TEST_WORKDIR
-          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
-          poetry run python3 -m coverage html
-          poetry run python3 -m coverage json
+          # runs tests with python with the pip venv
+          source venv_test/bin/activate
+          python -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+          python -m coverage html
+          python -m coverage json
+          deactivate
       - name: Publish coverage report to job summary
         if: ${{ matrix.python-version == '3.9'}}
         run: |
