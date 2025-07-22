@@ -214,6 +214,34 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.health_checks[0].duration, 259.113742
         )
 
+        # virt_checks
+        self.assertEqual(len(elastic_telemetry.virt_checks), 3)
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].vm_name, "windows-vm-50"
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].ip_address, "0.0.0.0"
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].namespace, "benchmark-runner"
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].node_name, "h03-r660"
+        )
+
+        self.assertEqual(elastic_telemetry.virt_checks[0].status, True)
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].start_timestamp,
+            datetime.datetime.fromisoformat("2025-03-12T14:57:34.555878"),
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].end_timestamp,
+            datetime.datetime.fromisoformat("2025-03-12T14:57:54.904352"),
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[0].duration, 20.348474
+        )
+
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")

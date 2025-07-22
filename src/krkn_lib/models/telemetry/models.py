@@ -421,6 +421,55 @@ class HealthCheck:
             self.end_timestamp = json_dict["end_timestamp"]
             self.duration = json_dict["duration"]
 
+@dataclass(order=False)
+class VirtCheck:
+    """
+    Virt checks Response for VMI endpoints
+    """
+
+    vm_name: str
+    """
+    Vm name
+    """
+    ip_address: str
+    """
+    Vm ip address
+    """
+    namespace: str
+    """
+    Namespace
+    """
+    node_name: str
+    """
+    Node Name
+    """
+    status: bool
+    """
+    Status of VMI ssh connection
+    """
+    start_timestamp: str
+    """
+    start time stamp of virt check
+    """
+    end_timestamp: str
+    """
+    end time stamp of virt check
+    """
+    duration: float
+    """
+    Denotes the time between start time and end time
+    """
+
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.node_name = json_dict["node_name"]
+            self.ip_address = json_dict["ip_address"]
+            self.namespace = json_dict["namespace"]
+            self.vm_name = json_dict["vm_name"]
+            self.status = json_dict.get("status",True)
+            self.start_timestamp = json_dict.get("start_timestamp","")
+            self.end_timestamp = json_dict.get("end_timestamp","")
+            self.duration = json_dict.get("duration","")
 
 @dataclass(order=False)
 class ChaosRunTelemetry:
@@ -485,6 +534,10 @@ class ChaosRunTelemetry:
     """
     Health checks of application endpoint
     """
+    virt_checks: list[VirtCheck] = None
+    """
+    Virt checks of VMIs
+    """
     job_status: bool = True
     """
     Overall job status, will take all scenario's exit status
@@ -504,6 +557,7 @@ class ChaosRunTelemetry:
             "%Y-%m-%dT%H:%M:%SZ"
         )
         self.health_checks = list[HealthCheck]()
+        self.virt_checks = list[VirtCheck]()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -529,6 +583,11 @@ class ChaosRunTelemetry:
             self.health_checks = (
                 [HealthCheck(k) for k in json_dict.get("health_checks")]
                 if json_dict.get("health_checks")
+                else None
+            )
+            self.virt_checks = (
+                [VirtCheck(k) for k in json_dict.get("virt_checks")]
+                if json_dict.get("virt_checks")
                 else None
             )
             self.job_status = json_dict.get("job_status")

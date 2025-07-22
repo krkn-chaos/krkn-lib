@@ -132,7 +132,9 @@ jobs:
         run: |
           poetry run python3 -m coverage html
           poetry run python3 -m coverage json
+
       - name: Publish coverage report to job summary
+    
         if: ${{ matrix.python-version == '3.9'}}
         run: |
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
