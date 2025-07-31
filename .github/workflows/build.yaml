@@ -10,6 +10,11 @@ permissions:
   # https://github.community/t/permissions-nesecary-to-comment-on-a-pr/179047/5
   pull-requests: write
   contents: write
+env:
+  ELASTIC_URL: "https://localhost"
+  ELASTIC_PORT: 9091
+  ELASTIC_USER: "elastic"
+  ELASTIC_PASSWORD: "test"
 jobs:
   check-secret:
     runs-on: ubuntu-latest
@@ -83,10 +88,10 @@ jobs:
         uses: redhat-chaos/actions/prometheus@main
       - name: Deploy Elasticsearch
         with:
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+          ELASTIC_URL: ${{ env.ELASTIC_URL }}
+          ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
+          ELASTIC_USER: ${{ env.ELASTIC_USER }}
+          ELASTIC_PASSWORD: ${{ env.ELASTIC_PASSWORD }}
         uses: redhat-chaos/actions/elastic@main
       - name: Install project dependencies
         run: poetry install --no-interaction
@@ -97,10 +102,10 @@ jobs:
           echo "TEST_WORKDIR=$TEST_WORKDIR" >> $GITHUB_ENV
       - name: Run tests with coverage
         env:
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+          ELASTIC_URL: ${{ env.ELASTIC_URL }}
+          ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
+          ELASTIC_USER: ${{ env.ELASTIC_USER }}
+          ELASTIC_PASSWORD: ${{ env.ELASTIC_PASSWORD }}
 
         run: |
           
@@ -114,10 +119,10 @@ jobs:
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ELASTIC_URL: ${{ vars.ELASTIC_URL }}
-          ELASTIC_PORT: ${{ vars.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ vars.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ vars.ELASTIC_PASSWORD }}
+          ELASTIC_URL: ${{ env.ELASTIC_URL }}
+          ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
+          ELASTIC_USER: ${{ env.ELASTIC_USER }}
+          ELASTIC_PASSWORD: ${{ env.ELASTIC_PASSWORD }}
         if: needs.check-secret.outputs.my-key-exists == 'true'
         run: |
           poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/aws_tests/
