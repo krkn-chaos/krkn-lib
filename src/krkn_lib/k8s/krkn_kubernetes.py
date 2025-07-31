@@ -2990,9 +2990,8 @@ class KrknKubernetes:
             return pods_status
 
         while time.time() - start_time <= max_timeout:
-            if event:
-                if event.is_set():
-                    return pods_status
+            if event and event.is_set():
+                return pods_status
 
             time_offset = time.time() - start_time
             remaining_time = max_timeout - time_offset
