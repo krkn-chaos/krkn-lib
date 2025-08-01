@@ -1583,7 +1583,7 @@ class KrknKubernetes:
                     creation_timestamp=response.metadata.creation_timestamp,
                 )
         except Exception:
-            logging.error(
+            logging.info(
                 "Pod '%s' doesn't exist in namespace '%s'", name, namespace
             )
             return None
