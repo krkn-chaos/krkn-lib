@@ -463,7 +463,7 @@ class VirtCheck:
     def __init__(self, json_dict: dict = None):
         if json_dict is not None:
             self.node_name = json_dict["node_name"]
-            self.vm_address = json_dict["ip_address"]
+            self.ip_address = json_dict["ip_address"]
             self.namespace = json_dict["namespace"]
             self.vm_name = json_dict["vm_name"]
             self.status = json_dict.get("status",True)
