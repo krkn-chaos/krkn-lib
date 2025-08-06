@@ -410,3 +410,9 @@ class UtilFunctionTests(BaseTest):
             success_output_not_test_version, success_test_not_test_version
         )
         self.assertEqual(failure_output, failure_test)
+
+    def test_get_ci_job_url(self):
+
+        ci_job_url = utils.get_ci_job_url()
+        print('ci job url' + str(ci_job_url))
+        self.assertNotEqual(ci_job_url, "manual")
