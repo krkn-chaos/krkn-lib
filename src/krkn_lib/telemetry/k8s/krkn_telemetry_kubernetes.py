@@ -102,6 +102,7 @@ class KrknTelemetryKubernetes:
         chaos_telemetry.cluster_version = self.__kubecli.get_version()
         chaos_telemetry.major_version = chaos_telemetry.cluster_version[1:5]
         chaos_telemetry.node_taints = taints
+        chaos_telemetry.build_url = utils.get_ci_job_url()
         for info in node_infos:
             chaos_telemetry.total_node_count += info.count
         chaos_telemetry.job_status = True

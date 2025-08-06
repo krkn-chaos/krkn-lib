@@ -489,6 +489,10 @@ class ChaosRunTelemetry:
     """
     Overall job status, will take all scenario's exit status
     """
+    build_url: str = "manual"
+    """
+    Build url if run in CI
+    """
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
@@ -528,6 +532,7 @@ class ChaosRunTelemetry:
                 else None
             )
             self.job_status = json_dict.get("job_status")
+            self.build_url = json_dict.get("build_url")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

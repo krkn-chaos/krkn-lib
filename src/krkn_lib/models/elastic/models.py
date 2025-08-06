@@ -127,6 +127,7 @@ class ElasticChaosRunTelemetry(Document):
     cloud_type = Text()
     cluster_version = Text()
     major_version = Text()
+    build_url = Text()
     job_status = Boolean()
     run_uuid = Text(fields={"keyword": Keyword()})
     health_checks = Nested(ElasticHealthChecks, multi=True)
@@ -205,7 +206,7 @@ class ElasticChaosRunTelemetry(Document):
             chaos_run_telemetry.kubernetes_objects_count
         )
         self.network_plugins = chaos_run_telemetry.network_plugins
-
+        
         if chaos_run_telemetry.health_checks:
             self.health_checks = [
                 ElasticHealthChecks(
@@ -233,3 +234,4 @@ class ElasticChaosRunTelemetry(Document):
         self.run_uuid = chaos_run_telemetry.run_uuid
         self.job_status = chaos_run_telemetry.job_status
         self.major_version = chaos_run_telemetry.major_version
+        self.build_url = chaos_run_telemetry.build_url
