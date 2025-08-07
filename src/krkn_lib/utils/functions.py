@@ -466,7 +466,7 @@ def get_ci_job_url():
         github_run_id = os.getenv("GITHUB_RUN_ID")
         github_repo = os.getenv("GITHUB_REPOSITORY")
         build_url = (
-            f"https://github.com/${github_repo}/actions/runs/${github_run_id}"
+            f"https://github.com/{github_repo}/actions/runs/{github_run_id}"
         )
     elif os.getenv("PROW_JOB_ID", ""):
         prow_base_url = (
@@ -475,7 +475,7 @@ def get_ci_job_url():
         task_id = os.getenv("BUILD_ID")
         job_id = os.getenv("JOB_NAME")
 
-        build_url = f"${prow_base_url}/${job_id}/${task_id}"
+        build_url = f"{prow_base_url}/{job_id}/{task_id}"
 
     elif os.getenv("BUILD_URL", ""):
         # Jenkins build url
