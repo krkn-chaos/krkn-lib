@@ -150,6 +150,9 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.node_summary_infos[0].instance_type, "m2i.xlarge"
         )
         self.assertEqual(
+            elastic_telemetry.node_summary_infos[0].nodes_type, "master"
+        )
+        self.assertEqual(
             elastic_telemetry.node_summary_infos[0].kernel_version,
             "5.4.0-66-generic",
         )

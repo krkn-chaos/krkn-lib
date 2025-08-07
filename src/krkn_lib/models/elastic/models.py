@@ -94,7 +94,7 @@ class ElasticNodeInfo(InnerDoc):
     count = Integer()
     architecture = Text()
     instance_type = Text()
-    node_type = Text()
+    nodes_type = Text()
     kernel_version = Text()
     kubelet_version = Text()
     os_version = Text()
@@ -188,6 +188,7 @@ class ElasticChaosRunTelemetry(Document):
         self.node_summary_infos = [
             ElasticNodeInfo(
                 count=info.count,
+                nodes_type=info.nodes_type,
                 architecture=info.architecture,
                 instance_type=info.instance_type,
                 kernel_version=info.kernel_version,
