@@ -579,5 +579,6 @@ class BaseTest(unittest.TestCase):
             "cluster_version": "4.18.0-0.nightly-202491014",
             "major_verison": "4.18",
             "job_status": True,
+            "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
         }
         return example_data

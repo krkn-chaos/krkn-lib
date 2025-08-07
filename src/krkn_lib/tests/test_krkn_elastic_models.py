@@ -218,6 +218,7 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")
         self.assertEqual(elastic_telemetry.run_uuid, run_uuid)
+        self.assertEqual(elastic_telemetry.build_url, "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547")
 
     def test_ElasticChaosRunTelemetry(self):
         run_uuid = str(uuid.uuid4())
