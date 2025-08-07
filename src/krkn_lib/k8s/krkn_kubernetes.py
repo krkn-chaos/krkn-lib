@@ -602,6 +602,48 @@ class KrknKubernetes:
             body, namespace, self.net_cli.create_namespaced_network_policy
         )
 
+    def get_configmap_name(self, name: str, namespace: str) -> list[str]:
+        """
+        Return a config map model based on name and namesapce
+
+        :param name: name to find configmap in
+        :param namespace: namespace to find configmap in
+        :return: list of daemonset names
+        """
+        daemonsets = []
+        try:
+            self.cli
+            ret = self.cli.read_namespaced_config_map(name=name, namespace=namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "CoreV1Api->get_configmap_name: %s\n",
+                str(e),
+            )
+            raise e
+        return ret
+    
+    def get_configmap_name(self, name: str, namespace: str) -> list[str]:
+        """
+        Return a config map model based on name and namesapce
+
+        :param name: name to find configmap in
+        :param namespace: namespace to find configmap in
+        :return: list of daemonset names
+        """
+        daemonsets = []
+        try:
+            self.cli
+            ret = self.cli.read_namespaced_config_map(name=name, namespace=namespace)
+        except ApiException as e:
+            logging.error(
+                "Exception when calling "
+                "CoreV1Api->get_configmap_name: %s\n",
+                str(e),
+            )
+            raise e
+        return ret
+
     def get_daemonset(self, namespace: str) -> list[str]:
         """
         Return a list of daemon set names
