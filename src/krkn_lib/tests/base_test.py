@@ -549,6 +549,7 @@ class BaseTest(unittest.TestCase):
                     "kernel_version": "5.4.0-66-generic",
                     "kubelet_version": "v2.1.2",
                     "os_version": "Linux",
+                    "nodes_type": "master"
                 }
             ],
             "node_taints": [
