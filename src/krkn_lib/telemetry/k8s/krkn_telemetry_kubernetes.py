@@ -100,6 +100,7 @@ class KrknTelemetryKubernetes:
         node_infos, taints = self.__kubecli.get_nodes_infos()
         chaos_telemetry.node_summary_infos = node_infos
         chaos_telemetry.cluster_version = self.__kubecli.get_version()
+        chaos_telemetry.fips_enabled = self.__kubecli.get_configmap_name("cluster-config-v1","kube-system")
         chaos_telemetry.major_version = chaos_telemetry.cluster_version[1:5]
         chaos_telemetry.node_taints = taints
         chaos_telemetry.build_url = utils.get_ci_job_url()
