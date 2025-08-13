@@ -457,3 +457,27 @@ def get_junit_test_case(
         ET.SubElement(test_case, "failure", message="").text = test_stdout
 
     return ET.tostring(root, encoding="utf-8").decode("UTF-8")
+
+
+def get_ci_job_url():
+    build_url = "manual"
+    if os.getenv("GITHUB_RUN_ID", ""):
+        # github actions build url
+        github_run_id = os.getenv("GITHUB_RUN_ID")
+        github_repo = os.getenv("GITHUB_REPOSITORY")
+        build_url = (
+            f"https://github.com/{github_repo}/actions/runs/{github_run_id}"
+        )
+    elif os.getenv("PROW_JOB_ID", ""):
+        prow_base_url = (
+            "https://prow.ci.openshift.org/view/gs/origin-ci-test/logs"
+        )
+        task_id = os.getenv("BUILD_ID")
+        job_id = os.getenv("JOB_NAME")
+
+        build_url = f"{prow_base_url}/{job_id}/{task_id}"
+
+    elif os.getenv("BUILD_URL", ""):
+        # Jenkins build url
+        build_url = os.getenv("BUILD_URL")
+    return build_url
