@@ -41,7 +41,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         # added half second of delay that might be introduced to API
         # calls
-        self.assertAlmostEqual(end_time - start_time, monitor_timeout, 1)
+        self.assertAlmostEqual(end_time - start_time, monitor_timeout, 0)
 
         self.assertEqual(len(pods_status.recovered), 0)
         self.assertEqual(len(pods_status.unrecovered), 0)
