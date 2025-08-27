@@ -7,8 +7,6 @@ import re
 import threading
 import time
 import warnings
-from concurrent.futures import ThreadPoolExecutor, wait
-from functools import partial
 from queue import Queue
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -27,12 +25,10 @@ from urllib3 import HTTPResponse
 from krkn_lib.models.k8s import (
     PVC,
     AffectedNode,
-    AffectedPod,
     ApiRequestException,
     Container,
     NodeResources,
     Pod,
-    PodsStatus,
     ServiceHijacking,
     Volume,
     VolumeMount,

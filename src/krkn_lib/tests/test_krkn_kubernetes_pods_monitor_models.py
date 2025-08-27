@@ -1,13 +1,14 @@
 import time
 import unittest
 
-from krkn_lib.k8s.pod_monitor import (
+
+from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.pod_monitor.models import (
     PodEvent,
     PodStatus,
     MonitoredPod,
     PodsSnapshot,
 )
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
 
 
 class TestMonitorModels(unittest.TestCase):
