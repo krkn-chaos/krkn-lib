@@ -1513,10 +1513,14 @@ class KrknKubernetes:
             logging.error("Error trying to apply_yaml" + str(e))
 
     def get_pod_info(
-        self, name: str, namespace: str = "default", delete_expected: bool = False
+        self,
+        name: str,
+        namespace: str = "default",
+        delete_expected: bool = False,
     ) -> Optional[Pod]:
         """
         Retrieve information about a specific pod
+
 
         :param name: pod name
         :param namespace: namespace (optional default `default`)
@@ -1583,11 +1587,11 @@ class KrknKubernetes:
                     creation_timestamp=response.metadata.creation_timestamp,
                 )
         except Exception:
-            if not delete_expected: 
+            if not delete_expected:
                 logging.error(
                     "Pod '%s' doesn't exist in namespace '%s'", name, namespace
                 )
-            else: 
+            else:
                 logging.info(
                     "Pod '%s' doesn't exist in namespace '%s'", name, namespace
                 )
@@ -3006,7 +3010,9 @@ class KrknKubernetes:
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
 
-                    pod_info = self.get_pod_info(pod[0], pod[1], delete_expected=True)
+                    pod_info = self.get_pod_info(
+                        pod[0], pod[1], delete_expected=True
+                    )
                     # for pod_info in pod_list_info:
                     if pod_info:
                         pod_creation_timestamp = (

@@ -114,6 +114,7 @@ class ElasticHealthChecks(InnerDoc):
     end_timestamp = Date()
     duration = Float()
 
+
 class ElasticVirtChecks(InnerDoc):
     vm_name = Text()
     ip_address = Text()
@@ -123,6 +124,7 @@ class ElasticVirtChecks(InnerDoc):
     start_timestamp = Date()
     end_timestamp = Date()
     duration = Float()
+
 
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
@@ -141,6 +143,7 @@ class ElasticChaosRunTelemetry(Document):
     run_uuid = Text(fields={"keyword": Keyword()})
     health_checks = Nested(ElasticHealthChecks, multi=True)
     virt_checks = Nested(ElasticVirtChecks, multi=True)
+
     class Index:
         name = "chaos_run_telemetry"
 
@@ -215,7 +218,7 @@ class ElasticChaosRunTelemetry(Document):
             chaos_run_telemetry.kubernetes_objects_count
         )
         self.network_plugins = chaos_run_telemetry.network_plugins
-        
+
         if chaos_run_telemetry.health_checks:
             self.health_checks = [
                 ElasticHealthChecks(
@@ -234,7 +237,7 @@ class ElasticChaosRunTelemetry(Document):
             ]
         else:
             self.health_checks = None
-        
+
         if chaos_run_telemetry.virt_checks:
             self.virt_checks = [
                 ElasticVirtChecks(

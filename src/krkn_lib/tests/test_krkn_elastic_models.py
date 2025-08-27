@@ -238,15 +238,16 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.virt_checks[0].end_timestamp,
             datetime.datetime.fromisoformat("2025-03-12T14:57:54.904352"),
         )
-        self.assertEqual(
-            elastic_telemetry.virt_checks[0].duration, 20.348474
-        )
+        self.assertEqual(elastic_telemetry.virt_checks[0].duration, 20.348474)
 
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")
         self.assertEqual(elastic_telemetry.run_uuid, run_uuid)
-        self.assertEqual(elastic_telemetry.build_url, "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547")
+        self.assertEqual(
+            elastic_telemetry.build_url,
+            "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",
+        )
 
     def test_ElasticChaosRunTelemetry(self):
         run_uuid = str(uuid.uuid4())
