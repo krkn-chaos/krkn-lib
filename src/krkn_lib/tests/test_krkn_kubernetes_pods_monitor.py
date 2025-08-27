@@ -8,7 +8,7 @@ from krkn_lib.k8s.pod_monitor import (
 from krkn_lib.tests import BaseTest
 
 
-class TestKrknKubernetesPodsMonitorPool(BaseTest):
+class TestKrknKubernetesPodsMonitor(BaseTest):
     def test_monitor_pods_by_label_no_pods_affected(self):
         # test no pods affected
         namespace = "test-ns-0-" + self.get_random_string(10)

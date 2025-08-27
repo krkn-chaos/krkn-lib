@@ -11,7 +11,7 @@ from krkn_lib.models.pod_monitor.models import (
 )
 
 
-class TestMonitorModels(unittest.TestCase):
+class TestMonitorPodsMonitorModels(unittest.TestCase):
     def test_init_affectedpod(self):
         # Test with required arguments only
         pod = AffectedPod("my-pod", "my-namespace")
