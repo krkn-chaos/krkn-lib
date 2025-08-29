@@ -9,6 +9,8 @@ spec:
   containers:
   - name: service-hijacking
     image: {{image}}
+    securityContext:
+      privileged: {{privileged}}
     env:
         - name: TEST_PLAN_PATH
           value: /service-hijacking/plan.yaml
