@@ -1,3 +1,4 @@
+import json
 import time
 
 from krkn_lib.k8s.pod_monitor import (
@@ -40,7 +41,6 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         pods_status = snapshot.get_pods_status()
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
-
         # added half second of delay that might be introduced to API
         # calls
         self.assertAlmostEqual(end_time - start_time, monitor_timeout, 0)
@@ -53,7 +53,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self,
     ):
         # test pod with different name recovered
-        namespace = "test-ns-1-" + self.get_random_string(10)
+        namespace_random_pattern = "test-ns-1-" + self.get_random_string(3)
+        namespace = f"{namespace_random_pattern}-" + self.get_random_string(10)
         delayed_1 = "delayed-1-" + self.get_random_string(10)
         delayed_2 = "delayed-1-" + self.get_random_string(10)
         delayed_respawn = "delayed-1-respawn-" + self.get_random_string(10)
@@ -72,7 +73,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         future = select_and_monitor_by_name_pattern_and_namespace_pattern(
             pod_name_pattern="^delayed-1-.*",
-            namespace_pattern="^test-ns-1-.*",
+            namespace_pattern=f"^{namespace_random_pattern}-.*",
             max_timeout=monitor_timeout,
             v1_client=self.lib_k8s.cli,
         )
@@ -81,7 +82,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         # to prevent the pod scheduling happening before the deletion
         # event that in a real world scenario
         # can't happen (eg. replicaset or deployment)
-        time.sleep(0.01)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_respawn, namespace, pod_delay, label
         )
@@ -94,13 +95,15 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         time.sleep(3)
 
         snapshot = future.result()
+        print(f"\nRunning test ID: {self.id()}")
+        print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
 
         self.assertEqual(len(pods_status.recovered), 1)
         self.assertEqual(pods_status.recovered[0].pod_name, delayed_respawn)
         self.assertEqual(pods_status.recovered[0].namespace, namespace)
         self.assertTrue(pods_status.recovered[0].pod_readiness_time > 0)
-        self.assertTrue(pods_status.recovered[0].pod_rescheduling_time >= 0)
+        self.assertTrue(pods_status.recovered[0].pod_rescheduling_time > 0)
         self.assertTrue(
             pods_status.recovered[0].total_recovery_time >= pod_delay
         )
@@ -135,7 +138,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         # to prevent the pod scheduling happening before the deletion
         # event that in a real world scenario can't happen
         # (eg. replicaset or deployment)
-        time.sleep(0.01)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_1, namespace, pod_delay, label
         )
@@ -146,6 +149,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         time.sleep(3)
 
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
         self.assertEqual(len(pods_status.recovered), 1)
@@ -189,12 +194,14 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         # to prevent the pod scheduling happening before the deletion
         # event that in a real world scenario can't happen
         # (eg. replicaset or deployment)
-        time.sleep(0.01)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_respawn, namespace, pod_delay, label
         )
 
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
 
         self.assertEqual(len(pods_status.unrecovered), 1)
@@ -229,6 +236,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         )
         self.background_delete_pod(delayed_1, namespace)
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
 
         self.assertEqual(len(pods_status.unrecovered), 1)
@@ -271,15 +280,20 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         # to prevent the pod scheduling happening before the deletion
         # event that in a real world scenario can't happen
         # (eg. replicaset or deployment)
-        time.sleep(0.01)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_respawn_1, namespace, pod_delay, label
         )
+        # introduce a delay in the next recovering pod to check
+        # if delayed recoveries are captured
+        time.sleep(2)
         self.deploy_delayed_readiness_pod(
             delayed_respawn_2, namespace, pod_delay, label
         )
 
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
 
         self.background_delete_pod(delayed_3, namespace)
@@ -332,7 +346,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         # to prevent the pod scheduling happening before the deletion
         # event that in a real world scenario can't happen
         # (eg. replicaset or deployment)
-        time.sleep(0.01)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_respawn_1, namespace, pod_delay, label
         )
@@ -341,6 +355,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         )
 
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
 
@@ -388,6 +404,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             delayed_respawn_1, namespace, pod_delay, label
         )
         snapshot = future.result()
+        # print(f"\nRunning test ID: {self.id()}")
+        # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
         self.assertEqual(len(pods_status.unrecovered), 1)
@@ -419,6 +437,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         self.lib_k8s.exec_cmd_in_pod(["kill 1"], delayed_1, namespace)
         snapshot = future.result()
+
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
         self.assertEqual(len(pods_status.recovered), 1)
@@ -465,7 +484,6 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertGreater(monitor_timeout - (end_time - start_time), 110)
 
     def test_monitor_forced_to_wait_with_no_status_change(self):
-
         # tests that the monitor deadlines:
         # - if no change is made in the set of monitored pods the monitor is
         #   forced to wait all the time set in case something happens

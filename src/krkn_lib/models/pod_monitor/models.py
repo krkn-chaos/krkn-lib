@@ -1,6 +1,8 @@
+import json
 import time
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any
 
 from krkn_lib.models.k8s import PodsStatus, AffectedPod
 
@@ -13,13 +15,15 @@ class PodStatus(Enum):
     ADDED = 5
 
 
+@dataclass
 class PodEvent:
     status: PodStatus
-    parent: Optional[str]
 
-    def __init__(self):
-        self._timestamp = time.time()
-        self.parent = None
+    def __init__(self, timestamp: float = None):
+        if not timestamp:
+            self._timestamp = time.time()
+        else:
+            self._timestamp = timestamp
 
     @property
     def timestamp(self):
@@ -29,27 +33,8 @@ class PodEvent:
     def timestamp(self, value):
         raise AttributeError("timestamp cannot be set")
 
-    def __eq__(self, other):
-        return (
-            self.status == other.status and self.timestamp == other.timestamp
-        )
 
-    def __ne__(self, other):
-        return self.status != other.status or self.timestamp != other.timestamp
-
-    def __gt__(self, other):
-        return self.timestamp > other.timestamp
-
-    def __lt__(self, other):
-        return self.timestamp < other.timestamp
-
-    def __ge__(self, other):
-        return self.timestamp >= other.timestamp
-
-    def __le__(self, other):
-        return self.timestamp <= other.timestamp
-
-
+@dataclass
 class MonitoredPod:
     namespace: str
     name: str
@@ -60,30 +45,79 @@ class MonitoredPod:
         self.name = ""
         self.status_changes = []
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "namespace": self.namespace,
+            "name": self.name,
+            "status_changes": [
+                {"status": v.status.name, "timestamp": v.timestamp}
+                for v in self.status_changes
+            ],
+        }
 
+
+@dataclass
 class PodsSnapshot:
     resource_version: str
     pods: dict[str, MonitoredPod]
     added_pods: list[str]
     initial_pods: list[str]
+    _found_rescheduled_pods: dict[str, str]
 
-    def __init__(self):
+    def __init__(self, json_str: str = None):
         self.resource_version = ""
         self.pods = {}
         self.added_pods = []
         self.initial_pods = []
+        self._found_rescheduled_pods = {}
+        if json_str:
+            json_obj = json.loads(json_str)
+            for _, pod in json_obj["pods"]:
+                p = MonitoredPod()
+                p.name = pod["name"]
+                p.namespace = pod["namespace"]
+                for status in pod["status_changes"]:
+                    s = PodEvent(timestamp=status["timestamp"])
+                    if status["status"] == "READY":
+                        s.status = PodStatus.READY
+                    elif status["status"] == "NOT_READY":
+                        s.status = PodStatus.NOT_READY
+                    elif status["status"] == "DELETION_SCHEDULED":
+                        s.status = PodStatus.DELETION_SCHEDULED
+                    elif status["status"] == "DELETED":
+                        s.status = PodStatus.DELETED
+                    elif status["status"] == "ADDED":
+                        s.status = PodStatus.ADDED
+                    p.status_changes.append(s)
+                self.pods[p.name] = p
+            for p in json_obj["added_pods"]:
+                self.added_pods.append(p)
+            for p in json_obj["initial_pods"]:
+                self.initial_pods.append(p)
+
+                pass
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "resource_version": self.resource_version,
+            "pods": [[k, v.to_dict()] for k, v in self.pods.items()],
+            "added_pods": self.added_pods,
+            "initial_pods": self.initial_pods,
+        }
 
     def _find_rescheduled_pod(self, parent: str) -> Optional[MonitoredPod]:
         for _, v in self.pods.items():
             found_pod = next(
                 filter(
-                    lambda p: p.status == PodStatus.ADDED
-                    and p.parent == parent,
+                    lambda p: p.status == PodStatus.ADDED,
                     v.status_changes,
                 ),
                 None,
             )
-            if found_pod:
+            if found_pod and v.name not in self._found_rescheduled_pods:
+                # just pick rescheduled pods once
+                # keeping the parent for future uses
+                self._found_rescheduled_pods[v.name] = parent
                 return v
         return None
 
@@ -122,7 +156,7 @@ class PodsSnapshot:
                 # looks for the rescheduled pod
                 # and calculates its scheduling and readiness time
                 if status_change.status == PodStatus.DELETION_SCHEDULED:
-                    rescheduled_pod = self._find_rescheduled_pod(pod.name)
+                    rescheduled_pod = self._find_rescheduled_pod(pod_name)
                     if not rescheduled_pod:
                         pods_status.unrecovered.append(
                             AffectedPod(

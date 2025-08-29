@@ -89,8 +89,7 @@ def _monitor_pods(
                 pod_event.status = PodStatus.DELETED
             elif event_type == "ADDED":
                 pod_event.status = PodStatus.ADDED
-                if deleted_parent_pods:
-                    pod_event.parent = deleted_parent_pods.pop()
+
             if pod_event.status == PodStatus.ADDED:
                 snapshot.added_pods.append(pod.metadata.name)
                 # in case a pod is respawn with the same name

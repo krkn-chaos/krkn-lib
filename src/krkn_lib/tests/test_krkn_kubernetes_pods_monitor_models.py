@@ -65,7 +65,6 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
     def test_init_podevent(self):
         event = PodEvent()
         self.assertIsInstance(event.timestamp, float)
-        self.assertIsNone(event.parent)
         # Verify that timestamp is close to the current time
         self.assertLess(abs(event.timestamp - time.time()), 0.1)
 
@@ -83,34 +82,6 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         # Patch the timestamp to be equal for a fair comparison
         event2._timestamp = event1.timestamp
         self.assertEqual(event1, event2)
-
-    def test_inequality_podevent(self):
-        event1 = PodEvent()
-        event1.status = PodStatus.READY
-        event2 = PodEvent()
-        event2.status = PodStatus.NOT_READY
-        self.assertNotEqual(event1, event2)
-
-        event2.status = PodStatus.READY
-        event2._timestamp += 10
-        self.assertNotEqual(event1, event2)
-
-    def test_comparison_operators_podevent(self):
-        event1 = PodEvent()
-        event1._timestamp = 100.0
-        event2 = PodEvent()
-        event2._timestamp = 200.0
-        event3 = PodEvent()
-        event3._timestamp = 100.0
-
-        self.assertLess(event1, event2)
-        self.assertGreater(event2, event1)
-        self.assertLessEqual(event1, event2)
-        self.assertLessEqual(event1, event3)
-        self.assertGreaterEqual(event2, event1)
-        self.assertGreaterEqual(event1, event3)
-        self.assertTrue(event1 <= event3)
-        self.assertTrue(event1 >= event3)
 
     def test_init_monitoredpod(self):
         pod = MonitoredPod()
@@ -141,7 +112,7 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
             "parent-pod": parent_pod,
             "rescheduled-pod": rescheduled_pod,
         }
-        found_pod = snapshot._find_rescheduled_pod("parent-pod")
+        found_pod = snapshot._find_rescheduled_pod(parent_pod.name)
         self.assertEqual(found_pod.name, "rescheduled-pod")
 
     def test_find_rescheduled_pod_not_found_podssnapshot(self):
@@ -149,7 +120,7 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         parent_pod = MonitoredPod()
         parent_pod.name = "parent-pod"
         snapshot.pods = {"parent-pod": parent_pod}
-        found_pod = snapshot._find_rescheduled_pod("non-existent-parent")
+        found_pod = snapshot._find_rescheduled_pod(parent_pod.name)
         self.assertIsNone(found_pod)
 
     def test_get_pods_status_not_ready_unrecovered_podssnapshot(self):
@@ -285,3 +256,150 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         self.assertEqual(len(status.unrecovered), 1)
         self.assertEqual(len(status.recovered), 0)
         self.assertEqual(status.unrecovered[0].pod_name, "rescheduled-pod")
+
+    def test_respawn_buggy_input(self):
+        buggy_json = """
+     {
+ "resource_version": "3370",
+ "pods": [
+  [
+   "delayed-3-bjojvqzxou",
+   {
+    "namespace": "test-ns-3-cprfhlhdox",
+    "name": "delayed-3-bjojvqzxou",
+    "status_changes": []
+   }
+  ],
+  [
+   "delayed-3-ogjrbicxis",
+   {
+    "namespace": "test-ns-3-cprfhlhdox",
+    "name": "delayed-3-ogjrbicxis",
+    "status_changes": [
+     {
+      "parent": null,
+      "status": "DELETION_SCHEDULED",
+      "timestamp": 1.0
+     }
+    ]
+   }
+  ],
+  [
+   "delayed-respawn-3-giuxefqrps",
+   {
+    "namespace": "test-ns-3-cprfhlhdox",
+    "name": "delayed-respawn-3-giuxefqrps",
+    "status_changes": [
+     {
+      "parent": null,
+      "status": "ADDED",
+      "timestamp": 1.0
+     },
+     {
+      "parent": null,
+      "status": "NOT_READY",
+      "timestamp": 2.0
+     },
+     {
+      "parent": null,
+      "status": "NOT_READY",
+      "timestamp": 3.0
+     },
+     {
+      "parent": null,
+      "status": "NOT_READY",
+      "timestamp": 4.0
+     }
+    ]
+   }
+  ]
+ ],
+ "added_pods": [
+  "delayed-respawn-3-giuxefqrps"
+ ],
+ "initial_pods": [
+  "delayed-3-bjojvqzxou",
+  "delayed-3-ogjrbicxis"
+ ]
+}
+"""
+        snapshot = PodsSnapshot(json_str=buggy_json)
+        status = snapshot.get_pods_status()
+        self.assertEqual(len(status.unrecovered), 1)
+        self.assertEqual(
+            status.unrecovered[0].pod_name, "delayed-respawn-3-giuxefqrps"
+        )
+
+        another_buggy_json = """
+{
+ "resource_version": "3584",
+ "pods": [
+  [
+   "delayed-1-fsghkeirdl",
+   {
+    "namespace": "test-ns-1-tyu-crsltvqclh",
+    "name": "delayed-1-fsghkeirdl",
+    "status_changes": [
+     {
+      "status": "DELETION_SCHEDULED",
+      "timestamp": 1756824656.2687368
+     }
+    ]
+   }
+  ],
+  [
+   "delayed-1-sxaelejdul",
+   {
+    "namespace": "test-ns-1-tyu-crsltvqclh",
+    "name": "delayed-1-sxaelejdul",
+    "status_changes": []
+   }
+  ],
+  [
+   "delayed-1-respawn-lcfmnhgxzs",
+   {
+    "namespace": "test-ns-1-tyu-crsltvqclh",
+    "name": "delayed-1-respawn-lcfmnhgxzs",
+    "status_changes": [
+     {
+      "status": "ADDED",
+      "timestamp": 1756824656.2621553
+     },
+     {
+      "status": "NOT_READY",
+      "timestamp": 1756824656.2722685
+     },
+     {
+      "status": "NOT_READY",
+      "timestamp": 1756824656.2776031
+     },
+     {
+      "status": "NOT_READY",
+      "timestamp": 1756824657.1519113
+     },
+     {
+      "status": "READY",
+      "timestamp": 1756824658.1827428
+     }
+    ]
+   }
+  ]
+ ],
+ "added_pods": [
+  "delayed-1-respawn-lcfmnhgxzs"
+ ],
+ "initial_pods": [
+  "delayed-1-fsghkeirdl",
+  "delayed-1-sxaelejdul"
+ ]
+}
+        """
+        snapshot = PodsSnapshot(json_str=another_buggy_json)
+        status = snapshot.get_pods_status()
+        self.assertTrue(len(status.recovered), 1)
+        self.assertTrue(status.recovered[0].pod_readiness_time > 0)
+        # Tests a real case where the pod has been rescheduled before
+        # The event of the deletion has been emitted measuring a negative
+        # rescheduling time.
+        self.assertTrue(status.recovered[0].pod_rescheduling_time < 0)
+        self.assertTrue(status.recovered[0].total_recovery_time > 0)
