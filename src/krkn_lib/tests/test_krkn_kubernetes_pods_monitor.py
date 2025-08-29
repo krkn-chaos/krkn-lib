@@ -31,7 +31,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         start_time = time.time()
 
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
         snapshot = future.result()
         end_time = time.time()
@@ -72,6 +74,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pod_name_pattern="^delayed-1-.*",
             namespace_pattern="^test-ns-1-.*",
             max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
 
         self.background_delete_pod(delayed_1, namespace)
@@ -125,6 +128,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             namespace_pattern="^test-ns-2-.*",
             label_selector=f"test={label}",
             max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
 
         self.lib_k8s.delete_pod(delayed_1, namespace)
@@ -176,7 +180,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         pod_delay = 21
 
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
 
         self.background_delete_pod(delayed_1, namespace)
@@ -217,7 +223,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         monitor_timeout = 15
 
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
         self.background_delete_pod(delayed_1, namespace)
         snapshot = future.result()
@@ -253,7 +261,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         pod_delay = 2
 
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
 
         self.background_delete_pod(delayed_1, namespace)
@@ -313,7 +323,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         pod_delay = 0
         pod_too_much_delay = 25
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
@@ -365,7 +377,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         monitor_timeout = 10
         pod_delay = 1
         future = select_and_monitor_by_label(
-            label_selector=f"test={label}", max_timeout=monitor_timeout
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
         self.background_delete_pod(delayed_1, namespace)
         self.background_delete_pod(delayed_2, namespace)
@@ -397,7 +411,10 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         monitor_timeout = 20
 
         future = select_and_monitor_by_name_pattern_and_namespace_pattern(
-            delayed_1, namespace, max_timeout=monitor_timeout
+            delayed_1,
+            namespace,
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
         )
 
         self.lib_k8s.exec_cmd_in_pod(["kill 1"], delayed_1, namespace)
@@ -407,3 +424,72 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertEqual(len(pods_status.recovered), 1)
         self.assertEqual(pods_status.recovered[0].pod_rescheduling_time, None)
         self.assertGreater(pods_status.recovered[0].pod_readiness_time, 0)
+
+    def test_monitor_stopping_earlier(self):
+
+        # tests that the monitor deadlines:
+        # - if the monitored pods status changes and is restored
+        #   before than the 120 seconds deadline the monitor returns earlier
+        #   the assertions checks that the monitor returns within 10 seconds
+        #   120 - (end-start) >= 110
+        # - if no change is made in the set of monitor pods the monitor is
+        #   forced to wait all the time set
+
+        namespace = "test-ns-6-" + self.get_random_string(10)
+        delayed_1 = "delayed-6-" + self.get_random_string(10)
+        delayed_respawn_1 = "delayed-6-respawn-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        pod_delay = 3
+        while not self.lib_k8s.is_pod_running(delayed_1, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120
+
+        start_time = time.time()
+
+        future = select_and_monitor_by_label(
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+        self.deploy_delayed_readiness_pod(
+            delayed_respawn_1, namespace, pod_delay, label
+        )
+        _ = future.result()
+        end_time = time.time()
+
+        self.assertGreater(monitor_timeout - (end_time - start_time), 110)
+
+    def test_monitor_forced_to_wait_with_no_status_change(self):
+
+        # tests that the monitor deadlines:
+        # - if no change is made in the set of monitored pods the monitor is
+        #   forced to wait all the time set in case something happens
+
+        namespace = "test-ns-7-" + self.get_random_string(10)
+        delayed_1 = "delayed-7" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        while not self.lib_k8s.is_pod_running(delayed_1, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 20
+
+        start_time = time.time()
+
+        future = select_and_monitor_by_label(
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+        _ = future.result()
+        end_time = time.time()
+
+        self.assertGreaterEqual((end_time - start_time), monitor_timeout)
