@@ -26,7 +26,7 @@ jobs:
           --method POST \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          /repos/krkn-chaos/krkn/releases/generate-notes \
+          /repos/krkn-chaos/krkn-lib/releases/generate-notes \
           -f "tag_name=${{ github.ref_name }}" -f "target_commitish=main" -f "previous_tag_name=${{ env.PREVIOUS_TAG }}" | jq -r .body)
           echo "NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
