@@ -421,6 +421,7 @@ class HealthCheck:
             self.end_timestamp = json_dict["end_timestamp"]
             self.duration = json_dict["duration"]
 
+
 @dataclass(order=False)
 class VirtCheck:
     """
@@ -466,10 +467,11 @@ class VirtCheck:
             self.ip_address = json_dict["ip_address"]
             self.namespace = json_dict["namespace"]
             self.vm_name = json_dict["vm_name"]
-            self.status = json_dict.get("status",True)
-            self.start_timestamp = json_dict.get("start_timestamp","")
-            self.end_timestamp = json_dict.get("end_timestamp","")
-            self.duration = json_dict.get("duration","")
+            self.status = json_dict.get("status", True)
+            self.start_timestamp = json_dict.get("start_timestamp", "")
+            self.end_timestamp = json_dict.get("end_timestamp", "")
+            self.duration = json_dict.get("duration", "")
+
 
 @dataclass(order=False)
 class ChaosRunTelemetry:

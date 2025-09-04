@@ -3490,7 +3490,7 @@ class KrknKubernetes:
         cmd = (
             f"for dir in /proc/[0-9]*; do grep -q {pod_container_id}  "
             f"$dir/cgroup 2>/dev/null "
-            "&& echo ${dir/\/proc\//}; done"
+            "&& echo ${dir/\/proc\//}; done"  # NOQA
         )
 
         pids = self.exec_cmd_in_pod(
