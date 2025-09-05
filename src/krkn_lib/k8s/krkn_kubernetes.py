@@ -1513,7 +1513,10 @@ class KrknKubernetes:
             logging.error("Error trying to apply_yaml" + str(e))
 
     def get_pod_info(
-        self, name: str, namespace: str = "default", delete_expected: bool = False
+        self,
+        name: str,
+        namespace: str = "default",
+        delete_expected: bool = False,
     ) -> Optional[Pod]:
         """
         Retrieve information about a specific pod
@@ -1583,11 +1586,11 @@ class KrknKubernetes:
                     creation_timestamp=response.metadata.creation_timestamp,
                 )
         except Exception:
-            if not delete_expected: 
+            if not delete_expected:
                 logging.error(
                     "Pod '%s' doesn't exist in namespace '%s'", name, namespace
                 )
-            else: 
+            else:
                 logging.info(
                     "Pod '%s' doesn't exist in namespace '%s'", name, namespace
                 )
@@ -3006,7 +3009,9 @@ class KrknKubernetes:
             if set(pods_and_namespaces) == set(current_pods_and_namespaces):
                 for pod in current_pods_and_namespaces:
 
-                    pod_info = self.get_pod_info(pod[0], pod[1], delete_expected=True)
+                    pod_info = self.get_pod_info(
+                        pod[0], pod[1], delete_expected=True
+                    )
                     # for pod_info in pod_list_info:
                     if pod_info:
                         pod_creation_timestamp = (
@@ -3217,7 +3222,7 @@ class KrknKubernetes:
         port_number: int = 5000,
         port_name: str = "flask",
         stats_route: str = "/stats",
-        privileged: bool = True
+        privileged: bool = True,
     ) -> ServiceHijacking:
         """
         Deploys a pod running the service-hijacking webservice
@@ -3271,7 +3276,7 @@ class KrknKubernetes:
                 config_map_name=config_map_name,
                 port_number=port_number,
                 stats_route=stats_route,
-                privileged=privileged
+                privileged=privileged,
             )
         )
 
@@ -3483,8 +3488,9 @@ class KrknKubernetes:
             )
 
         cmd = (
-            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && "
-            "echo ${dir/\/proc\//}; done" % pod_container_id  # noqa
+            f"for dir in /proc/[0-9]*; do grep -q {pod_container_id}  "
+            f"$dir/cgroup 2>/dev/null "
+            "&& echo ${dir/\/proc\//}; done"  # NOQA
         )
 
         pids = self.exec_cmd_in_pod(

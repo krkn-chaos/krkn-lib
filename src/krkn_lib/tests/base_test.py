@@ -549,7 +549,7 @@ class BaseTest(unittest.TestCase):
                     "kernel_version": "5.4.0-66-generic",
                     "kubelet_version": "v2.1.2",
                     "os_version": "Linux",
-                    "nodes_type": "master"
+                    "nodes_type": "master",
                 }
             ],
             "node_taints": [
@@ -573,36 +573,37 @@ class BaseTest(unittest.TestCase):
                 }
             ],
             "virt_checks": [
-            {
-                "node_name": "h03-r660",
-                "namespace": "benchmark-runner",
-                "ip_address": "0.0.0.0",
-                "vm_name": "windows-vm-50",
-                "status": True,
-                "start_timestamp": "2025-03-12T14:57:34.555878",
-                "end_timestamp": "2025-03-12T14:57:54.904352",
-                "duration": 20.348474
-            },
-            {
-                "node_name": "h27-r660",
-                "namespace": "benchmark-runner",
-                "vm_name": "windows-vm-51",
-                "ip_address": "0.0.0.1",
-                "status": True,
-                "start_timestamp": "2025-03-12T14:57:34.759105",
-                "end_timestamp": "2025-03-12T14:57:54.904352",
-                "duration": 20.145247
-            },
-            {
-                "node_name": "h10-r660",
-                "namespace": "benchmark-runner",
-                "vm_name": "windows-vm-52",
-                "ip_address": "0.0.0.2",
-                "status": False,
-                "start_timestamp": "2025-03-12T14:57:35.308957",
-                "end_timestamp": "2025-03-12T14:57:54.904352",
-                "duration": 19.595395
-            }],
+                {
+                    "node_name": "h03-r660",
+                    "namespace": "benchmark-runner",
+                    "ip_address": "0.0.0.0",
+                    "vm_name": "windows-vm-50",
+                    "status": True,
+                    "start_timestamp": "2025-03-12T14:57:34.555878",
+                    "end_timestamp": "2025-03-12T14:57:54.904352",
+                    "duration": 20.348474,
+                },
+                {
+                    "node_name": "h27-r660",
+                    "namespace": "benchmark-runner",
+                    "vm_name": "windows-vm-51",
+                    "ip_address": "0.0.0.1",
+                    "status": True,
+                    "start_timestamp": "2025-03-12T14:57:34.759105",
+                    "end_timestamp": "2025-03-12T14:57:54.904352",
+                    "duration": 20.145247,
+                },
+                {
+                    "node_name": "h10-r660",
+                    "namespace": "benchmark-runner",
+                    "vm_name": "windows-vm-52",
+                    "ip_address": "0.0.0.2",
+                    "status": False,
+                    "start_timestamp": "2025-03-12T14:57:35.308957",
+                    "end_timestamp": "2025-03-12T14:57:54.904352",
+                    "duration": 19.595395,
+                },
+            ],
             "total_node_count": 3,
             "cloud_infrastructure": "AWS",
             "cloud_type": "EC2",

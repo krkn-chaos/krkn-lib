@@ -414,20 +414,24 @@ class UtilFunctionTests(BaseTest):
     def test_get_ci_job_url(self):
 
         ci_job_url = utils.get_ci_job_url()
-        print('ci job url' + str(ci_job_url))
+        print("ci job url" + str(ci_job_url))
         self.assertNotEqual(ci_job_url, "manual")
 
-        github_run_id = os.getenv("GITHUB_RUN_ID","")
+        github_run_id = os.getenv("GITHUB_RUN_ID", "")
         os.environ["GITHUB_RUN_ID"] = ""
         os.environ["PROW_JOB_ID"] = "1953335493844275200"
-        os.environ["BUILD_ID"] = "periodic-ci-redhat-chaos-prow-scripts-main-cr-4.19-nightly-krkn-hub-aws" # NOQA
-        os.environ["JOB_NAME"] = "1953335493844275200" 
+        os.environ["BUILD_ID"] = (
+            "periodic-ci-redhat-chaos-prow-scripts-main-cr-4.19-nightly-krkn-hub-aws"  # NOQA
+        )
+        os.environ["JOB_NAME"] = "1953335493844275200"
         ci_job_url = utils.get_ci_job_url()
-        print('ci job url' + str(ci_job_url))
+        print("ci job url" + str(ci_job_url))
         self.assertIn("prow.ci.openshift.org", ci_job_url)
         os.environ["PROW_JOB_ID"] = ""
-        os.environ["BUILD_URL"] = "https://jenkins-csb-openshift-qe-mastern.dno.corp.redhat.com/job/scale-ci/job/e2e-benchmarking-multibranch-pipeline/job/kraken/" # NOQA 
+        os.environ["BUILD_URL"] = (
+            "https://jenkins-csb-openshift-qe-mastern.dno.corp.redhat.com/job/scale-ci/job/e2e-benchmarking-multibranch-pipeline/job/kraken/"  # NOQA
+        )
         ci_job_url = utils.get_ci_job_url()
-        print('ci job url' + str(ci_job_url))
+        print("ci job url" + str(ci_job_url))
         self.assertEqual(ci_job_url, os.environ["BUILD_URL"])
         os.environ["GITHUB_RUN_ID"] = github_run_id
