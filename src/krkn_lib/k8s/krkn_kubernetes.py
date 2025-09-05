@@ -2848,7 +2848,7 @@ class KrknKubernetes:
         port_number: int = 5000,
         port_name: str = "flask",
         stats_route: str = "/stats",
-        privileged: bool = True
+        privileged: bool = True,
     ) -> ServiceHijacking:
         """
         Deploys a pod running the service-hijacking webservice
@@ -2902,7 +2902,7 @@ class KrknKubernetes:
                 config_map_name=config_map_name,
                 port_number=port_number,
                 stats_route=stats_route,
-                privileged=privileged
+                privileged=privileged,
             )
         )
 
@@ -3114,8 +3114,9 @@ class KrknKubernetes:
             )
 
         cmd = (
-            "for dir in /proc/[0-9]*; do [ $(cat $dir/cgroup | grep %s) ] && "
-            "echo ${dir/\/proc\//}; done" % pod_container_id  # noqa
+            f"for dir in /proc/[0-9]*; do grep -q {pod_container_id}  "
+            f"$dir/cgroup 2>/dev/null "
+            "&& echo ${dir/\/proc\//}; done"  # NOQA
         )
 
         pids = self.exec_cmd_in_pod(
