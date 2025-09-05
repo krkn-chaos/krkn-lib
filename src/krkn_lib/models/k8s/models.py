@@ -1,6 +1,5 @@
-from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass(frozen=True, order=False)
@@ -186,7 +185,6 @@ class PodsStatus:
 
     recovered: list[AffectedPod]
     unrecovered: list[AffectedPod]
-    error: Optional[str]
 
     def __init__(self, json_object: str = None):
         self.recovered = []
@@ -218,28 +216,6 @@ class PodsStatus:
             self.recovered.append(recovered)
         for unrecovered in pods_status.unrecovered:
             self.unrecovered.append(unrecovered)
-
-
-class PodsMonitorThread:
-    executor: ThreadPoolExecutor
-    future: Future
-
-    def __init__(self, executor: ThreadPoolExecutor, future: Future):
-        self.future = future
-        self.executor = executor
-
-    def join(self, timeout: int = 120) -> PodsStatus:
-        try:
-            result = self.future.result(timeout=timeout)
-            self.executor.shutdown(wait=False, cancel_futures=True)
-            return result
-        except Exception as e:
-            pods_status = PodsStatus()
-            pods_status.error = Exception(
-                f"Thread pool did not shutdown correctly,"
-                f"aborting.\nException: {e}"
-            )
-            return pods_status
 
 
 class AffectedNode:
