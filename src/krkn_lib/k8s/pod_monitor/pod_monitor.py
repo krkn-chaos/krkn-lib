@@ -1,10 +1,9 @@
-import os
 import re
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 
-from kubernetes import config, watch
+from kubernetes import watch
 from kubernetes.client import V1Pod, CoreV1Api
 
 from krkn_lib.models.pod_monitor.models import (
@@ -13,9 +12,6 @@ from krkn_lib.models.pod_monitor.models import (
     PodEvent,
     PodStatus,
 )
-
-config.load_kube_config(os.path.join(os.environ["HOME"], ".kube/config"))
-
 
 def _select_pods(
     select_partial: partial,
