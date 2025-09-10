@@ -441,8 +441,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
         self.assertEqual(len(pods_status.recovered), 1)
-        self.assertEqual(pods_status.recovered[0].pod_rescheduling_time, None)
+        self.assertEqual(pods_status.recovered[0].pod_rescheduling_time, 0)
         self.assertGreater(pods_status.recovered[0].pod_readiness_time, 0)
+        self.assertEqual(pods_status.recovered[0].total_recovery_time, pods_status.recovered[0].pod_readiness_time)
 
     def test_monitor_stopping_earlier(self):
 

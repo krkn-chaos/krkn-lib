@@ -8,6 +8,7 @@ from krkn_lib.models.k8s import PodsStatus, AffectedPod
 
 
 class PodStatus(Enum):
+    UNDEFINED = 0
     READY = 1
     NOT_READY = 2
     DELETION_SCHEDULED = 3
@@ -20,6 +21,7 @@ class PodEvent:
     status: PodStatus
 
     def __init__(self, timestamp: float = None):
+        self.status = PodStatus.UNDEFINED
         if not timestamp:
             self._timestamp = time.time()
         else:
@@ -142,12 +144,18 @@ class PodsSnapshot:
                             )
                         )
                     else:
+                        # pod stayed ready but was restarted 
+                        # or has a failed container
                         pods_status.recovered.append(
                             AffectedPod(
                                 pod_name=pod.name,
                                 namespace=pod.namespace,
                                 pod_readiness_time=ready_status.timestamp
                                 - status_change.timestamp,
+                                pod_rescheduling_time=0,
+                                total_recovery_time=
+                                        ready_status.timestamp
+                                            - status_change.timestamp
                             )
                         )
                     break
