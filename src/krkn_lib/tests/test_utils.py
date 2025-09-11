@@ -426,7 +426,25 @@ class UtilFunctionTests(BaseTest):
         os.environ["JOB_NAME"] = "1953335493844275200"
         ci_job_url = utils.get_ci_job_url()
         print("ci job url" + str(ci_job_url))
-        self.assertIn("prow.ci.openshift.org", ci_job_url)
+        self.assertIn(
+            "prow.ci.openshift.org/view/gs/origin-ci-test", ci_job_url
+        )
+        os.environ["PULL_NUMBER"] = "68493"
+        os.environ["PROW_JOB_ID"] = os.environ["JOB_NAME"] = (
+            "1965813126276321280"
+        )
+        os.environ["JOB_TYPE"] = "presubmit"
+
+        os.environ["BUILD_ID"] = (
+            "rehearse-68493-periodic-ci-redhat-chaos-prow-scripts-main-4.20-nightly-krkn-hub-node-tests-aws-ipsec"  # NOQA
+        )
+
+        ci_job_url = utils.get_ci_job_url()
+        print("ci job url" + str(ci_job_url))
+        self.assertIn(
+            "prow.ci.openshift.org/view/gs/test-platform-results", ci_job_url
+        )
+
         os.environ["PROW_JOB_ID"] = ""
         os.environ["BUILD_URL"] = (
             "https://jenkins-csb-openshift-qe-mastern.dno.corp.redhat.com/job/scale-ci/job/e2e-benchmarking-multibranch-pipeline/job/kraken/"  # NOQA
