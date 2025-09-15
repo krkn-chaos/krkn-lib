@@ -237,7 +237,7 @@ jobs:
           name: dist
           path: dist
       - name: Install twine
-        run: pip install -U twine
+        run: pip install -U twine packaging==24.2
       - name: Publish
         env:
           TWINE_USERNAME: __token__
