@@ -2881,11 +2881,13 @@ class KrknKubernetes:
             "service_hijacking_config_map.j2"
         )
         plan_dump = yaml.dump(plan)
+
         cm_body = yaml.safe_load(
             config_map_template.render(
                 name=config_map_name, namespace=namespace, plan=plan_dump
             )
         )
+        print('cm body ' + str(cm_body))
         self.cli.create_namespaced_config_map(
             namespace=namespace, body=cm_body
         )

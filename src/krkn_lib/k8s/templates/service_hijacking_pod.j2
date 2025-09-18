@@ -12,12 +12,12 @@ spec:
     securityContext:
       privileged: {{privileged}}
     env:
-        - name: TEST_PLAN_PATH
-          value: /service-hijacking/plan.yaml
-        - name: STATS_ROUTE
-          value: {{stats_route}}
-        - name: FLASK_RUN_PORT
-          value: '{{port_number}}'
+    - name: TEST_PLAN_PATH
+      value: /service-hijacking/plan.yaml
+    - name: STATS_ROUTE
+      value: {{stats_route}}
+    - name: FLASK_RUN_PORT
+      value: '{{port_number}}'
     ports:
     - name: {{port_name}}
       containerPort: {{port_number}}
