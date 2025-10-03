@@ -13,6 +13,7 @@ from krkn_lib.models.pod_monitor.models import (
     PodStatus,
 )
 
+
 def _select_pods(
     select_partial: partial,
     namespace_pattern: str = None,

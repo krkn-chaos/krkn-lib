@@ -86,8 +86,11 @@ class KrknKubernetesTestsList(BaseTest):
         )
         self.assertTrue(len(pods) == 0)
 
-        # Test with exclude_label - should not exclude any pods (no matching labels)
-        pods = self.lib_k8s.list_pods(namespace=namespace, exclude_label="skip=true")
+        # Test with exclude_label - should not exclude
+        # any pods (no matching labels)
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, exclude_label="skip=true"
+        )
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
 
@@ -103,7 +106,9 @@ class KrknKubernetesTestsList(BaseTest):
         self.assertIn("kraken-exclude", pods)
 
         # Test with exclude_label - should exclude the labeled pod
-        pods = self.lib_k8s.list_pods(namespace=namespace, exclude_label="skip=true")
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, exclude_label="skip=true"
+        )
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
         self.assertNotIn("kraken-exclude", pods)

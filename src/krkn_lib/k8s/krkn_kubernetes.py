@@ -528,7 +528,7 @@ class KrknKubernetes:
         namespace: str,
         label_selector: str = None,
         field_selector: str = None,
-        exclude_label: str = None
+        exclude_label: str = None,
     ) -> list[str]:
         """
         List pods in the given namespace
@@ -538,7 +538,6 @@ class KrknKubernetes:
             (optional default `None`)
         :param field_selector: filter results by config details
             select only running pods by setting "status.phase=Running"
-            
         :param exclude_label: exclude pods matching this label
             in format "key=value" (optional default `None`)
         :return: a list of pod names
