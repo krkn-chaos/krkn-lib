@@ -88,14 +88,14 @@ jobs:
       - name: Deploy Elasticsearch
         with:
           ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
-        uses: redhat-chaos/actions/elastic@elastic_search
+        uses: redhat-chaos/actions/elastic@main
       - name: Download elastic password
         uses: actions/download-artifact@v4
         with:
-          name: elastic_password.txt
+          name: elastic_password
       - name: Set elastic password on env
         run: |
-          ELASTIC_PASSWORD=$(cat elastic_password)
+          ELASTIC_PASSWORD=$(cat elastic_password.txt)
           echo "ELASTIC_PASSWORD=$ELASTIC_PASSWORD" >> "$GITHUB_ENV"
       - name: Install project dependencies
         run: poetry install --no-interaction
