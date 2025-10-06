@@ -14,7 +14,6 @@ env:
   ELASTIC_URL: "https://localhost"
   ELASTIC_PORT: 9091
   ELASTIC_USER: "elastic"
-  ELASTIC_PASSWORD: "test"
 jobs:
   check-secret:
     runs-on: ubuntu-latest
@@ -88,11 +87,16 @@ jobs:
         uses: redhat-chaos/actions/prometheus@main
       - name: Deploy Elasticsearch
         with:
-          ELASTIC_URL: ${{ env.ELASTIC_URL }}
           ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
-          ELASTIC_USER: ${{ env.ELASTIC_USER }}
-          ELASTIC_PASSWORD: ${{ env.ELASTIC_PASSWORD }}
-        uses: redhat-chaos/actions/elastic@main
+        uses: redhat-chaos/actions/elastic@elastic_search
+      - name: Download elastic password
+        uses: actions/download-artifact@v4
+        with:
+          name: elastic_password.txt
+      - name: Set elastic password on env
+        run: |
+          ELASTIC_PASSWORD=$(cat elastic_password)
+          echo "ELASTIC_PASSWORD=$ELASTIC_PASSWORD" >> "$GITHUB_ENV"
       - name: Install project dependencies
         run: poetry install --no-interaction
       - name: Set TEST_WORKDIR
@@ -108,7 +112,7 @@ jobs:
           ELASTIC_PASSWORD: ${{ env.ELASTIC_PASSWORD }}
 
         run: |
-          
+          echo "ELASTIC PASSWORD: $ELASTIC_PASSWORD"
           poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
           poetry run python3 -m coverage html
           poetry run python3 -m coverage json
