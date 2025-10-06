@@ -88,11 +88,12 @@ jobs:
       - name: Deploy Elasticsearch
         with:
           ELASTIC_PORT: ${{ env.ELASTIC_PORT }}
+          RUN_ID: ${{ github.run_id }}
         uses: redhat-chaos/actions/elastic@main
       - name: Download elastic password
         uses: actions/download-artifact@v4
         with:
-          name: elastic_password
+          name: elastic_password_${{ github.run_id }}
       - name: Set elastic password on env
         run: |
           ELASTIC_PASSWORD=$(cat elastic_password.txt)
