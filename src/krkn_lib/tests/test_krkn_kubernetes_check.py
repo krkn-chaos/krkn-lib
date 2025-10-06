@@ -82,7 +82,9 @@ class KrknKubernetesTestsCheck(BaseTest):
         bad_namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(bad_namespace, [])
         self.deploy_fake_kraken(
-            bad_namespace, random_label=None, node_name="do_not_exist"
+            namespace=bad_namespace,
+            random_label=None,
+            node_name="do_not_exist",
         )
         status = self.lib_k8s.monitor_namespace(namespace=bad_namespace)
         # sleeping for a while just in case
@@ -108,7 +110,9 @@ class KrknKubernetesTestsCheck(BaseTest):
         bad_namespace = "test-ns-" + self.get_random_string(10)
         self.deploy_namespace(bad_namespace, [])
         self.deploy_fake_kraken(
-            bad_namespace, random_label=None, node_name="do_not_exist"
+            namespace=bad_namespace,
+            random_label=None,
+            node_name="do_not_exist",
         )
         status = self.lib_k8s.monitor_component(
             iteration=1, component_namespace=bad_namespace
