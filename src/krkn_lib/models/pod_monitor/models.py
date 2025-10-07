@@ -144,7 +144,8 @@ class PodsSnapshot:
                             )
                         )
                     else:
-                        # pod stayed ready but was restarted 
+
+                        # pod stayed ready but was restarted
                         # or has a failed container
                         pods_status.recovered.append(
                             AffectedPod(
@@ -153,9 +154,8 @@ class PodsSnapshot:
                                 pod_readiness_time=ready_status.timestamp
                                 - status_change.timestamp,
                                 pod_rescheduling_time=0,
-                                total_recovery_time=
-                                        ready_status.timestamp
-                                            - status_change.timestamp
+                                total_recovery_time=ready_status.timestamp
+                                - status_change.timestamp,
                             )
                         )
                     break

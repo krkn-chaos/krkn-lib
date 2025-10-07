@@ -472,13 +472,12 @@ def get_ci_job_url():
         prow_base_url = (
             "https://prow.ci.openshift.org/view/gs/origin-ci-test/logs"
         )
-        prow_pr_base_url=(
-            "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release" # NOQA
-        )
+
+        prow_pr_base_url = "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release"  # NOQA
         task_id = os.getenv("BUILD_ID")
         job_id = os.getenv("JOB_NAME")
         pull_number = os.getenv("PULL_NUMBER")
-        job_type=os.getenv("JOB_TYPE")
+        job_type = os.getenv("JOB_TYPE")
         if job_type == "presubmit" and "pull" in task_id:
             # Indicates a ci test triggered in PR against source code
             job_type = "pull"
@@ -487,11 +486,11 @@ def get_ci_job_url():
             job_type = "pull"
         # Handle cases where a periodic job iw triggered via pull request
         if job_type == "periodic" and pull_number:
-          job_type = "pull"
-        if job_type == "pull" :
-            build_url=f"{prow_pr_base_url}/{pull_number}/{task_id}/{job_id}"
+            job_type = "pull"
+        if job_type == "pull":
+            build_url = f"{prow_pr_base_url}/{pull_number}/{task_id}/{job_id}"
         else:
-            build_url=f"{prow_base_url}/{job_id}/{task_id}"
+            build_url = f"{prow_base_url}/{job_id}/{task_id}"
 
     elif os.getenv("BUILD_URL", ""):
         # Jenkins build url

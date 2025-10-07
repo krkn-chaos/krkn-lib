@@ -165,12 +165,13 @@ class BaseTest(unittest.TestCase):
 
     def deploy_fake_kraken(
         self,
+        name: str = "kraken-deployment",
         namespace: str = "default",
         random_label: str = None,
         node_name: str = None,
     ):
         template = self.template_to_pod(
-            "kraken-deployment", namespace, random_label, node_name
+            name, namespace, random_label, node_name
         )
         self.apply_template(template)
 

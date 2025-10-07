@@ -67,6 +67,8 @@ class KrknKubernetesTestsList(BaseTest):
         namespace = "test-lp" + self.get_random_string(10)
         self.deploy_namespace(namespace, [])
         self.deploy_fake_kraken(namespace=namespace)
+
+        # Test basic pod listing
         pods = self.lib_k8s.list_pods(namespace=namespace)
         self.assertTrue(len(pods) == 1)
         self.assertIn("kraken-deployment", pods)
@@ -83,7 +85,38 @@ class KrknKubernetesTestsList(BaseTest):
             namespace=namespace, field_selector="status.phase=Terminating"
         )
         self.assertTrue(len(pods) == 0)
+
+        # Test with exclude_label - should not exclude
+        # any pods (no matching labels)
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, exclude_label="skip=true"
+        )
+        self.assertTrue(len(pods) == 1)
+        self.assertIn("kraken-deployment", pods)
+
+        # Add a pod with the exclude label leveraging random_label will set
+        # random=skip
+        self.deploy_fake_kraken(
+            namespace=namespace, name="kraken-exclude", random_label="skip"
+        )
+
+        # Test listing all pods without exclusion
+        pods = self.lib_k8s.list_pods(namespace=namespace)
+        self.assertTrue(len(pods) == 2)
+        self.assertIn("kraken-deployment", pods)
+        self.assertIn("kraken-exclude", pods)
+
+        # Test with exclude_label - should exclude the labeled pod
+        pods = self.lib_k8s.list_pods(
+            namespace=namespace, exclude_label="random=skip"
+        )
+        self.assertTrue(len(pods) == 1)
+        self.assertIn("kraken-deployment", pods)
+        self.assertNotIn("kraken-exclude", pods)
+
+        # Clean up
         self.pod_delete_queue.put(["kraken-deployment", namespace])
+        self.pod_delete_queue.put(["kraken-exclude", namespace])
 
     def test_list_ready_nodes(self):
         try:
