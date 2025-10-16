@@ -3170,6 +3170,7 @@ class KrknKubernetes:
         nics = nics_str.split("\n")
         try:
             nics.remove("lo")
+            nics.remove("")
         except ValueError:
             pass
         return nics
