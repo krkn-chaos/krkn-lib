@@ -3141,3 +3141,35 @@ class KrknKubernetes:
             pids_list = list(filter(None, pids_list))
             return pids_list
         return None
+
+    def list_pod_network_interfaces(
+        self, pod_name: str, namespace: str, container_name: str = None
+    ) -> list[str]:
+        """
+        Lists the network interfaces of a pod (Linux only)
+        :param pod_name: the name of the pod
+        :param namespace: the namespaces of the pod
+        :param container_name: the container of the pod where the interfaces
+            will be listed, if None the first will be picked
+        :return: the list of the interfaces
+        """
+
+        if not self.check_if_pod_exists(pod_name, namespace):
+            raise Exception(
+                f"target pod {pod_name} does not exist in "
+                f"namespace {namespace}"
+            )
+
+        cmd = "ls /sys/class/net"
+        nics_str = self.exec_cmd_in_pod(
+            [cmd],
+            pod_name,
+            namespace,
+            container_name,
+        )
+        nics = nics_str.split("\n")
+        try:
+            nics.remove("lo")
+        except ValueError:
+            pass
+        return nics
