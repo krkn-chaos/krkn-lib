@@ -114,7 +114,12 @@ jobs:
 
         run: |
           echo "ELASTIC PASSWORD: $ELASTIC_PASSWORD"
-          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/
+          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/ --omit=test_krkn_kubernetes_socks_proxy.py 
+          poetry run python3 -m coverage html
+          poetry run python3 -m coverage json
+      - name: Run tests with coverage with proxy
+        run: |
+          poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/tests/ --include=test_krkn_kubernetes_socks_proxy.py
           poetry run python3 -m coverage html
           poetry run python3 -m coverage json
       - name: Run AWS specific tests with coverage
