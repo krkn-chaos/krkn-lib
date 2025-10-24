@@ -173,6 +173,19 @@ class KrknKubernetesTestsList(BaseTest):
             len(schedulable_nodes), len(schedulable_nodes_empty_selector)
         )
 
+    def test_list_pod_network_interfaces(self):
+        namespace = "test-cid-" + self.get_random_string(10)
+        base_pod_name = "test-name-" + self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(namespace=namespace, name=base_pod_name)
+        self.wait_pod(base_pod_name, namespace)
+
+        nics = self.lib_k8s.list_pod_network_interfaces(
+            base_pod_name, namespace
+        )
+        self.assertGreater(len(nics), 0)
+        self.assertTrue("eth0" in nics)
+
 
 if __name__ == "__main__":
     unittest.main()
