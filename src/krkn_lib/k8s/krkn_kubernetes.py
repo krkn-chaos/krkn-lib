@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import ssl
 import threading
 import time
 import warnings
@@ -21,6 +22,7 @@ from kubernetes.client.rest import ApiException
 from kubernetes.dynamic.client import DynamicClient
 from kubernetes.stream import stream
 from urllib3 import HTTPResponse
+from urllib3.contrib.socks import SOCKSProxyManager
 
 from krkn_lib.models.k8s import (
     PVC,
@@ -50,10 +52,43 @@ class KrknKubernetes:
     __kubeconfig_string: str = None
     __kubeconfig_path: str = None
     client_config: kubernetes.client.Configuration = None
+    __socks_proxy_manager = None
+    __api_client_instance = None
 
     @property
     def api_client(self) -> client.ApiClient:
-        return client.ApiClient(self.client_config)
+        # Cache the api_client to avoid creating multiple instances
+        if self.__api_client_instance is None:
+            # If SOCKS proxy manager is configured, we need to ensure it's used
+            # before the ApiClient creates any connections
+            if self.__socks_proxy_manager is not None:
+                logging.info("=== Creating ApiClient with SOCKS proxy ===")
+                # Double-check that proxy is not set in configuration
+                # prevents urllib3 from creating PoolManager with SOCKS URL
+                self.client_config.proxy = None
+                self.client_config.proxy_headers = None
+                logging.info(f"Config proxy: {self.client_config.proxy}")
+
+                # Create the client
+                self.__api_client_instance = client.ApiClient(
+                    self.client_config
+                )
+
+                # Force replace the pool manager on the rest client instance
+                self.__api_client_instance.rest_client.pool_manager = (
+                    self.__socks_proxy_manager
+                )
+
+                # Also clear any existing pools that might have been created
+                if hasattr(self.__api_client_instance.rest_client, "pools"):
+                    self.__api_client_instance.rest_client.pools.clear()
+            else:
+                logging.info("=== Creating ApiClient without proxy ===")
+                self.__api_client_instance = client.ApiClient(
+                    self.client_config
+                )
+            client.Configuration.set_default(self.client_config)
+        return self.__api_client_instance
 
     @property
     def cli(self) -> client.CoreV1Api:
@@ -76,12 +111,12 @@ class KrknKubernetes:
         return client.NetworkingV1Api(self.api_client)
 
     @property
-    def dyn_client(cls) -> DynamicClient:
-        return DynamicClient(cls.api_client)
+    def dyn_client(self) -> DynamicClient:
+        return DynamicClient(self.api_client)
 
     @property
-    def custom_object_client(cls) -> client.CustomObjectsApi:
-        return client.CustomObjectsApi(cls.api_client)
+    def custom_object_client(self) -> client.CustomObjectsApi:
+        return client.CustomObjectsApi(self.api_client)
 
     def __init__(
         self,
@@ -114,8 +149,12 @@ class KrknKubernetes:
             self.__kubeconfig_path = kubeconfig_path
 
     def __del__(self):
-        self.api_client.rest_client.pool_manager.clear()
-        self.api_client.close()
+        if self.__api_client_instance is not None:
+            try:
+                self.__api_client_instance.rest_client.pool_manager.clear()
+                self.__api_client_instance.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
 
     # Load kubeconfig and initialize k8s python client
     def __initialize_config(self, kubeconfig_path: str = None):
@@ -151,11 +190,84 @@ class KrknKubernetes:
                 self.client_config = client.Configuration().get_default_copy()
 
         try:
+            # Check for SOCKS proxy before loading kubeconfig
+            http_proxy = os.getenv("http_proxy", None)
+
+            # Store the original proxy values
+            original_http_proxy = http_proxy
+
             config.load_kube_config(kubeconfig_path)
 
             self.client_config = client.Configuration().get_default_copy()
-            http_proxy = os.getenv("http_proxy", None)
-            if http_proxy is not None:
+
+            if original_http_proxy and "socks" in original_http_proxy.lower():
+                # Configure SOCKS5 proxy
+                # Parse socks5://host:port format
+                proxy_parsed = urlparse(original_http_proxy)
+                proxy_host = proxy_parsed.hostname
+                proxy_port = proxy_parsed.port
+                proxy_username = proxy_parsed.username
+                proxy_password = proxy_parsed.password
+
+                logging.info(
+                    f"Configuring SOCKS5 proxy: {proxy_host}:{proxy_port}"
+                )
+
+                # Ensure client config doesn't have standard proxy set
+                self.client_config.proxy = None
+                self.client_config.proxy_headers = None
+
+                # Use socks5h:// scheme to force remote DNS resolution
+                # 'h' suffix tells PySocks to do DNS resolution on proxy side
+                if proxy_username and proxy_password:
+                    socks_proxy_url = f"socks5h://{proxy_username}:"\
+                        "{proxy_password}@{proxy_host}:{proxy_port}"
+                else:
+                    socks_proxy_url = f"socks5h://{proxy_host}:{proxy_port}"
+
+                logging.info(f"SOCKS proxy URL: {socks_proxy_url}")
+
+                # Disable SSL warnings for SOCKS proxy
+                urllib3.disable_warnings(
+                    urllib3.exceptions.InsecureRequestWarning
+                )
+
+                # Create SSL context with client certificates from kubeconfig
+                ssl_context = ssl.create_default_context()
+
+                # Configure SSL verification
+                if self.client_config.verify_ssl:
+                    ssl_context.check_hostname = True
+                    ssl_context.verify_mode = ssl.CERT_REQUIRED
+                    if self.client_config.ssl_ca_cert:
+                        ssl_context.load_verify_locations(
+                            cafile=self.client_config.ssl_ca_cert
+                        )
+                else:
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+
+                # Load client certificate if present (for mutual TLS auth)
+                if (
+                    self.client_config.cert_file
+                    and self.client_config.key_file
+                ):
+                    ssl_context.load_cert_chain(
+                        certfile=self.client_config.cert_file,
+                        keyfile=self.client_config.key_file,
+                    )
+
+                # Create SOCKS proxy manager with proper settings
+                # socks5h:// scheme forces DNS resolution on the proxy side
+                self.__socks_proxy_manager = SOCKSProxyManager(
+                    socks_proxy_url,
+                    num_pools=10,
+                    maxsize=10,
+                    ssl_context=ssl_context,
+                )
+
+                logging.info("SOCKS5 proxy configuration completed")
+            elif http_proxy is not None:
                 os.environ["HTTP_PROXY"] = http_proxy
                 self.client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
@@ -165,8 +277,8 @@ class KrknKubernetes:
                 )
 
             client.Configuration.set_default(self.client_config)
-            self.watch_resource = watch.Watch()
 
+            self.watch_resource = watch.Watch()
         except OSError:
             raise Exception(
                 "Invalid kube-config file: {0}. "
@@ -197,7 +309,11 @@ class KrknKubernetes:
                     if condition["type"] == "Available":
                         return condition["message"].split(" ")[-1]
             return ""
-        except client.exceptions.ApiException as e:
+        except Exception as e:
+            logging.error(
+                "Exception when calling CustomObjectsApi->"
+                "list_cluster_custom_object: {e}"
+            )
             if e.status == 404:
                 return ""
             else:
