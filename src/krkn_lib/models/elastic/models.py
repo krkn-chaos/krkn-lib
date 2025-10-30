@@ -118,6 +118,7 @@ class ElasticHealthChecks(InnerDoc):
 class ElasticVirtChecks(InnerDoc):
     vm_name = Text()
     ip_address = Text()
+    new_ip_address = Text()
     namespace = Text()
     node_name = Text()
     status = Boolean()
@@ -243,6 +244,7 @@ class ElasticChaosRunTelemetry(Document):
                 ElasticVirtChecks(
                     vm_name=info.vm_name,
                     ip_address=info.ip_address,
+                    new_ip_address=info.new_ip_address,
                     namespace=info.namespace,
                     node_name=info.node_name,
                     status=info.status,

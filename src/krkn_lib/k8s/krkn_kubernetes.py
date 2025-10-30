@@ -173,7 +173,6 @@ class KrknKubernetes:
             # such as INFO, WARNING, or ERROR
             # This will effectively disable DEBUG level messages.
             kubernetes_logger.setLevel(logging.INFO)
-
         except OSError:
             raise Exception(
                 "Invalid kube-config file: {0}. "

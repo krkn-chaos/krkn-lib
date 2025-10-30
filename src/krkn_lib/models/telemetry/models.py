@@ -436,6 +436,10 @@ class VirtCheck:
     """
     Vm ip address
     """
+    new_ip_address: str
+    """
+    New Ip address when vm restarts
+    """
     namespace: str
     """
     Namespace
@@ -471,6 +475,7 @@ class VirtCheck:
             self.start_timestamp = json_dict.get("start_timestamp", "")
             self.end_timestamp = json_dict.get("end_timestamp", "")
             self.duration = json_dict.get("duration", "")
+            self.new_ip_address = json_dict.get("new_ip_address", "")
 
 
 @dataclass(order=False)
