@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 
 import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
+from elastic_transport import RequestsHttpNode
 from elasticsearch_dsl import Search
 
 from krkn_lib.models.elastic.models import (
@@ -46,12 +48,15 @@ class KrknElastic:
             credentials = (
                 (username, password) if username and password else None
             )
+            os.environ['NO_PROXY'] = elastic_url
             self.es = Elasticsearch(
                 f"{elastic_url}:{elastic_port}",
                 http_auth=credentials,
                 verify_certs=verify_certs,
                 ssl_show_warn=False,
+                node_class=RequestsHttpNode,
             )
+            del os.environ['NO_PROXY'] 
         except Exception as e:
             self.safe_logger.error("Failed to initalize elasticsearch: %s" % e)
             raise e

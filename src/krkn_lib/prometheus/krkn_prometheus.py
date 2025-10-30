@@ -1,11 +1,12 @@
 import logging
+import os
 import re
 import sys
 import time
 import warnings
 from datetime import datetime, timedelta
 from io import StringIO
-from typing import Optional
+from urllib.parse import urlparse
 
 import urllib3
 from prometheus_api_client import PrometheusConnect
@@ -36,9 +37,32 @@ class KrknPrometheus:
         if prometheus_bearer_token is not None:
             bearer = "Bearer " + prometheus_bearer_token
             headers = {"Authorization": bearer}
+
+        http_proxy = os.getenv("http_proxy", None)
+        if http_proxy: 
+            proxy_parsed = urlparse(http_proxy)
+            proxy_host = proxy_parsed.hostname
+            proxy_port = proxy_parsed.port
+            proxy_username = proxy_parsed.username
+            proxy_password = proxy_parsed.password
+
+            logging.info(
+                f"Configuring SOCKS5 proxy: {proxy_host}:{proxy_port}"
+            )
+
+            # Use socks5h:// scheme to force remote DNS resolution
+            # 'h' suffix tells PySocks to do DNS resolution on proxy side
+            if proxy_username and proxy_password:
+                socks_proxy_url = f"socks5h://{proxy_username}:"\
+                    f"{proxy_password}@{proxy_host}:{proxy_port}"
+            else:
+                socks_proxy_url = f"socks5h://{proxy_host}:{proxy_port}"
+            proxies = {"https": socks_proxy_url, "http": socks_proxy_url}
+        else:
+            proxies = {"https": os.environ.get("HTTPS_PROXY", None), "http": os.environ.get("HTTP_PROXY", None)}
         try:
             self.prom_cli = PrometheusConnect(
-                url=prometheus_url, headers=headers, disable_ssl=True
+                url=prometheus_url, headers=headers, disable_ssl=True, proxy=proxies
             )
         except Exception as e:
             logging.error("Not able to initialize the client %s" % e)

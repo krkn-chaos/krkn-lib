@@ -12,7 +12,7 @@ homepage = "https://github.com/redhat-chaos/krkn"
 python = "^3.9"
 kubernetes ="34.1.0"
 sphinxnotes-markdown-builder="^0.5.6"
-requests="^2.29.0"
+requests={extras = ["socks"], version = "^2.32.5"}
 kubeconfig = "^1.1.1"
 base64io = "^1.0.3"
 sphinx-rtd-theme = "^1.2.2"
@@ -28,6 +28,7 @@ numpy= "1.26.4"
 deprecation="2.1.0"
 coverage="^7.6.12"
 urllib3 = {version = "1.26.3", extras = ["socks"]}
+elastic-transport = "8.15.1"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
