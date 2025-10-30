@@ -223,6 +223,12 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.virt_checks[0].ip_address, "0.0.0.0"
         )
         self.assertEqual(
+            elastic_telemetry.virt_checks[0].new_ip_address, ""
+        )
+        self.assertEqual(
+            elastic_telemetry.virt_checks[2].new_ip_address, "0.0.0.3"
+        )
+        self.assertEqual(
             elastic_telemetry.virt_checks[0].namespace, "benchmark-runner"
         )
         self.assertEqual(

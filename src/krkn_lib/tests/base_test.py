@@ -583,6 +583,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:34.555878",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.348474,
+                    "new_ip_address": ""
                 },
                 {
                     "node_name": "h27-r660",
@@ -593,6 +594,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:34.759105",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.145247,
+                    "new_ip_address": ""
                 },
                 {
                     "node_name": "h10-r660",
@@ -603,6 +605,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:35.308957",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 19.595395,
+                    "new_ip_address": "0.0.0.3"
                 },
             ],
             "total_node_count": 3,
