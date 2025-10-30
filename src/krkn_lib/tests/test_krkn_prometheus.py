@@ -1,5 +1,7 @@
 import datetime
 import logging
+import os
+from unittest.mock import patch, MagicMock
 
 from krkn_lib.prometheus.krkn_prometheus import KrknPrometheus
 from krkn_lib.tests import BaseTest
@@ -232,3 +234,112 @@ class TestKrknPrometheus(BaseTest):
         self.assertEqual(control, result)
         self.assertEqual(control_no_value, result_no_value)
         self.assertEqual(control_underscore, result_underscore)
+
+    @patch('krkn_lib.prometheus.krkn_prometheus.PrometheusConnect')
+    def test_socks5_proxy_without_auth(self, mock_prom_connect):
+        """Test SOCKS5 proxy configuration without authentication"""
+        mock_prom_connect.return_value = MagicMock()
+
+        # Set http_proxy environment variable with socks5 URL
+        test_proxy = "socks5://127.0.0.1:1080"
+        with patch.dict(os.environ, {'http_proxy': test_proxy}, clear=False):
+            prom_cli = KrknPrometheus(self.url)
+
+            # Verify PrometheusConnect was called with correct proxy configuration
+            mock_prom_connect.assert_called_once()
+            call_args = mock_prom_connect.call_args
+
+            # Check that proxy was passed correctly
+            self.assertIn('proxy', call_args[1])
+            proxy_config = call_args[1]['proxy']
+
+            # Should use socks5h:// scheme for remote DNS resolution
+            expected_proxy = "socks5h://127.0.0.1:1080"
+            self.assertEqual(proxy_config['http'], expected_proxy)
+            self.assertEqual(proxy_config['https'], expected_proxy)
+
+            # Verify other parameters
+            self.assertEqual(call_args[1]['url'], self.url)
+            self.assertTrue(call_args[1]['disable_ssl'])
+
+    @patch('krkn_lib.prometheus.krkn_prometheus.PrometheusConnect')
+    def test_socks5_proxy_with_auth(self, mock_prom_connect):
+        """Test SOCKS5 proxy configuration with authentication"""
+        mock_prom_connect.return_value = MagicMock()
+
+        # Set http_proxy environment variable with credentials
+        test_proxy = "socks5://testuser:testpass@127.0.0.1:1080"
+        with patch.dict(os.environ, {'http_proxy': test_proxy}, clear=False):
+            prom_cli = KrknPrometheus(self.url)
+
+            # Verify PrometheusConnect was called with correct proxy configuration
+            mock_prom_connect.assert_called_once()
+            call_args = mock_prom_connect.call_args
+
+            # Check that proxy was passed correctly
+            self.assertIn('proxy', call_args[1])
+            proxy_config = call_args[1]['proxy']
+
+            # Should include credentials in socks5h:// URL
+            expected_proxy = "socks5h://testuser:testpass@127.0.0.1:1080"
+            self.assertEqual(proxy_config['http'], expected_proxy)
+            self.assertEqual(proxy_config['https'], expected_proxy)
+
+    @patch('krkn_lib.prometheus.krkn_prometheus.PrometheusConnect')
+    def test_no_proxy_configuration(self, mock_prom_connect):
+        """Test initialization without proxy configuration"""
+        mock_prom_connect.return_value = MagicMock()
+
+        # Clear proxy environment variables
+        env_vars = {
+            'http_proxy': None,
+            'HTTP_PROXY': None,
+            'https_proxy': None,
+            'HTTPS_PROXY': None
+        }
+
+        with patch.dict(os.environ, env_vars, clear=False):
+            # Remove the keys if they exist
+            for key in ['http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY']:
+                os.environ.pop(key, None)
+
+            prom_cli = KrknPrometheus(self.url)
+
+            # Verify PrometheusConnect was called
+            mock_prom_connect.assert_called_once()
+            call_args = mock_prom_connect.call_args
+
+            # Check that proxy configuration is None for both protocols
+            self.assertIn('proxy', call_args[1])
+            proxy_config = call_args[1]['proxy']
+            self.assertIsNone(proxy_config['http'])
+            self.assertIsNone(proxy_config['https'])
+
+    @patch('krkn_lib.prometheus.krkn_prometheus.PrometheusConnect')
+    def test_socks5_proxy_with_bearer_token(self, mock_prom_connect):
+        """Test SOCKS5 proxy configuration with bearer token authentication"""
+        mock_prom_connect.return_value = MagicMock()
+
+        # Set http_proxy environment variable
+        test_proxy = "socks5://proxyuser:proxypass@127.0.0.1:1080"
+        bearer_token = "test-bearer-token-12345"
+
+        with patch.dict(os.environ, {'http_proxy': test_proxy}, clear=False):
+            prom_cli = KrknPrometheus(self.url, bearer_token)
+
+            # Verify PrometheusConnect was called
+            mock_prom_connect.assert_called_once()
+            call_args = mock_prom_connect.call_args
+
+            # Check proxy configuration
+            self.assertIn('proxy', call_args[1])
+            proxy_config = call_args[1]['proxy']
+            expected_proxy = "socks5h://proxyuser:proxypass@127.0.0.1:1080"
+            self.assertEqual(proxy_config['http'], expected_proxy)
+            self.assertEqual(proxy_config['https'], expected_proxy)
+
+            # Verify bearer token is included in headers
+            self.assertIn('headers', call_args[1])
+            headers = call_args[1]['headers']
+            self.assertIn('Authorization', headers)
+            self.assertEqual(headers['Authorization'], f'Bearer {bearer_token}')
