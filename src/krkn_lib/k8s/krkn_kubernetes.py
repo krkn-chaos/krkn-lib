@@ -166,6 +166,13 @@ class KrknKubernetes:
 
             client.Configuration.set_default(self.client_config)
             self.watch_resource = watch.Watch()
+            # Get the logger for the kubernetes client
+            kubernetes_logger = logging.getLogger('kubernetes')
+
+            # Set the logging level to a higher level than DEBUG, 
+            # such as INFO, WARNING, or ERROR
+            # This will effectively disable DEBUG level messages.
+            kubernetes_logger.setLevel(logging.INFO)
 
         except OSError:
             raise Exception(
