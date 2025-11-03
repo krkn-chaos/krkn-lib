@@ -6,6 +6,7 @@ import random
 import re
 import threading
 import time
+import traceback
 import warnings
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -1188,6 +1189,7 @@ class KrknKubernetes:
                 return
             else:
                 logging.error("Failed to delete pod %s/%s: %s", name, namespace, str(e))
+                logging.error("Stack trace:\n%s", traceback.format_exc())
                 raise e
         except (urllib3.exceptions.InvalidChunkLength, urllib3.exceptions.ProtocolError, urllib3.exceptions.HTTPError) as e:
             # Connection error occurred, check if pod still exists
@@ -1195,6 +1197,7 @@ class KrknKubernetes:
                 "Connection error during pod deletion: %s. Checking if pod %s/%s still exists...",
                 str(e), name, namespace
             )
+            logging.info("Stack trace:\n%s", traceback.format_exc())
             try:
                 # Verify if pod still exists after connection error
                 self.cli.read_namespaced_pod(name=name, namespace=namespace)
@@ -1203,6 +1206,7 @@ class KrknKubernetes:
                     "Failed to delete pod %s/%s due to connection error: %s",
                     name, namespace, str(e)
                 )
+                logging.error("Stack trace:\n%s", traceback.format_exc())
                 raise e
             except ApiException as read_e:
                 if read_e.status == 404:
@@ -1211,8 +1215,13 @@ class KrknKubernetes:
                         "Pod %s/%s was successfully deleted despite connection error",
                         name, namespace
                     )
+                    logging.info("Stack trace:\n%s", traceback.format_exc())
                     return
                 raise read_e
+        except Exception as e:
+            logging.info('Other Exception' + str(e))
+            logging.info("Stack trace:\n%s", traceback.format_exc())
+            
 
     def create_pod(self, body: any, namespace: str, timeout: int = 120):
         """
