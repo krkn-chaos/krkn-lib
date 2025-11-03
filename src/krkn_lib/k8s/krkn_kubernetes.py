@@ -169,7 +169,7 @@ class KrknKubernetes:
             # Get the logger for the kubernetes client
             kubernetes_logger = logging.getLogger('kubernetes')
 
-            # Set the logging level to a higher level than DEBUG, 
+            # Set the logging level to a higher level than DEBUG,
             # such as INFO, WARNING, or ERROR
             # This will effectively disable DEBUG level messages.
             kubernetes_logger.setLevel(logging.INFO)
