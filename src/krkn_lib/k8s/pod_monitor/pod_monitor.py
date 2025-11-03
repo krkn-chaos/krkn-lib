@@ -1,10 +1,14 @@
+import logging
 import re
+import time
+import traceback
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 
 from kubernetes import watch
 from kubernetes.client import V1Pod, CoreV1Api
+from urllib3.exceptions import ProtocolError
 
 from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
@@ -47,67 +51,151 @@ def _monitor_pods(
     max_timeout: int,
     name_pattern: str = None,
     namespace_pattern: str = None,
+    max_retries: int = 3,
 ) -> PodsSnapshot:
-    w = watch.Watch(return_type=V1Pod)
+    """
+    Monitor pods with automatic retry on watch stream disconnection.
+
+    :param monitor_partial: Partial function for monitoring pods
+    :param snapshot: Snapshot to populate with pod events
+    :param max_timeout: Maximum time to monitor (seconds)
+    :param name_pattern: Regex pattern for pod names
+    :param namespace_pattern: Regex pattern for namespaces
+    :param max_retries: Maximum number of retries on connection error
+        (default: 3)
+    :return: PodsSnapshot with collected pod events
+    """
+
+    start_time = time.time()
+    retry_count = 0
     deleted_parent_pods = []
     restored_pods = []
     cluster_restored = False
-    for event in w.stream(monitor_partial, timeout_seconds=max_timeout):
-        match_name = True
-        match_namespace = True
-        event_type = event["type"]
-        pod = event["object"]
 
-        if namespace_pattern:
-            match = re.match(namespace_pattern, pod.metadata.namespace)
-            match_namespace = match is not None
-        if name_pattern:
-            match = re.match(name_pattern, pod.metadata.name)
-            match_name = match is not None
-
-        if match_name and match_namespace:
-            pod_event = PodEvent()
-            if event_type == "MODIFIED":
-                if pod.metadata.deletion_timestamp is not None:
-                    pod_event.status = PodStatus.DELETION_SCHEDULED
-                    deleted_parent_pods.append(pod.metadata.name)
-                elif _is_pod_ready(pod):
-                    pod_event.status = PodStatus.READY
-                    # if there are at least the same number of ready
-                    # pods as the snapshot.initial_pods set we assume that
-                    # the cluster is restored to the initial condition
-                    restored_pods.append(pod.metadata.name)
-                    if len(restored_pods) >= len(snapshot.initial_pods):
-                        cluster_restored = True
-                else:
-                    pod_event.status = PodStatus.NOT_READY
-
-            elif event_type == "DELETED":
-                pod_event.status = PodStatus.DELETED
-            elif event_type == "ADDED":
-                pod_event.status = PodStatus.ADDED
-
-            if pod_event.status == PodStatus.ADDED:
-                snapshot.added_pods.append(pod.metadata.name)
-                # in case a pod is respawn with the same name
-                # the dictionary must not be reinitialized
-                if pod.metadata.name not in snapshot.pods:
-                    snapshot.pods[pod.metadata.name] = MonitoredPod()
-                    snapshot.pods[pod.metadata.name].name = pod.metadata.name
-                    snapshot.pods[pod.metadata.name].namespace = (
-                        pod.metadata.namespace
-                    )
-            # skips events out of the snapshot
-            if pod.metadata.name in snapshot.pods:
-                snapshot.pods[pod.metadata.name].status_changes.append(
-                    pod_event
+    while retry_count <= max_retries:
+        try:
+            # Calculate remaining timeout if retrying
+            if retry_count > 0:
+                elapsed = time.time() - start_time
+                remain_timeout = max(1, int(max_timeout - elapsed))
+                logging.info("remain timeout " + str(remain_timeout))
+                if remain_timeout <= 0:
+                    logging.info("Maximum timeout reached, stopping monitoring")
+                    break
+                logging.info(
+                    "Reconnecting watch stream"
+                    f"(attempt {retry_count}/{max_retries}),"
+                    f"remaining timeout: {remain_timeout}s"
                 )
-            # this flag is set when all the pods
-            # that has been deleted or not ready
-            # have been restored, if True the
-            # monitoring is stopeed earlier
-            if cluster_restored:
-                w.stop()
+            else:
+                remain_timeout = max_timeout
+
+            w = watch.Watch(return_type=V1Pod)
+
+            for e in w.stream(monitor_partial, timeout_seconds=remain_timeout):
+                match_name = True
+                match_namespace = True
+                event_type = e["type"]
+                pod = e["object"]
+
+                if namespace_pattern:
+                    match = re.match(namespace_pattern, pod.metadata.namespace)
+                    match_namespace = match is not None
+                if name_pattern:
+                    match = re.match(name_pattern, pod.metadata.name)
+                    match_name = match is not None
+
+                if match_name and match_namespace:
+                    pod_event = PodEvent()
+                    pod_name = pod.metadata.name
+                    if event_type == "MODIFIED":
+                        if pod.metadata.deletion_timestamp is not None:
+                            pod_event.status = PodStatus.DELETION_SCHEDULED
+                            if pod_name not in deleted_parent_pods:
+                                deleted_parent_pods.append(pod_name)
+                        elif _is_pod_ready(pod):
+                            pod_event.status = PodStatus.READY
+                            # if there are at least the same number of ready
+                            # pods as the snapshot.initial_pods set we assume
+                            # the cluster is restored to the initial condition
+                            if pod_name not in restored_pods:
+                                restored_pods.append(pod_name)
+                            inital_pod_len = len(snapshot.initial_pods)
+                            if len(restored_pods) >= inital_pod_len:
+                                cluster_restored = True
+                        else:
+                            pod_event.status = PodStatus.NOT_READY
+
+                    elif event_type == "DELETED":
+                        pod_event.status = PodStatus.DELETED
+                    elif event_type == "ADDED":
+                        pod_event.status = PodStatus.ADDED
+
+                    if pod_event.status == PodStatus.ADDED:
+                        
+                        if pod_name not in snapshot.added_pods:
+                            snapshot.added_pods.append(pod_name)
+                        # in case a pod is respawn with the same name
+                        # the dictionary must not be reinitialized
+                        if pod_name not in snapshot.pods:
+                            snapshot.pods[pod_name] = MonitoredPod()
+                            snapshot.pods[pod_name].name = pod_name
+                            snapshot.pods[pod_name].namespace = (
+                                pod.metadata.namespace
+                            )
+                    # skips events out of the snapshot
+                    if pod_name in snapshot.pods:
+                        snapshot.pods[pod_name].status_changes.append(
+                            pod_event
+                        )
+                    # this flag is set when all the pods
+                    # that has been deleted or not ready
+                    # have been restored, if True the
+                    # monitoring is stopped earlier
+                    if cluster_restored:
+                        logging.info("Cluster restored, stopping monitoring")
+                        w.stop()
+                        return snapshot
+
+            # If we exit the loop normally (timeout reached), we're done
+            logging.info("Watch stream completed normally")
+            break
+
+        except ProtocolError as e:
+
+            if retry_count > max_retries:
+                logging.warning(
+                    f"Watch stream connection broken after {max_retries}"
+                    f"retries. ProtocolError: {e}. Returning snapshot "
+                    "with data collected so far."
+                )
+                break
+
+            # Log retry attempt
+            logging.info(
+                f"Watch stream connection broken (ProtocolError): {e}. "
+                f"Retry {retry_count}/{max_retries} in progress..."
+            )
+            backoff_time = 1
+
+            # Check if we have time for backoff
+            elapsed = time.time() - start_time
+            if elapsed + backoff_time >= max_timeout:
+                logging.info(
+                    "Not enough time remaining for backoff, "
+                    "returning snapshot with data collected."
+                )
+                break
+
+            logging.debug(f"Waiting {backoff_time}s before retry...")
+            time.sleep(backoff_time)
+
+        except Exception as e:
+            logging.error("Error in monitor pods: " + str(e))
+            logging.error("Stack trace:\n%s", traceback.format_exc())
+            raise Exception(e)
+        
+        retry_count += 1
 
     return snapshot
 
