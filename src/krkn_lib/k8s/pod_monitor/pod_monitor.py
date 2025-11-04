@@ -1,10 +1,13 @@
+import logging
 import re
+import traceback
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 
 from kubernetes import watch
 from kubernetes.client import V1Pod, CoreV1Api
+from urllib3.exceptions import ProtocolError
 
 from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
@@ -48,67 +51,79 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
 ) -> PodsSnapshot:
-    w = watch.Watch(return_type=V1Pod)
-    deleted_parent_pods = []
-    restored_pods = []
-    cluster_restored = False
-    for event in w.stream(monitor_partial, timeout_seconds=max_timeout):
-        match_name = True
-        match_namespace = True
-        event_type = event["type"]
-        pod = event["object"]
 
-        if namespace_pattern:
-            match = re.match(namespace_pattern, pod.metadata.namespace)
-            match_namespace = match is not None
-        if name_pattern:
-            match = re.match(name_pattern, pod.metadata.name)
-            match_name = match is not None
+    try:
+        w = watch.Watch(return_type=V1Pod)
+        deleted_parent_pods = []
+        restored_pods = []
+        cluster_restored = False
+        for event in w.stream(monitor_partial, timeout_seconds=max_timeout):
+            match_name = True
+            match_namespace = True
+            event_type = event["type"]
+            pod = event["object"]
 
-        if match_name and match_namespace:
-            pod_event = PodEvent()
-            if event_type == "MODIFIED":
-                if pod.metadata.deletion_timestamp is not None:
-                    pod_event.status = PodStatus.DELETION_SCHEDULED
-                    deleted_parent_pods.append(pod.metadata.name)
-                elif _is_pod_ready(pod):
-                    pod_event.status = PodStatus.READY
-                    # if there are at least the same number of ready
-                    # pods as the snapshot.initial_pods set we assume that
-                    # the cluster is restored to the initial condition
-                    restored_pods.append(pod.metadata.name)
-                    if len(restored_pods) >= len(snapshot.initial_pods):
-                        cluster_restored = True
-                else:
-                    pod_event.status = PodStatus.NOT_READY
+            if namespace_pattern:
+                match = re.match(namespace_pattern, pod.metadata.namespace)
+                match_namespace = match is not None
+            if name_pattern:
+                match = re.match(name_pattern, pod.metadata.name)
+                match_name = match is not None
 
-            elif event_type == "DELETED":
-                pod_event.status = PodStatus.DELETED
-            elif event_type == "ADDED":
-                pod_event.status = PodStatus.ADDED
+            if match_name and match_namespace:
+                pod_event = PodEvent()
+                if event_type == "MODIFIED":
+                    if pod.metadata.deletion_timestamp is not None:
+                        pod_event.status = PodStatus.DELETION_SCHEDULED
+                        deleted_parent_pods.append(pod.metadata.name)
+                    elif _is_pod_ready(pod):
+                        pod_event.status = PodStatus.READY
+                        # if there are at least the same number of ready
+                        # pods as the snapshot.initial_pods set we assume that
+                        # the cluster is restored to the initial condition
+                        restored_pods.append(pod.metadata.name)
+                        if len(restored_pods) >= len(snapshot.initial_pods):
+                            cluster_restored = True
+                    else:
+                        pod_event.status = PodStatus.NOT_READY
 
-            if pod_event.status == PodStatus.ADDED:
-                snapshot.added_pods.append(pod.metadata.name)
-                # in case a pod is respawn with the same name
-                # the dictionary must not be reinitialized
-                if pod.metadata.name not in snapshot.pods:
-                    snapshot.pods[pod.metadata.name] = MonitoredPod()
-                    snapshot.pods[pod.metadata.name].name = pod.metadata.name
-                    snapshot.pods[pod.metadata.name].namespace = (
-                        pod.metadata.namespace
+                elif event_type == "DELETED":
+                    pod_event.status = PodStatus.DELETED
+                elif event_type == "ADDED":
+                    pod_event.status = PodStatus.ADDED
+
+                if pod_event.status == PodStatus.ADDED:
+                    snapshot.added_pods.append(pod.metadata.name)
+                    # in case a pod is respawn with the same name
+                    # the dictionary must not be reinitialized
+                    if pod.metadata.name not in snapshot.pods:
+                        snapshot.pods[pod.metadata.name] = MonitoredPod()
+                        snapshot.pods[pod.metadata.name].name = pod.metadata.name
+                        snapshot.pods[pod.metadata.name].namespace = (
+                            pod.metadata.namespace
+                        )
+                # skips events out of the snapshot
+                if pod.metadata.name in snapshot.pods:
+                    snapshot.pods[pod.metadata.name].status_changes.append(
+                        pod_event
                     )
-            # skips events out of the snapshot
-            if pod.metadata.name in snapshot.pods:
-                snapshot.pods[pod.metadata.name].status_changes.append(
-                    pod_event
-                )
-            # this flag is set when all the pods
-            # that has been deleted or not ready
-            # have been restored, if True the
-            # monitoring is stopeed earlier
-            if cluster_restored:
-                w.stop()
-
+                # this flag is set when all the pods
+                # that has been deleted or not ready
+                # have been restored, if True the
+                # monitoring is stopeed earlier
+                if cluster_restored:
+                    w.stop()
+    except ProtocolError as e:
+        # Handle connection broken errors from urllib3
+        # This is common with long-running watch streams
+        logging.warning(
+            f"Watch stream connection broken (ProtocolError): {e}. "
+            "Returning snapshot with data collected so far."
+        )
+    except Exception as e:
+        logging.error("Error in monitor pods" + str(e))
+        logging.error("Stack trace:\n%s", traceback.format_exc())
+        raise Exception(e)
     return snapshot
 
 
