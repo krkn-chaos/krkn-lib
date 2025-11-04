@@ -1,7 +1,4 @@
-import logging
 import re
-import traceback
-
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
@@ -155,30 +152,26 @@ def select_and_monitor_by_label(
         gathered to obtain the pod infos.
 
     """
-    try:
-        select_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            label_selector=label_selector,
-            field_selector="status.phase=Running",
-        )
-        snapshot = _select_pods(select_partial)
-        monitor_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            resource_version=snapshot.resource_version,
-            label_selector=label_selector,
-        )
-        pool = ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(
-            _monitor_pods,
-            monitor_partial,
-            snapshot,
-            max_timeout,
-            name_pattern=None,
-            namespace_pattern=None,
-        )
-    except Exception as e:
-        logging.info("select and montior by label exceptin"+ str(e))
-        logging.error("Stack trace:\n%s", traceback.format_exc())
+    select_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        label_selector=label_selector,
+        field_selector="status.phase=Running",
+    )
+    snapshot = _select_pods(select_partial)
+    monitor_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        resource_version=snapshot.resource_version,
+        label_selector=label_selector,
+    )
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(
+        _monitor_pods,
+        monitor_partial,
+        snapshot,
+        max_timeout,
+        name_pattern=None,
+        namespace_pattern=None,
+    )
     return future
 
 
@@ -217,41 +210,35 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
     try:
         re.compile(pod_name_pattern)
     except re.error as e:
-        logging.error("Stack trace:\n%s", traceback.format_exc())
         raise Exception(f"invalid pod name pattern regex: {e}")
 
     try:
         re.compile(namespace_pattern)
     except re.error as e:
-        logging.error("Stack trace:\n%s", traceback.format_exc())
         raise Exception(f"invalid pod namespace regex: {e}")
-    try:
-        select_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            field_selector="status.phase=Running",
-        )
-        snapshot = _select_pods(
-            select_partial,
-            name_pattern=pod_name_pattern,
-            namespace_pattern=namespace_pattern,
-        )
-        monitor_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            resource_version=snapshot.resource_version,
-        )
-        pool = ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(
-            _monitor_pods,
-            monitor_partial,
-            snapshot,
-            max_timeout,
-            name_pattern=pod_name_pattern,
-            namespace_pattern=namespace_pattern,
-        )
-    except Exception as e:
-        logging.error("Stack trace:\n%s", traceback.format_exc())
-        logging.info("select and montior by name and namespace exceptin"+ str(e))
-        return None
+
+    select_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        field_selector="status.phase=Running",
+    )
+    snapshot = _select_pods(
+        select_partial,
+        name_pattern=pod_name_pattern,
+        namespace_pattern=namespace_pattern,
+    )
+    monitor_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        resource_version=snapshot.resource_version,
+    )
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(
+        _monitor_pods,
+        monitor_partial,
+        snapshot,
+        max_timeout,
+        name_pattern=pod_name_pattern,
+        namespace_pattern=namespace_pattern,
+    )
     return future
 
 
@@ -290,33 +277,29 @@ def select_and_monitor_by_namespace_pattern_and_label(
     try:
         re.compile(namespace_pattern)
     except re.error as e:
-        logging.error("Stack trace:\n%s", traceback.format_exc())
         raise Exception(f"invalid pod namespace regex: {e}")
-    try:
-        select_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            label_selector=label_selector,
-            field_selector="status.phase=Running",
-        )
-        snapshot = _select_pods(
-            select_partial,
-            namespace_pattern=namespace_pattern,
-        )
-        monitor_partial = partial(
-            v1_client.list_pod_for_all_namespaces,
-            resource_version=snapshot.resource_version,
-            label_selector=label_selector,
-        )
-        pool = ThreadPoolExecutor(max_workers=1)
-        future = pool.submit(
-            _monitor_pods,
-            monitor_partial,
-            snapshot,
-            max_timeout,
-            name_pattern=None,
-            namespace_pattern=namespace_pattern,
-        )
-    except Exception as e:
-        logging.error("Stack trace:\n%s", traceback.format_exc())
-        logging.info("select and montior by namespace exceptin"+ str(e))
+
+    select_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        label_selector=label_selector,
+        field_selector="status.phase=Running",
+    )
+    snapshot = _select_pods(
+        select_partial,
+        namespace_pattern=namespace_pattern,
+    )
+    monitor_partial = partial(
+        v1_client.list_pod_for_all_namespaces,
+        resource_version=snapshot.resource_version,
+        label_selector=label_selector,
+    )
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(
+        _monitor_pods,
+        monitor_partial,
+        snapshot,
+        max_timeout,
+        name_pattern=None,
+        namespace_pattern=namespace_pattern,
+    )
     return future
