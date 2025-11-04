@@ -7,6 +7,7 @@ from functools import partial
 
 from kubernetes import watch
 from kubernetes.client import V1Pod, CoreV1Api
+from urllib3.exceptions import ProtocolError
 
 from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
@@ -50,7 +51,7 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
 ) -> PodsSnapshot:
-    
+
     try:
         w = watch.Watch(return_type=V1Pod)
         deleted_parent_pods = []
@@ -112,6 +113,13 @@ def _monitor_pods(
                 # monitoring is stopeed earlier
                 if cluster_restored:
                     w.stop()
+    except ProtocolError as e:
+        # Handle connection broken errors from urllib3
+        # This is common with long-running watch streams
+        logging.warning(
+            f"Watch stream connection broken (ProtocolError): {e}. "
+            "Returning snapshot with data collected so far."
+        )
     except Exception as e:
         logging.error("Error in monitor pods" + str(e))
         logging.error("Stack trace:\n%s", traceback.format_exc())
