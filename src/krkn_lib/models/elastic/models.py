@@ -126,7 +126,6 @@ class ElasticVirtChecks(InnerDoc):
     end_timestamp = Date()
     duration = Float()
 
-
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
     node_summary_infos = Nested(ElasticNodeInfo, multi=True)
@@ -144,6 +143,7 @@ class ElasticChaosRunTelemetry(Document):
     run_uuid = Text(fields={"keyword": Keyword()})
     health_checks = Nested(ElasticHealthChecks, multi=True)
     virt_checks = Nested(ElasticVirtChecks, multi=True)
+    post_virt_checks = Nested(ElasticVirtChecks, multi=True)
 
     class Index:
         name = "chaos_run_telemetry"
@@ -260,6 +260,28 @@ class ElasticChaosRunTelemetry(Document):
             ]
         else:
             self.virt_checks = None
+
+        if chaos_run_telemetry.post_virt_checks:
+            self.post_virt_checks = [
+                ElasticVirtChecks(
+                    vm_name=post_info.vm_name,
+                    ip_address=post_info.ip_address,
+                    new_ip_address=post_info.new_ip_address,
+                    namespace=post_info.namespace,
+                    node_name=post_info.node_name,
+                    status=post_info.status,
+                    start_timestamp=datetime.datetime.fromisoformat(
+                        str(post_info.start_timestamp)
+                    ),
+                    end_timestamp=datetime.datetime.fromisoformat(
+                        str(post_info.end_timestamp)
+                    ),
+                    duration=post_info.duration,
+                )
+                for post_info in chaos_run_telemetry.post_virt_checks
+            ]
+        else:
+            self.post_virt_checks = None
 
         self.timestamp = chaos_run_telemetry.timestamp
         self.total_node_count = chaos_run_telemetry.total_node_count

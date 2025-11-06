@@ -545,6 +545,10 @@ class ChaosRunTelemetry:
     """
     Virt checks of VMIs
     """
+    post_virt_checks: list[VirtCheck] = None
+    """
+    Post Scenario Virt checks of VMIs
+    """
     job_status: bool = True
     """
     Overall job status, will take all scenario's exit status
@@ -595,6 +599,11 @@ class ChaosRunTelemetry:
             self.virt_checks = (
                 [VirtCheck(k) for k in json_dict.get("virt_checks")]
                 if json_dict.get("virt_checks")
+                else None
+            )
+            self.post_virt_checks = (
+                [VirtCheck(k) for k in json_dict.get("post_virt_checks")]
+                if json_dict.get("post_virt_checks")
                 else None
             )
             self.job_status = json_dict.get("job_status")
