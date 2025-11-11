@@ -10,7 +10,7 @@ homepage = "https://github.com/redhat-chaos/krkn"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-kubernetes ="34.1.0"
+kubernetes ="28.1.0"
 sphinxnotes-markdown-builder="^0.5.6"
 requests="^2.29.0"
 kubeconfig = "^1.1.1"
