@@ -608,6 +608,19 @@ class BaseTest(unittest.TestCase):
                     "new_ip_address": "0.0.0.3"
                 },
             ],
+            "post_virt_checks": [
+                {
+                    "node_name": "h10-r660",
+                    "namespace": "benchmark-runner",
+                    "ip_address": "0.0.0.0",
+                    "vm_name": "windows-vm-52",
+                    "status": False,
+                    "start_timestamp": "2025-03-12T14:57:55.904352",
+                    "end_timestamp": "2025-03-12T14:57:55.904352",
+                    "duration": 0.00,
+                    "new_ip_address": ""
+                }
+            ],
             "total_node_count": 3,
             "cloud_infrastructure": "AWS",
             "cloud_type": "EC2",
