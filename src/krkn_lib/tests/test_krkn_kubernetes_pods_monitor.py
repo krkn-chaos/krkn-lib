@@ -515,3 +515,246 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         end_time = time.time()
 
         self.assertGreaterEqual((end_time - start_time), monitor_timeout)
+
+    def test_monitor_cancel_by_label(self):
+        # Test that cancel() properly stops monitoring and returns quickly
+        namespace = "test-ns-cancel-1-" + self.get_random_string(10)
+        delayed_1 = "delayed-cancel-1-" + self.get_random_string(10)
+        delayed_2 = "delayed-cancel-1-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(
+            delayed_1, namespace
+        ) and not self.lib_k8s.is_pod_running(delayed_2, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120  # Long timeout to test cancellation
+        cancel_delay = 2  # Cancel after 2 seconds
+
+        start_time = time.time()
+        future = select_and_monitor_by_label(
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+
+        # Wait a bit then cancel
+        time.sleep(cancel_delay)
+        cancel_start = time.time()
+        future.cancel()
+        
+        # Wait for future to finish
+        while not future.done():
+            time.sleep(0.1)
+        cancel_end = time.time()
+        
+        # Get the snapshot result (should have partial data)
+        snapshot = future.result(timeout=1)
+        end_time = time.time()
+        
+        pods_status = snapshot.get_pods_status()
+        
+        # Verify cancellation happened quickly (within 2-3 seconds total)
+        total_time = end_time - start_time
+        cancel_time = cancel_end - cancel_start
+        
+        self.assertLess(total_time, 5, "Cancellation should complete quickly")
+        self.assertLess(cancel_time, 2, "Future should finish quickly after cancel()")
+        
+        # Verify we can still get pods status (may be empty or partial)
+        self.assertIsNotNone(pods_status)
+        self.assertIsNotNone(pods_status.recovered)
+        self.assertIsNotNone(pods_status.unrecovered)
+        
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.background_delete_ns(namespace)
+
+    def test_monitor_cancel_by_name_pattern_and_namespace_pattern(self):
+        # Test cancellation with name pattern and namespace pattern monitoring
+        namespace_random_pattern = "test-ns-cancel-2-" + self.get_random_string(3)
+        namespace = f"{namespace_random_pattern}-" + self.get_random_string(10)
+        delayed_1 = "delayed-cancel-2-" + self.get_random_string(10)
+        delayed_2 = "delayed-cancel-2-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(
+            delayed_1, namespace
+        ) and not self.lib_k8s.is_pod_running(delayed_2, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120
+        cancel_delay = 2
+
+        start_time = time.time()
+        future = select_and_monitor_by_name_pattern_and_namespace_pattern(
+            pod_name_pattern="^delayed-cancel-2-.*",
+            namespace_pattern=f"^{namespace_random_pattern}-.*",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+
+        time.sleep(cancel_delay)
+        future.cancel()
+        
+        while not future.done():
+            time.sleep(0.1)
+        
+        snapshot = future.result(timeout=1)
+        end_time = time.time()
+        pods_status = snapshot.get_pods_status()
+
+        total_time = end_time - start_time
+        self.assertLess(total_time, 5, "Cancellation should complete quickly")
+        self.assertIsNotNone(pods_status)
+        
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.background_delete_ns(namespace)
+
+    def test_monitor_cancel_by_namespace_pattern_and_label(self):
+        # Test cancellation with namespace pattern and label monitoring
+        namespace = "test-ns-cancel-3-" + self.get_random_string(10)
+        delayed_1 = "delayed-cancel-3-" + self.get_random_string(10)
+        delayed_2 = "delayed-cancel-3-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(
+            delayed_1, namespace
+        ) and not self.lib_k8s.is_pod_running(delayed_2, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120
+        cancel_delay = 2
+
+        start_time = time.time()
+        future = select_and_monitor_by_namespace_pattern_and_label(
+            namespace_pattern="^test-ns-cancel-3-.*",
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+
+        time.sleep(cancel_delay)
+        future.cancel()
+        
+        while not future.done():
+            time.sleep(0.1)
+        
+        snapshot = future.result(timeout=1)
+        end_time = time.time()
+        pods_status = snapshot.get_pods_status()
+
+        total_time = end_time - start_time
+        self.assertLess(total_time, 5, "Cancellation should complete quickly")
+        self.assertIsNotNone(pods_status)
+        
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.background_delete_ns(namespace)
+
+    def test_monitor_cancel_immediately(self):
+        # Test that cancel() works even if called immediately
+        namespace = "test-ns-cancel-4-" + self.get_random_string(10)
+        delayed_1 = "delayed-cancel-4-" + self.get_random_string(10)
+        delayed_2 = "delayed-cancel-4-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(
+            delayed_1, namespace
+        ) and not self.lib_k8s.is_pod_running(delayed_2, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120
+
+        start_time = time.time()
+        future = select_and_monitor_by_label(
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+
+        # Cancel immediately
+        future.cancel()
+        
+        while not future.done():
+            time.sleep(0.1)
+        
+        snapshot = future.result(timeout=1)
+        end_time = time.time()
+        pods_status = snapshot.get_pods_status()
+
+        total_time = end_time - start_time
+        # Should complete very quickly (within 2 seconds)
+        self.assertLess(total_time, 2, "Immediate cancellation should complete very quickly")
+        self.assertIsNotNone(pods_status)
+        
+        self.background_delete_pod(delayed_1, namespace)
+        self.background_delete_pod(delayed_2, namespace)
+        self.background_delete_ns(namespace)
+
+    def test_monitor_cancel_after_pod_deletion(self):
+        # Test cancellation after a pod has been deleted but before recovery
+        namespace = "test-ns-cancel-5-" + self.get_random_string(10)
+        delayed_1 = "delayed-cancel-5-" + self.get_random_string(10)
+        delayed_2 = "delayed-cancel-5-" + self.get_random_string(10)
+        label = "readiness-" + self.get_random_string(5)
+        self.deploy_namespace(namespace, [])
+        self.deploy_delayed_readiness_pod(delayed_1, namespace, 0, label)
+        self.deploy_delayed_readiness_pod(delayed_2, namespace, 0, label)
+
+        while not self.lib_k8s.is_pod_running(
+            delayed_1, namespace
+        ) and not self.lib_k8s.is_pod_running(delayed_2, namespace):
+            time.sleep(1)
+            continue
+        time.sleep(3)
+
+        monitor_timeout = 120
+
+        future = select_and_monitor_by_label(
+            label_selector=f"test={label}",
+            max_timeout=monitor_timeout,
+            v1_client=self.lib_k8s.cli,
+        )
+
+        # Delete a pod to trigger monitoring
+        self.background_delete_pod(delayed_1, namespace)
+        time.sleep(1)  # Wait for deletion event to be processed
+        
+        # Cancel after deletion but before recovery
+        future.cancel()
+        
+        while not future.done():
+            time.sleep(0.1)
+        
+        snapshot = future.result(timeout=1)
+        pods_status = snapshot.get_pods_status()
+
+        # Should have captured the deletion event
+        self.assertIsNotNone(pods_status)
+        # The deleted pod might be in unrecovered or we might have partial data
+        # This depends on timing, so we just verify we got a valid result
+        
+        self.background_delete_pod(delayed_2, namespace)
+        self.background_delete_ns(namespace)

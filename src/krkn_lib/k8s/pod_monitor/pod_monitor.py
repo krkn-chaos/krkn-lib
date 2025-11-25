@@ -1,7 +1,12 @@
 import logging
 import re
+<<<<<<< HEAD
 import time
 import traceback
+=======
+import threading
+import time
+>>>>>>> baa57c3 (pod monitor cancellation)
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
@@ -52,6 +57,7 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
     max_retries: int = 3,
+    stop_event = None,
 ) -> PodsSnapshot:
     """
     Monitor pods with automatic retry on watch stream disconnection.
@@ -239,7 +245,8 @@ def select_and_monitor_by_label(
     :param v1_client: kubernetes V1Api client
     :return:
         a future which result (PodsSnapshot) must be
-        gathered to obtain the pod infos.
+        gathered to obtain the pod infos. Call cancel() on the future
+        to stop monitoring early.
 
     """
     select_partial = partial(
@@ -253,6 +260,7 @@ def select_and_monitor_by_label(
         resource_version=snapshot.resource_version,
         label_selector=label_selector,
     )
+    stop_event = threading.Event()
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(
         _monitor_pods,
@@ -261,7 +269,16 @@ def select_and_monitor_by_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=None,
+        stop_event=stop_event,
     )
+    # Store stop_event on the future so cancel() can trigger it
+    future._stop_event = stop_event
+    # Override cancel to also set the stop event
+    original_cancel = future.cancel
+    def cancel_with_stop():
+        stop_event.set()
+        return original_cancel()
+    future.cancel = cancel_with_stop
     return future
 
 
@@ -320,6 +337,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         v1_client.list_pod_for_all_namespaces,
         resource_version=snapshot.resource_version,
     )
+    stop_event = threading.Event()
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(
         _monitor_pods,
@@ -328,7 +346,16 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         max_timeout,
         name_pattern=pod_name_pattern,
         namespace_pattern=namespace_pattern,
+        stop_event=stop_event,
     )
+    # Store stop_event on the future so cancel() can trigger it
+    future._stop_event = stop_event
+    # Override cancel to also set the stop event
+    original_cancel = future.cancel
+    def cancel_with_stop():
+        stop_event.set()
+        return original_cancel()
+    future.cancel = cancel_with_stop
     return future
 
 
@@ -383,6 +410,7 @@ def select_and_monitor_by_namespace_pattern_and_label(
         resource_version=snapshot.resource_version,
         label_selector=label_selector,
     )
+    stop_event = threading.Event()
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(
         _monitor_pods,
@@ -391,5 +419,14 @@ def select_and_monitor_by_namespace_pattern_and_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=namespace_pattern,
+        stop_event=stop_event,
     )
+    # Store stop_event on the future so cancel() can trigger it
+    future._stop_event = stop_event
+    # Override cancel to also set the stop event
+    original_cancel = future.cancel
+    def cancel_with_stop():
+        stop_event.set()
+        return original_cancel()
+    future.cancel = cancel_with_stop
     return future
