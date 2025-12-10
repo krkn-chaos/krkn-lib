@@ -1,0 +1,5 @@
+[run]
+omit =
+    src/krkn_lib/tests/**
+    src/krkn_lib/aws_tests/**
+    src/krkn_lib/testdata/**
