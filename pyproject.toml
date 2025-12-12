@@ -27,6 +27,7 @@ cython = "3.0"
 numpy= "1.26.4"
 deprecation="2.1.0"
 coverage="^7.6.12"
+importlib-metadata = "^8.7.0"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"

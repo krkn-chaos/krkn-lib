@@ -126,6 +126,7 @@ class ElasticVirtChecks(InnerDoc):
     end_timestamp = Date()
     duration = Float()
 
+
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
     node_summary_infos = Nested(ElasticNodeInfo, multi=True)
