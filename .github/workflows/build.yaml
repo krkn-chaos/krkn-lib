@@ -132,14 +132,14 @@ jobs:
           poetry run python3 -m coverage run -a -m unittest discover -v src/krkn_lib/aws_tests/
       
       - name: Combine coverage and publish
-        if: ${{ success() || failure() }}
+        if: ${{ always() }}
         run: |
           poetry run python3 -m coverage html
           poetry run python3 -m coverage json
 
       - name: Publish coverage report to job summary
-
-        if: ${{ matrix.python-version == '3.11'}}
+    
+        if: ${{ always() }}
         run: |
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Update version number
