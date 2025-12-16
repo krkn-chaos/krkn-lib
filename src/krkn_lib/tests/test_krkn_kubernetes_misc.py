@@ -14,6 +14,7 @@ from kubernetes.client import ApiException
 
 
 class KrknKubernetesTestsMisc(BaseTest):
+
     def test_read_pod(self):
         namespace = "test-rp" + self.get_random_string(10)
         name = "test-name-" + self.get_random_string(10)
