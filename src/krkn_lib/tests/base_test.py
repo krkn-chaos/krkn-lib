@@ -37,13 +37,19 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.lib_elastic = KrknElastic(
-            SafeLogger(),
-            os.getenv("ELASTIC_URL"),
-            int(os.getenv("ELASTIC_PORT")),
-            username=os.getenv("ELASTIC_USER"),
-            password=os.getenv("ELASTIC_PASSWORD"),
-        )
+        # Initialize Elastic only if environment variables are set
+        elastic_port = os.getenv("ELASTIC_PORT")
+        if elastic_port:
+            cls.lib_elastic = KrknElastic(
+                SafeLogger(),
+                os.getenv("ELASTIC_URL"),
+                int(elastic_port),
+                username=os.getenv("ELASTIC_USER"),
+                password=os.getenv("ELASTIC_PASSWORD"),
+            )
+        else:
+            cls.lib_elastic = None
+
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
