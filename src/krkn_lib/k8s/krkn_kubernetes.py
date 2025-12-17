@@ -167,7 +167,7 @@ class KrknKubernetes:
             client.Configuration.set_default(self.client_config)
             self.watch_resource = watch.Watch()
             # Get the logger for the kubernetes client
-            kubernetes_logger = logging.getLogger('kubernetes')
+            kubernetes_logger = logging.getLogger("kubernetes")
 
             # Set the logging level to a higher level than DEBUG,
             # such as INFO, WARNING, or ERROR
@@ -1388,6 +1388,304 @@ class KrknKubernetes:
                 str(e),
             )
 
+    def get_vm(self, name: str, namespace: str) -> Optional[Dict]:
+        """
+        Get a Virtual Machine by name and namespace.
+
+        :param name: Name of the VM to retrieve
+        :param namespace: Namespace of the VM
+        :return: The VM object if found, None otherwise
+        """
+        try:
+            vm = self.custom_object_client.get_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+                name=name,
+            )
+            return vm
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VM {name} not found in namespace {namespace}"
+                )
+                return None
+            else:
+                logging.error(f"Error getting VM {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error getting VM {name}: {e}")
+            raise
+
+    def get_vmi(self, name: str, namespace: str) -> Optional[Dict]:
+        """
+        Get a Virtual Machine Instance by name and namespace.
+
+        :param name: Name of the VMI to retrieve
+        :param namespace: Namespace of the VMI
+        :return: The VMI object if found, None otherwise
+        """
+        try:
+            vmi = self.custom_object_client.get_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                name=name,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
+                return None
+            else:
+                logging.error(f"Error getting VMI {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error getting VMI {name}: {e}")
+            raise
+
+    def get_vmis(self, regex_name: str, namespace: str) -> Optional[Dict]:
+        """
+        Get a Virtual Machine Instance by name and namespace.
+
+        :param name: Name of the VMI to retrieve
+        :param namespace: Namespace of the VMI
+        :return: The VMI object if found, None otherwise
+        """
+        try:
+            vmis_list = []
+            namespaces = self.list_namespaces_by_regex(namespace)
+            for namespace in namespaces:
+                vmis = self.custom_object_client.list_namespaced_custom_object(
+                    group="kubevirt.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="virtualmachineinstances",
+                )
+
+                for vmi in vmis.get("items"):
+                    vmi_name = vmi.get("metadata", {}).get("name")
+                    match = re.match(regex_name, vmi_name)
+                    if match:
+                        vmis_list.append(vmi)
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VMI {regex_name} not found in namespace {namespace}"
+                )
+                return []
+            else:
+                logging.error(f"Error getting VMI {regex_name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error getting VMI {regex_name}: {e}")
+            raise
+        return vmis_list
+
+    def create_vmi(self, name: str, namespace: str, vm_name: str, vmi_body: dict) -> Optional[Dict]:
+        """
+        Create a Virtual Machine Instance by name and namespace.
+
+        :param name: Name of the VMI to create
+        :param namespace: Namespace of the VMI
+        :param vm_name: Name of the Virtual Machine to create the VMI from
+        :return: The VMI object if created, None otherwise
+        """
+        try:
+            vmi = self.custom_object_client.create_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                name=name,
+                body=vmi_body,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                return None
+            else:
+                logging.error(f"Error creating VMI {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error creating VMI {name}: {e}")
+            raise
+
+    def patch_vm(self, name: str, namespace: str, vm_body: dict) -> Optional[Dict]:
+        """
+        Patch a Virtual Machine by name and namespace.
+
+        :param name: Name of the VM to patch
+        :param namespace: Namespace of the VM
+        :param vm_body: Body of the VM to patch
+        :return: The VM object if patched, None otherwise
+        """
+        try:
+            vmi = self.custom_object_client.patch_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+                name=name,
+                body=vm_body,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(f"VM {name} not found in namespace {namespace}")
+                return None
+            else:
+                logging.error(f"Error patching VM {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error patching VM {name}: {e}")
+            raise
+
+    def patch_vmi(self, name: str, namespace: str, vmi_body: dict) -> Optional[Dict]:
+        """
+        Patch a Virtual Machine Instance by name and namespace.
+
+        :param name: Name of the VMI to patch
+        :param namespace: Namespace of the VMI
+        :param vmi_body: Body of the VMI to patch
+        :return: The VMI object if patched, None otherwise
+        """
+        try:
+            vmi = self.custom_object_client.patch_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                name=name,
+                body=vmi_body,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                return None
+            else:
+                logging.error(f"Error patching VMI {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error patching VMI {name}: {e}")
+            raise
+
+    def get_vms(self, regex_name: str, namespace: str) -> Optional[Dict]:
+        """
+        Get a Virtual Machine by name and namespace.
+
+        :param name: Name of the VM to retrieve
+        :param namespace: Namespace of the VM
+        :return: The VM object if found, None otherwise
+        """
+        try:
+            vms_list = []
+            namespaces = self.list_namespaces_by_regex(namespace)
+            for namespace in namespaces:
+                vms = self.custom_object_client.list_namespaced_custom_object(
+                    group="kubevirt.io",
+                    version="v1",
+                    namespace=namespace,
+                    plural="virtualmachines",
+                )
+
+                for vm in vms.get("items"):
+                    vm_name = vm.get("metadata", {}).get("name")
+                    match = re.match(regex_name, vm_name)
+                    if match:
+                        vms_list.append(vm)
+            return vms_list
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VM {regex_name} not found in namespace {namespace}"
+                )
+                return []
+            else:
+                logging.error(f"Error getting VM {regex_name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error getting VM {regex_name}: {e}")
+            raise
+    
+    def get_snapshot(self, name: str, namespace: str) -> Optional[Dict]:
+        """
+        Get a Snapshot by name and namespace.
+
+        :param name: Name of the Snapshot to retrieve
+        :param namespace: Namespace of the Snapshot
+        :return: The Snapshot object if found, None otherwise
+        """
+        try:
+            vmi = self.custom_object_client.get_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="VirtualMachineSnapshot",
+                name=name,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
+                return None
+            else:
+                logging.error(f"Error getting VMI {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error getting VMI {name}: {e}")
+            raise
+
+    def create_snapshot(
+        self, name: str, namespace: str, vm_name: str
+    ) -> Optional[Dict]:
+        """
+        Create a Snapshot by name and namespace.
+
+        :param name: Name of the Snapshot to create
+        :param namespace: Namespace of the Snapshot
+        :param vm_name: Name of the Virtual Machine to create the Snapshot from
+        :return: The Snapshot object if created, None otherwise
+        """
+        try:
+            file_loader = PackageLoader("krkn_lib.k8s", "templates")
+            env = Environment(loader=file_loader, autoescape=True)
+            snapshot_template = env.get_template("snapshot.j2")
+            ss_body = yaml.safe_load(
+                snapshot_template.render(
+                    name=name, namespace=namespace, vm_name=vm_name
+                )
+            )
+            vmi = self.custom_object_client.create_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="VirtualMachineSnapshot",
+                name=name,
+                body=ss_body,
+            )
+            return vmi
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"Snapshot {name} not found in namespace {namespace}"
+                )
+                return None
+            else:
+                logging.error(f"Error creating Snapshot {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Unexpected error creating Snapshot {name}: {e}")
+            raise
+
     def get_job_status(
         self, name: str, namespace: str = "default"
     ) -> client.V1Job:
@@ -1409,6 +1707,82 @@ class KrknKubernetes:
                 str(e),
             )
             raise
+
+    def delete_vm(self, name: str, namespace: str) -> Optional[Dict]:
+        """
+        Delete a Virtual Machine by name and namespace.
+
+        :param name: Name of the VM to delete
+        :param namespace: Namespace of the VM
+        :return: The VM object if found, None otherwise
+        """
+        try:
+            return self.custom_object_client.delete_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+                name=name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(
+                    f"VM {name} not found in namespace {namespace}"
+                )
+                return None
+            else:
+                logging.error(f"Error deleting VM {name}: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Error deleting VM {name}: {e}")
+            raise
+
+    def delete_vmi(self, vm_name: str, namespace: str):
+        """
+        Delete a Virtual Machine Instance to simulate a VM outage.
+
+        :param vm_name: Name of the VMI to delete
+        :param namespace: Namespace of the VMI
+        :return: 0 for success, 1 for failure
+        """
+        logging.info(
+            f"Injecting chaos: Deleting VMI {vm_name} in namespace {namespace}"
+        )
+        try:
+            self.custom_object_client.delete_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                name=vm_name,
+            )
+        except ApiException as e:
+            if e.status == 404:
+                logging.warning(f"VMI {vm_name} not found during deletion")
+                return 1
+            else:
+                logging.error(f"API error during VMI deletion: {e}")
+                return 1
+
+    def delete_snapshot(self, snapshot_name: str, namespace: str):
+        """Helper method to delete any snapshot created by the scenario."""
+        self.logger.info(f"Deleting snapshot '{self.snapshot_name}'...")
+        try:
+            self.custom_object_client.delete_namespaced_custom_object(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="VirtualMachineSnapshot",
+                name=snapshot_name,
+            )
+            self.logger.info(
+                f"Snapshot '{self.snapshot_name}' deleted successfully."
+            )
+        except Exception as e:
+            self.logger.warning(
+                "Failed to delete snapshot, "
+                f"might have been already deleted: {e}"
+            )
 
     def monitor_nodes(
         self,
