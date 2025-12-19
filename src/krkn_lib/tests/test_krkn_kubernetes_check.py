@@ -2,9 +2,10 @@ import logging
 import time
 import unittest
 
-from krkn_lib.tests import BaseTest
-from krkn_lib.k8s import ApiRequestException
 from kubernetes.client import ApiException
+
+from krkn_lib.k8s import ApiRequestException
+from krkn_lib.tests import BaseTest
 
 
 class KrknKubernetesTestsCheck(BaseTest):

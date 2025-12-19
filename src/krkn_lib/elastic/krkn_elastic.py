@@ -53,7 +53,9 @@ class KrknElastic:
                 ssl_show_warn=False,
             )
         except Exception as e:
-            self.safe_logger.error("Failed to initialize elasticsearch: %s" % e)
+            self.safe_logger.error(
+                "Failed to initialize elasticsearch: %s" % e
+            )
             raise e
 
     def upload_data_to_elasticsearch(self, item: dict, index: str = "") -> int:
