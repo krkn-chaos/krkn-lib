@@ -493,7 +493,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
 
         mock_get.assert_called_once_with(
             group="snapshot.kubevirt.io",
-            version="v1alpha1",
+            version="v1beta1",
             namespace=namespace,
             plural="virtualmachinesnapshots",
             name=snapshot_name,
@@ -542,7 +542,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
 
         mock_delete.assert_called_once_with(
             group="snapshot.kubevirt.io",
-            version="v1alpha1",
+            version="v1beta1",
             namespace=namespace,
             plural="virtualmachinesnapshots",
             name=snapshot_name,

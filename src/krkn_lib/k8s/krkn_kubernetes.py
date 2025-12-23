@@ -1624,7 +1624,7 @@ class KrknKubernetes:
         try:
             snapshot = self.custom_object_client.get_namespaced_custom_object(
                 group="snapshot.kubevirt.io",
-                version="v1alpha1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="virtualmachinesnapshots",
                 name=name,
@@ -1665,7 +1665,7 @@ class KrknKubernetes:
             )
             snapshot = self.custom_object_client.create_namespaced_custom_object(
                 group="snapshot.kubevirt.io",
-                version="v1alpha1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="virtualmachinesnapshots",
                 body=ss_body,
@@ -1763,7 +1763,7 @@ class KrknKubernetes:
         try:
             self.custom_object_client.delete_namespaced_custom_object(
                 group="snapshot.kubevirt.io",
-                version="v1alpha1",
+                version="v1beta1",
                 namespace=namespace,
                 plural="virtualmachinesnapshots",
                 name=snapshot_name,
