@@ -1501,7 +1501,6 @@ class KrknKubernetes:
                 version="v1",
                 namespace=namespace,
                 plural="virtualmachineinstances",
-                name=name,
                 body=vmi_body,
             )
             return vmi
@@ -1623,25 +1622,25 @@ class KrknKubernetes:
         :return: The Snapshot object if found, None otherwise
         """
         try:
-            vmi = self.custom_object_client.get_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
+            snapshot = self.custom_object_client.get_namespaced_custom_object(
+                group="snapshot.kubevirt.io",
+                version="v1beta1",
                 namespace=namespace,
-                plural="VirtualMachineSnapshot",
+                plural="virtualmachinesnapshots",
                 name=name,
             )
-            return vmi
+            return snapshot
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VMI {name} not found in namespace {namespace}"
+                    f"SnapShot {name} not found in namespace {namespace}"
                 )
                 return None
             else:
-                logging.error(f"Error getting VMI {name}: {e}")
+                logging.error(f"Error getting snapshot {name}: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VMI {name}: {e}")
+            logging.error(f"Unexpected error getting snapshot {name}: {e}")
             raise
 
     def create_snapshot(
@@ -1664,24 +1663,18 @@ class KrknKubernetes:
                     name=name, namespace=namespace, vm_name=vm_name
                 )
             )
-            vmi = self.custom_object_client.create_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
+            snapshot = self.custom_object_client.create_namespaced_custom_object(
+                group="snapshot.kubevirt.io",
+                version="v1beta1",
                 namespace=namespace,
-                plural="VirtualMachineSnapshot",
-                name=name,
+                plural="virtualmachinesnapshots",
                 body=ss_body,
             )
-            return vmi
+            return snapshot
         except ApiException as e:
-            if e.status == 404:
-                logging.warning(
-                    f"Snapshot {name} not found in namespace {namespace}"
-                )
-                return None
-            else:
-                logging.error(f"Error creating Snapshot {name}: {e}")
-                raise
+
+            logging.error(f"Error creating Snapshot {name}: {e}")
+            raise
         except Exception as e:
             logging.error(f"Unexpected error creating Snapshot {name}: {e}")
             raise
@@ -1766,20 +1759,20 @@ class KrknKubernetes:
 
     def delete_snapshot(self, snapshot_name: str, namespace: str):
         """Helper method to delete any snapshot created by the scenario."""
-        self.logger.info(f"Deleting snapshot '{self.snapshot_name}'...")
+        logging.info(f"Deleting snapshot '{snapshot_name}'...")
         try:
             self.custom_object_client.delete_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
+                group="snapshot.kubevirt.io",
+                version="v1beta1",
                 namespace=namespace,
-                plural="VirtualMachineSnapshot",
+                plural="virtualmachinesnapshots",
                 name=snapshot_name,
             )
-            self.logger.info(
-                f"Snapshot '{self.snapshot_name}' deleted successfully."
+            logging.info(
+                f"Snapshot '{snapshot_name}' deleted successfully."
             )
         except Exception as e:
-            self.logger.warning(
+            logging.warning(
                 "Failed to delete snapshot, "
                 f"might have been already deleted: {e}"
             )

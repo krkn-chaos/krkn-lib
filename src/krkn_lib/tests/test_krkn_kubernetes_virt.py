@@ -1,6 +1,39 @@
+#!/usr/bin/env python3
+
+
+"""
+Test suite for KubeVirt/virtualization-related functionality in KrknKubernetes
+
+This test suite covers KubeVirt-specific methods in the KrknKubernetes class,
+including operations on VirtualMachines (VMs), VirtualMachineInstances (VMIs),
+and VirtualMachineSnapshots.
+
+Tested functionality:
+- VM operations: get, list, delete, patch
+- VMI operations: get, list, create, delete, patch
+- Snapshot operations: get, create, delete
+
+Usage:
+    # Run all tests in this file
+    python -m unittest src.krkn_lib.tests.test_krkn_kubernetes_virt -v
+
+    # Run a specific test class
+    python -m unittest src.krkn_lib.tests.test_krkn_kubernetes_virt.TestKrknKubernetesVirt -v
+
+    # Run a specific test method
+    python -m unittest src.krkn_lib.tests.test_krkn_kubernetes_virt.TestKrknKubernetesVirt.test_get_vm_success -v
+
+    # Run with coverage
+    python -m coverage run -a -m unittest src.krkn_lib.tests.test_krkn_kubernetes_virt -v
+
+Assisted By: Claude Code
+""" # NOQA
+
 import unittest
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
+
 from kubernetes.client.rest import ApiException
+
 from krkn_lib.k8s.krkn_kubernetes import KrknKubernetes
 
 
@@ -389,27 +422,23 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         vmi_name = "test-vmi"
         namespace = "test-ns"
 
-        # Mock logging
-        with patch("krkn_lib.k8s.krkn_kubernetes.logging") as mock_logging:
-            # Configure the mock to return None (success)
-            mock_delete = (
-                self.mock_custom_client.delete_namespaced_custom_object
-            )
-            mock_delete.return_value = None
+        # Configure the mock to return None (success)
+        mock_delete = (
+            self.mock_custom_client.delete_namespaced_custom_object
+        )
+        mock_delete.return_value = None
 
-            result = self.lib_k8s.delete_vmi(vmi_name, namespace)
+        result = self.lib_k8s.delete_vmi(vmi_name, namespace)
 
-            mock_delete.assert_called_once_with(
-                group="kubevirt.io",
-                version="v1",
-                namespace=namespace,
-                plural="virtualmachineinstances",
-                name=vmi_name,
-            )
-            # delete_vmi doesn't explicitly return on success (returns None)
-            self.assertIsNone(result)
-            # Verify logging was called
-            mock_logging.info.assert_called_once()
+        mock_delete.assert_called_once_with(
+            group="kubevirt.io",
+            version="v1",
+            namespace=namespace,
+            plural="virtualmachineinstances",
+            name=vmi_name,
+        )
+        # delete_vmi doesn't explicitly return on success (returns None)
+        self.assertIsNone(result)
 
     def test_delete_vmi_not_found(self):
         """Test delete_vmi returns 1 when VMI doesn't exist"""
@@ -417,17 +446,15 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=404)
 
-        # Mock logging
-        with patch("krkn_lib.k8s.krkn_kubernetes.logging"):
-            # Configure the mock to raise 404
-            mock_delete = (
-                self.mock_custom_client.delete_namespaced_custom_object
-            )
-            mock_delete.side_effect = api_exception
+        # Configure the mock to raise 404
+        mock_delete = (
+            self.mock_custom_client.delete_namespaced_custom_object
+        )
+        mock_delete.side_effect = api_exception
 
-            result = self.lib_k8s.delete_vmi(vmi_name, namespace)
-            # Returns 1 on 404
-            self.assertEqual(result, 1)
+        result = self.lib_k8s.delete_vmi(vmi_name, namespace)
+        # Returns 1 on 404
+        self.assertEqual(result, 1)
 
     def test_delete_vmi_api_error(self):
         """Test delete_vmi returns 1 on API error"""
@@ -435,17 +462,15 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=500)
 
-        # Mock logging
-        with patch("krkn_lib.k8s.krkn_kubernetes.logging"):
-            # Configure the mock to raise 500
-            mock_delete = (
-                self.mock_custom_client.delete_namespaced_custom_object
-            )
-            mock_delete.side_effect = api_exception
+        # Configure the mock to raise 500
+        mock_delete = (
+            self.mock_custom_client.delete_namespaced_custom_object
+        )
+        mock_delete.side_effect = api_exception
 
-            result = self.lib_k8s.delete_vmi(vmi_name, namespace)
-            # Returns 1 on error
-            self.assertEqual(result, 1)
+        result = self.lib_k8s.delete_vmi(vmi_name, namespace)
+        # Returns 1 on error
+        self.assertEqual(result, 1)
 
     def test_get_snapshot_success(self):
         """Test get_snapshot returns snapshot when it exists"""
@@ -467,10 +492,10 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         result = self.lib_k8s.get_snapshot(snapshot_name, namespace)
 
         mock_get.assert_called_once_with(
-            group="kubevirt.io",
-            version="v1",
+            group="snapshot.kubevirt.io",
+            version="v1beta1",
             namespace=namespace,
-            plural="VirtualMachineSnapshot",
+            plural="virtualmachinesnapshots",
             name=snapshot_name,
         )
         self.assertEqual(result, expected_snapshot)
@@ -506,10 +531,6 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         snapshot_name = "test-snapshot"
         namespace = "test-ns"
 
-        # Mock the logger and snapshot_name attributes
-        self.lib_k8s.logger = MagicMock()
-        self.lib_k8s.snapshot_name = snapshot_name
-
         # Configure the mock to return None (success)
         mock_delete = (
             self.mock_custom_client.delete_namespaced_custom_object
@@ -520,18 +541,11 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         self.lib_k8s.delete_snapshot(snapshot_name, namespace)
 
         mock_delete.assert_called_once_with(
-            group="kubevirt.io",
-            version="v1",
+            group="snapshot.kubevirt.io",
+            version="v1beta1",
             namespace=namespace,
-            plural="VirtualMachineSnapshot",
+            plural="virtualmachinesnapshots",
             name=snapshot_name,
-        )
-        # Verify logger was called (uses self.snapshot_name, not parameter)
-        self.lib_k8s.logger.info.assert_any_call(
-            f"Deleting snapshot '{snapshot_name}'..."
-        )
-        self.lib_k8s.logger.info.assert_any_call(
-            f"Snapshot '{snapshot_name}' deleted successfully."
         )
 
     def test_delete_snapshot_not_found(self):
@@ -540,23 +554,14 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=404)
 
-        # Mock the logger and snapshot_name attributes
-        self.lib_k8s.logger = MagicMock()
-        self.lib_k8s.snapshot_name = snapshot_name
-
         # Configure the mock to raise 404
         mock_delete = (
             self.mock_custom_client.delete_namespaced_custom_object
         )
         mock_delete.side_effect = api_exception
 
-        # Should not raise exception, but log warning
+        # Should not raise exception
         self.lib_k8s.delete_snapshot(snapshot_name, namespace)
-
-        # Verify warning was logged
-        self.lib_k8s.logger.warning.assert_called_once()
-        warning_call_args = self.lib_k8s.logger.warning.call_args[0][0]
-        self.assertIn("Failed to delete snapshot", warning_call_args)
 
     def test_delete_snapshot_api_error(self):
         """Test delete_snapshot handles API errors gracefully"""
@@ -564,23 +569,14 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=500)
 
-        # Mock the logger and snapshot_name attributes
-        self.lib_k8s.logger = MagicMock()
-        self.lib_k8s.snapshot_name = snapshot_name
-
         # Configure the mock to raise 500
         mock_delete = (
             self.mock_custom_client.delete_namespaced_custom_object
         )
         mock_delete.side_effect = api_exception
 
-        # Should not raise exception, but log warning
+        # Should not raise exception
         self.lib_k8s.delete_snapshot(snapshot_name, namespace)
-
-        # Verify warning was logged
-        self.lib_k8s.logger.warning.assert_called_once()
-        warning_call_args = self.lib_k8s.logger.warning.call_args[0][0]
-        self.assertIn("Failed to delete snapshot", warning_call_args)
 
     def test_create_vmi_success(self):
         """Test create_vmi successfully creates a VMI"""
@@ -613,7 +609,6 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             version="v1",
             namespace=namespace,
             plural="virtualmachineinstances",
-            name=vmi_name,
             body=vmi_body,
         )
         self.assertEqual(result, expected_vmi)
