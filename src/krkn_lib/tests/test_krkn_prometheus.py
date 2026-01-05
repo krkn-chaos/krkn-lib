@@ -1,7 +1,6 @@
 import datetime
 import logging
 from unittest.mock import Mock, patch
-
 from krkn_lib.prometheus.krkn_prometheus import KrknPrometheus
 from krkn_lib.tests import BaseTest
 
