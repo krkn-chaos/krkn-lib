@@ -8,7 +8,6 @@ from krkn_lib.tests import BaseTest
 class TestKrknPrometheus(BaseTest):
     """
     Integration tests for KrknPrometheus class.
-    Uses mocking to avoid dependency on actual Prometheus server.
     """
     url = "http://localhost:9090"
 
