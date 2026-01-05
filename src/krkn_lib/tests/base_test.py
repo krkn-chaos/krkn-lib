@@ -37,13 +37,21 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.lib_elastic = KrknElastic(
-            SafeLogger(),
-            os.getenv("ELASTIC_URL"),
-            int(os.getenv("ELASTIC_PORT")),
-            username=os.getenv("ELASTIC_USER"),
-            password=os.getenv("ELASTIC_PASSWORD"),
-        )
+        # Try to initialize Elasticsearch, but don't fail if env vars are missing
+        cls.lib_elastic = None
+        try:
+            elastic_url = os.getenv("ELASTIC_URL")
+            elastic_port = os.getenv("ELASTIC_PORT")
+            if elastic_url and elastic_port:
+                cls.lib_elastic = KrknElastic(
+                    SafeLogger(),
+                    elastic_url,
+                    int(elastic_port),
+                    username=os.getenv("ELASTIC_USER"),
+                    password=os.getenv("ELASTIC_PASSWORD"),
+                )
+        except Exception as e:
+            logging.warning(f"Failed to initialize Elasticsearch: {e}")
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
