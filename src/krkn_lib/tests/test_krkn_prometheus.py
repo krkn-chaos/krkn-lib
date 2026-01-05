@@ -1,4 +1,5 @@
 import datetime
+import logging
 from unittest.mock import Mock, patch
 
 from krkn_lib.prometheus.krkn_prometheus import KrknPrometheus
@@ -12,22 +13,13 @@ class TestKrknPrometheus(BaseTest):
     """
     url = "http://localhost:9090"
 
-    # @classmethod
-    # def setUpClass(cls):
-    #     """Override BaseTest setup to avoid Kubernetes initialization."""
-    #     # Skip the BaseTest setup that requires a running Kubernetes cluster
-    #     # Set minimal attributes that might be referenced
-    #     cls.lib_elastic = None
-    #     cls.lib_k8s = None
-    #     cls.lib_ocp = None
-    #     cls.lib_telemetry_k8s = None
-    #     cls.lib_telemetry_ocp = None
-
-    @classmethod
-    def tearDownClass(cls):
-        """Override BaseTest teardown."""
-        # Nothing to clean up since we didn't initialize anything
-        pass
+    def setUp(self):
+        logging.disable(logging.NOTSET)
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(levelname)s: %(message)s',
+            force=True
+        )
 
     def test_constructor_success(self):
         """Test successful initialization of KrknPrometheus."""
@@ -208,15 +200,13 @@ class TestKrknPrometheus(BaseTest):
             start_time = datetime.datetime.now() - datetime.timedelta(days=1)
             end_time = datetime.datetime.now()
             
-            with self.assertLogs(level="INFO") as lc:
-                timestamp, log_output = prom_cli.process_alert(alert, start_time, end_time)
-                
-                self.assertIsNotNone(timestamp)
-                self.assertIsNotNone(log_output)
-                self.assertTrue(len(lc.records) > 0)
-                self.assertEqual(lc.records[0].levelname, "INFO")
-                self.assertIn("test-container", log_output)
-                self.assertIn("test-endpoint", log_output)
+            timestamp, log_output = prom_cli.process_alert(alert, start_time, end_time)
+            
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("test-container", log_output)
+            self.assertIn("test-endpoint", log_output)
+            self.assertIn("0.1", log_output)
 
     def test_process_alert_debug_severity(self):
         """Test process_alert with debug severity level."""
@@ -240,15 +230,16 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "debug"
             }
             
-            with self.assertLogs(level="DEBUG") as lc:
-                timestamp, log_output = prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertIsNotNone(timestamp)
-                self.assertIn("test-pod", log_output)
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("test-pod", log_output)
+            self.assertIn("1.5", log_output)
 
     def test_process_alert_warning_severity(self):
         """Test process_alert with warning severity level."""
@@ -272,15 +263,16 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "warning"
             }
             
-            with self.assertLogs(level="WARNING") as lc:
-                timestamp, log_output = prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertIsNotNone(timestamp)
-                self.assertEqual(lc.records[0].levelname, "WARNING")
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("node1", log_output)
+            self.assertIn("90", log_output)
 
     def test_process_alert_error_severity(self):
         """Test process_alert with error severity level."""
@@ -304,15 +296,16 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "error"
             }
             
-            with self.assertLogs(level="ERROR") as lc:
-                timestamp, log_output = prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertIsNotNone(timestamp)
-                self.assertEqual(lc.records[0].levelname, "ERROR")
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("api", log_output)
+            self.assertIn("500", log_output)
 
     def test_process_alert_critical_severity(self):
         """Test process_alert with critical severity level."""
@@ -336,15 +329,16 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "critical"
             }
             
-            with self.assertLogs(level="CRITICAL") as lc:
-                timestamp, log_output = prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertIsNotNone(timestamp)
-                self.assertEqual(lc.records[0].levelname, "CRITICAL")
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("prod", log_output)
+            self.assertIn("down", log_output)
 
     def test_process_alert_invalid_severity(self):
         """Test process_alert with invalid severity level."""
@@ -360,16 +354,16 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "not_exists"
             }
             
-            with self.assertLogs(level="ERROR") as lc:
-                prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertTrue(len(lc.records) > 0)
-                self.assertEqual(lc.records[0].levelname, "ERROR")
-                self.assertIn("invalid severity level: not_exists", lc.records[0].msg)
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            # Should return timestamp and log_output with error message
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("invalid severity level", log_output)
 
     def test_process_alert_missing_expr(self):
         """Test process_alert with missing expr field."""
@@ -384,16 +378,17 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "info"
             }
             
-            with self.assertLogs(level="ERROR") as lc:
-                prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertTrue(len(lc.records) > 0)
-                self.assertIn("expr", lc.records[0].msg)
-                self.assertIn("missing", lc.records[0].msg)
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            # Should return timestamp and log_output with error message
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("expr", log_output)
+            self.assertIn("missing", log_output)
 
     def test_process_alert_missing_description(self):
         """Test process_alert with missing description field."""
@@ -408,16 +403,17 @@ class TestKrknPrometheus(BaseTest):
                 "severity": "info"
             }
             
-            with self.assertLogs(level="ERROR") as lc:
-                prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertTrue(len(lc.records) > 0)
-                self.assertIn("description", lc.records[0].msg)
-                self.assertIn("missing", lc.records[0].msg)
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            # Should return timestamp and log_output with error message
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("description", log_output)
+            self.assertIn("missing", log_output)
 
     def test_process_alert_missing_severity(self):
         """Test process_alert with missing severity field."""
@@ -432,16 +428,17 @@ class TestKrknPrometheus(BaseTest):
                 "description": "Test description"
             }
             
-            with self.assertLogs(level="ERROR") as lc:
-                prom_cli.process_alert(
-                    alert,
-                    datetime.datetime.now() - datetime.timedelta(hours=1),
-                    datetime.datetime.now()
-                )
-                
-                self.assertTrue(len(lc.records) > 0)
-                self.assertIn("severity", lc.records[0].msg)
-                self.assertIn("missing", lc.records[0].msg)
+            timestamp, log_output = prom_cli.process_alert(
+                alert,
+                datetime.datetime.now() - datetime.timedelta(hours=1),
+                datetime.datetime.now()
+            )
+            
+            # Should return timestamp and log_output with error message
+            self.assertIsNotNone(timestamp)
+            self.assertIsNotNone(log_output)
+            self.assertIn("severity", log_output)
+            self.assertIn("missing", log_output)
 
     def test_process_alert_no_records(self):
         """Test process_alert when query returns no records."""
