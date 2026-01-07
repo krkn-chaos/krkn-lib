@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import tempfile
 import threading
 import time
 import warnings
@@ -86,6 +87,7 @@ class KrknKubernetes:
     def __init__(
         self,
         kubeconfig_path: str,
+        kubeconfig_string: str = None,
         request_chunk_size: int = 250,
     ):
         """
@@ -108,6 +110,12 @@ class KrknKubernetes:
         )
 
         self.request_chunk_size = request_chunk_size
+
+        if kubeconfig_string is not None:
+            with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+                f.write(kubeconfig_string)
+                f.flush()
+                kubeconfig_path = f.name
 
         if kubeconfig_path is not None:
             self.__initialize_config(kubeconfig_path)
@@ -1486,7 +1494,9 @@ class KrknKubernetes:
             raise
         return vmis_list
 
-    def create_vmi(self, name: str, namespace: str, vm_name: str, vmi_body: dict) -> Optional[Dict]:
+    def create_vmi(
+        self, name: str, namespace: str, vm_name: str, vmi_body: dict
+    ) -> Optional[Dict]:
         """
         Create a Virtual Machine Instance by name and namespace.
 
@@ -1507,7 +1517,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error creating VMI {name}: {e}")
@@ -1516,7 +1528,9 @@ class KrknKubernetes:
             logging.error(f"Unexpected error creating VMI {name}: {e}")
             raise
 
-    def patch_vm(self, name: str, namespace: str, vm_body: dict) -> Optional[Dict]:
+    def patch_vm(
+        self, name: str, namespace: str, vm_body: dict
+    ) -> Optional[Dict]:
         """
         Patch a Virtual Machine by name and namespace.
 
@@ -1537,7 +1551,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VM {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VM {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error patching VM {name}: {e}")
@@ -1546,7 +1562,9 @@ class KrknKubernetes:
             logging.error(f"Unexpected error patching VM {name}: {e}")
             raise
 
-    def patch_vmi(self, name: str, namespace: str, vmi_body: dict) -> Optional[Dict]:
+    def patch_vmi(
+        self, name: str, namespace: str, vmi_body: dict
+    ) -> Optional[Dict]:
         """
         Patch a Virtual Machine Instance by name and namespace.
 
@@ -1567,7 +1585,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error patching VMI {name}: {e}")
@@ -1613,7 +1633,7 @@ class KrknKubernetes:
         except Exception as e:
             logging.error(f"Unexpected error getting VM {regex_name}: {e}")
             raise
-    
+
     def get_snapshot(self, name: str, namespace: str) -> Optional[Dict]:
         """
         Get a Snapshot by name and namespace.
