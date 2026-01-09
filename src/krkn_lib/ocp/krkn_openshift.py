@@ -20,9 +20,11 @@ class KrknOpenshift(KrknKubernetes):
     def __init__(
         self,
         kubeconfig_path: str = None,
+        kubeconfig_string: str = None,
     ):
         super().__init__(
             kubeconfig_path=kubeconfig_path,
+            kubeconfig_string=kubeconfig_string,
         )
 
     def get_clusterversion_string(self) -> str:
