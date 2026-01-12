@@ -114,6 +114,17 @@ def _monitor_pods(
                             if pod_name not in deleted_parent_pods:
                                 deleted_parent_pods.append(pod_name)
                         elif _is_pod_ready(pod):
+                            # Only record the first READY event for each pod
+                            # Check if we've already recorded a READY event for this pod
+                            if pod_name in snapshot.pods:
+                                already_ready = any(
+                                    event.status == PodStatus.READY
+                                    for event in snapshot.pods[pod_name].status_changes
+                                )
+                                if already_ready:
+                                    # Skip duplicate READY events
+                                    continue
+
                             pod_event.status = PodStatus.READY
                             # if there are at least the same number of ready
                             # pods as the snapshot.initial_pods set we assume
