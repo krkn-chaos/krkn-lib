@@ -7,13 +7,13 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 
 from kubernetes import watch
-from kubernetes.client import V1Pod, CoreV1Api
+from kubernetes.client import CoreV1Api, V1Pod
 from urllib3.exceptions import ProtocolError
 
 from krkn_lib.models.pod_monitor.models import (
-    PodsSnapshot,
     MonitoredPod,
     PodEvent,
+    PodsSnapshot,
     PodStatus,
 )
 
@@ -70,6 +70,9 @@ def _monitor_pods(
     retry_count = 0
     deleted_parent_pods = []
     restored_pods = []
+    # Track which initial pods are accounted for (either still
+    # ready themselves or replaced by a ready pod)
+    recovered_initial_pods = set()
     cluster_restored = False
 
     while retry_count <= max_retries:
@@ -80,7 +83,9 @@ def _monitor_pods(
                 remain_timeout = max(1, int(max_timeout - elapsed))
                 logging.info("remain timeout " + str(remain_timeout))
                 if remain_timeout <= 0:
-                    logging.info("Maximum timeout reached, stopping monitoring")
+                    logging.info(
+                        "Maximum timeout reached, stopping monitoring"
+                    )
                     break
                 logging.info(
                     "Reconnecting watch stream"
@@ -106,33 +111,96 @@ def _monitor_pods(
                     match_name = match is not None
 
                 if match_name and match_namespace:
-                    pod_event = PodEvent()
+                    # Capture client timestamp immediately when event
+                    # is received for consistency
+                    client_timestamp = time.time()
                     pod_name = pod.metadata.name
+
+                    # Determine server timestamp and status based on
+                    # event type
+                    server_timestamp = None
+                    status = PodStatus.UNDEFINED
+
                     if event_type == "MODIFIED":
                         if pod.metadata.deletion_timestamp is not None:
-                            pod_event.status = PodStatus.DELETION_SCHEDULED
+                            status = PodStatus.DELETION_SCHEDULED
+                            server_timestamp = (
+                                _get_pod_deletion_timestamp(pod)
+                            )
                             if pod_name not in deleted_parent_pods:
                                 deleted_parent_pods.append(pod_name)
                         elif _is_pod_ready(pod):
-                            pod_event.status = PodStatus.READY
-                            # if there are at least the same number of ready
-                            # pods as the snapshot.initial_pods set we assume
-                            # the cluster is restored to the initial condition
+                            status = PodStatus.READY
+                            server_timestamp = (
+                                _get_pod_ready_timestamp(pod)
+                            )
+                            # Track ready pods
                             if pod_name not in restored_pods:
                                 restored_pods.append(pod_name)
-                            inital_pod_len = len(snapshot.initial_pods)
-                            if len(restored_pods) >= inital_pod_len:
+
+                            # Track which initial pods are recovered:
+                            # - If this is an initial pod, mark it recovered
+                            # - If this is a new pod (ADDED), it replaces
+                            #   a deleted initial pod
+                            if pod_name in snapshot.initial_pods:
+                                # Original pod is ready
+                                recovered_initial_pods.add(pod_name)
+                            elif pod_name in snapshot.added_pods:
+                                # This is a replacement pod. Find which
+                                # initial pod it replaces by checking if
+                                # any initial pod was deleted
+                                for initial_pod in snapshot.initial_pods:
+                                    if (initial_pod in deleted_parent_pods
+                                        and initial_pod not in
+                                        recovered_initial_pods):
+                                        # Mark the initial pod as recovered
+                                        # by its replacement
+                                        recovered_initial_pods.add(
+                                            initial_pod
+                                        )
+                                        logging.debug(
+                                            f"Pod {pod_name} replaces "
+                                            f"{initial_pod}"
+                                        )
+                                        break
+
+                            # Check if all initial pods are recovered
+                            initial_pod_count = len(snapshot.initial_pods)
+                            recovered_count = len(recovered_initial_pods)
+
+                            if recovered_count >= initial_pod_count:
                                 cluster_restored = True
+                                logging.info(
+                                    f"All initial pods recovered: "
+                                    f"{recovered_count}/{initial_pod_count}"
+                                )
                         else:
-                            pod_event.status = PodStatus.NOT_READY
+                            status = PodStatus.NOT_READY
+                            # For NOT_READY, use client timestamp
+                            # since there's no specific server timestamp
+                            server_timestamp = client_timestamp
 
                     elif event_type == "DELETED":
-                        pod_event.status = PodStatus.DELETED
+                        status = PodStatus.DELETED
+                        if pod.metadata.deletion_timestamp:
+                            server_timestamp = (
+                                _get_pod_deletion_timestamp(pod)
+                            )
                     elif event_type == "ADDED":
-                        pod_event.status = PodStatus.ADDED
+                        status = PodStatus.ADDED
+                        server_timestamp = (
+                            _get_pod_creation_timestamp(pod)
+                        )
+
+                    # Create PodEvent with both timestamps set at once
+                    pod_event = PodEvent(
+                        timestamp=client_timestamp,
+                        server_timestamp=server_timestamp
+                    )
+                    pod_event.status = status
 
                     if pod_event.status == PodStatus.ADDED:
-                        
+
                         if pod_name not in snapshot.added_pods:
                             snapshot.added_pods.append(pod_name)
                         # in case a pod is respawn with the same name
@@ -143,19 +211,34 @@ def _monitor_pods(
                             snapshot.pods[pod_name].namespace = (
                                 pod.metadata.namespace
                             )
+                    # Check if cluster is restored and stop monitoring
+                    # early. This check must happen before skipping
+                    # duplicate events to ensure we exit promptly.
+                    if cluster_restored:
+                        logging.info(
+                            "Cluster restored, stopping monitoring"
+                        )
+                        w.stop()
+                        return snapshot
+
                     # skips events out of the snapshot
                     if pod_name in snapshot.pods:
+                        # Skip duplicate READY events to ensure consistent
+                        # timing measurements
+                        if pod_event.status == PodStatus.READY:
+                            already_ready = any(
+                                event.status == PodStatus.READY
+                                for event in snapshot.pods[
+                                    pod_name
+                                ].status_changes
+                            )
+                            if already_ready:
+                                # Skip duplicate READY event, but still
+                                # check cluster_restored above
+                                continue
                         snapshot.pods[pod_name].status_changes.append(
                             pod_event
                         )
-                    # this flag is set when all the pods
-                    # that has been deleted or not ready
-                    # have been restored, if True the
-                    # monitoring is stopped earlier
-                    if cluster_restored:
-                        logging.info("Cluster restored, stopping monitoring")
-                        w.stop()
-                        return snapshot
 
             # If we exit the loop normally (timeout reached), we're done
             logging.info("Watch stream completed normally")
@@ -194,7 +277,7 @@ def _monitor_pods(
             logging.error("Error in monitor pods: " + str(e))
             logging.error("Stack trace:\n%s", traceback.format_exc())
             raise Exception(e)
-        
+
         retry_count += 1
 
     return snapshot
@@ -213,6 +296,74 @@ def _is_pod_terminating(pod: V1Pod) -> bool:
     if pod.metadata.deletion_timestamp is not None:
         return True
     return False
+
+
+def _get_pod_ready_timestamp(pod: V1Pod) -> float:
+    """
+    Extract the server-side timestamp when the pod became ready.
+    Uses the lastTransitionTime from the Ready condition in pod status.
+
+    :param pod: V1Pod object
+    :return: Unix timestamp (float) when pod became ready,
+        or current time if not available
+    """
+    if pod.status.conditions:
+        for condition in pod.status.conditions:
+            if condition.type == "Ready" and condition.status == "True":
+                if condition.last_transition_time:
+                    # Convert Kubernetes datetime to Unix timestamp
+                    # in seconds
+                    ts = condition.last_transition_time.timestamp()
+                    logging.debug(
+                        f"Pod {pod.metadata.name} ready timestamp: "
+                        f"{ts} (from condition)"
+                    )
+                    return ts
+    # Fallback to current time if not available
+    fallback = time.time()
+    logging.debug(
+        f"Pod {pod.metadata.name} ready timestamp fallback: " f"{fallback}"
+    )
+    return fallback
+
+
+def _get_pod_deletion_timestamp(pod: V1Pod) -> float:
+    """
+    Extract the server-side timestamp when the pod deletion was
+    scheduled.
+
+    :param pod: V1Pod object
+    :return: Unix timestamp (float) when deletion was scheduled,
+        or current time if not available
+    """
+    if pod.metadata.deletion_timestamp:
+        ts = pod.metadata.deletion_timestamp.timestamp()
+        logging.debug(f"Pod {pod.metadata.name} deletion timestamp: {ts}")
+        return ts
+    fallback = time.time()
+    logging.debug(
+        f"Pod {pod.metadata.name} deletion timestamp fallback: " f"{fallback}"
+    )
+    return fallback
+
+
+def _get_pod_creation_timestamp(pod: V1Pod) -> float:
+    """
+    Extract the server-side timestamp when the pod was created.
+
+    :param pod: V1Pod object
+    :return: Unix timestamp (float) when pod was created,
+        or current time if not available
+    """
+    if pod.metadata.creation_timestamp:
+        ts = pod.metadata.creation_timestamp.timestamp()
+        logging.debug(f"Pod {pod.metadata.name} creation timestamp: {ts}")
+        return ts
+    fallback = time.time()
+    logging.debug(
+        f"Pod {pod.metadata.name} creation timestamp fallback: " f"{fallback}"
+    )
+    return fallback
 
 
 def select_and_monitor_by_label(
