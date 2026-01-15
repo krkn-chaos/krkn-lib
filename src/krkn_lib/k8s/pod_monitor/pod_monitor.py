@@ -142,9 +142,20 @@ def _monitor_pods(
                             # - If this is an initial pod, mark it recovered
                             # - If this is a new pod (ADDED), it replaces
                             #   a deleted initial pod
+                            is_initial = pod_name in snapshot.initial_pods
+                            is_added = pod_name in snapshot.added_pods
+                            logging.debug(
+                                f"READY event for {pod_name}. "
+                                f"In initial_pods: {is_initial}, "
+                                f"In added_pods: {is_added}"
+                            )
+
                             if pod_name in snapshot.initial_pods:
                                 # Original pod is ready
                                 recovered_initial_pods.add(pod_name)
+                                logging.debug(
+                                    f"Initial pod {pod_name} is ready"
+                                )
                             elif pod_name in snapshot.added_pods:
                                 # This is a replacement pod. Find which
                                 # initial pod it replaces by checking if
@@ -158,8 +169,9 @@ def _monitor_pods(
                                         recovered_initial_pods.add(
                                             initial_pod
                                         )
-                                        logging.debug(
-                                            f"Pod {pod_name} replaces "
+                                        logging.info(
+                                            f"Replacement pod {pod_name} "
+                                            f"recovered initial pod "
                                             f"{initial_pod}"
                                         )
                                         break
@@ -167,6 +179,13 @@ def _monitor_pods(
                             # Check if all initial pods are recovered
                             initial_pod_count = len(snapshot.initial_pods)
                             recovered_count = len(recovered_initial_pods)
+
+                            logging.debug(
+                                f"Recovery status: {recovered_count}/"
+                                f"{initial_pod_count} initial pods "
+                                f"recovered. Recovered set: "
+                                f"{recovered_initial_pods}"
+                            )
 
                             if recovered_count >= initial_pod_count:
                                 cluster_restored = True
