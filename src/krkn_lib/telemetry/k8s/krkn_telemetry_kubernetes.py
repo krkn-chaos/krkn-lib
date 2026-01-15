@@ -181,9 +181,15 @@ class KrknTelemetryKubernetes:
         prometheus_container_name: str,
         prometheus_namespace: str,
         remote_archive_path: str = "/prometheus",
+        start_timestamp: Optional[int] = None,
+        end_timestamp: Optional[int] = None,
+        prometheus_url: Optional[str] = None,
+        prometheus_bearer_token: Optional[str] = None,
     ) -> list[(int, str)]:
         """
-        Downloads the prometheus metrics folder from a prometheus pod
+        Downloads the prometheus metrics folder from a prometheus pod.
+        Attempts API-based collection first (if parameters provided),
+        then falls back to filesystem backup.
 
         :param telemetry_config: krkn telemetry conf section
             will be stored
@@ -197,6 +203,14 @@ class KrknTelemetryKubernetes:
             pod lives
         :param remote_archive_path: (Optional) the path where prometheus logs
             are stored, if not specified will default to `/prometheus`
+        :param start_timestamp: (Optional) Start time for API-based collection
+            (Unix timestamp in seconds)
+        :param end_timestamp: (Optional) End time for API-based collection
+            (Unix timestamp in seconds)
+        :param prometheus_url: (Optional) Prometheus API URL for API-based
+            collection
+        :param prometheus_bearer_token: (Optional) Bearer token for
+            Prometheus API authentication
         :return: the list of the archive number and filenames downloaded
         """
         file_list = list[(int, str)]()
@@ -248,6 +262,71 @@ class KrknTelemetryKubernetes:
         if not prometheus_backup:
             return file_list
 
+        # Try API-based collection if parameters provided
+        use_api = telemetry_config.get("prometheus_backup_use_api", True)
+
+        if (
+            use_api
+            and start_timestamp
+            and end_timestamp
+            and prometheus_url
+        ):
+            try:
+                from krkn_lib.telemetry.prometheus_exporter import (
+                    PrometheusExporter,
+                )
+
+                exporter = PrometheusExporter(
+                    prometheus_url, prometheus_bearer_token
+                )
+
+                if exporter.test_connection():
+                    # Get time window buffers from config
+                    time_before = telemetry_config.get(
+                        "prometheus_time_window_minutes_before", 10
+                    )
+                    time_after = telemetry_config.get(
+                        "prometheus_time_window_minutes_after", 10
+                    )
+
+                    window_start = start_timestamp - (time_before * 60)
+                    window_end = end_timestamp + (time_after * 60)
+
+                    self.safe_logger.info(
+                        f"Attempting Prometheus API collection for time "
+                        f"window: {(window_end - window_start) / 60:.1f} "
+                        f"minutes"
+                    )
+
+                    archive_file = exporter.export_metrics_snapshot(
+                        window_start,
+                        window_end,
+                        archive_path,
+                        f"prometheus-api-{request_id}",
+                    )
+
+                    if archive_file:
+                        self.safe_logger.info(
+                            f"Successfully collected via API: {archive_file}"
+                        )
+                        return [(0, archive_file)]
+                    else:
+                        self.safe_logger.warning(
+                            "API export returned no data, falling back to "
+                            "filesystem backup"
+                        )
+                else:
+                    self.safe_logger.warning(
+                        "API connection test failed, falling back to "
+                        "filesystem backup"
+                    )
+            except Exception as e:
+                self.safe_logger.warning(
+                    f"API collection failed: {str(e)}, falling back to "
+                    f"filesystem backup"
+                )
+
+        # Fallback to existing filesystem backup
         prometheus_pod = self.__kubecli.get_pod_info(
             prometheus_pod_name, prometheus_namespace
         )
