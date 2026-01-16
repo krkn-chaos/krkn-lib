@@ -48,8 +48,10 @@ class PrometheusExporter:
             # Try a simple query to test connection
             self.prom_client.process_query("up")
             return True
-        except Exception as e:  
-            logging.debug(f"Prometheus API connection test failed: {str(e)}")
+        except Exception as e:
+            logging.debug(
+                f"Prometheus API connection test failed: {str(e)}"
+            )
             return False
 
     def export_metrics_snapshot(
@@ -69,20 +71,25 @@ class PrometheusExporter:
         :return: Full path to created archive, or None on failure
         """
         try:
+            duration_minutes = (end_timestamp - start_timestamp) / 60
             logging.info(
-                f"Exporting Prometheus metrics from {start_timestamp} to {end_timestamp} "
-                f"using API (time window: {(end_timestamp - start_timestamp) / 60:.1f} minutes)"
+                f"Exporting Prometheus metrics from {start_timestamp} "
+                f"to {end_timestamp} using API "
+                f"(time window: {duration_minutes:.1f} minutes)"
             )
 
             # Convert Unix timestamps to datetime objects
             start_time = datetime.fromtimestamp(start_timestamp)
             end_time = datetime.fromtimestamp(end_timestamp)
 
-            # Calculate appropriate step size (1 point per minute for efficiency)
+            # Calculate step size (1 point per minute for efficiency)
             duration = end_timestamp - start_timestamp
-            step = max(60, duration // 1000)  # At least 60s, max 1000 points
+            # At least 60s, max 1000 points
+            step = max(60, duration // 1000)
 
-            logging.info("Querying Prometheus API for all metrics in time range...")
+            logging.info(
+                "Querying Prometheus API for all metrics in time range..."
+            )
 
             # Query all metrics using regex pattern
             metrics_data = self.prom_client.process_prom_query_in_range(
@@ -93,7 +100,9 @@ class PrometheusExporter:
             )
 
             if not metrics_data:
-                logging.warning("No metrics data returned from Prometheus API")  # ✅ ADDED
+                logging.warning(
+                    "No metrics data returned from Prometheus API"
+                )
                 return None
 
             # Create temporary directory for archive contents
@@ -128,12 +137,15 @@ class PrometheusExporter:
                         arcname="metadata.json",
                     )
 
+                size_mb = os.path.getsize(archive_path) / (1024 * 1024)
                 logging.info(
-                    f"Successfully exported Prometheus metrics to {archive_path} "
-                    f"({os.path.getsize(archive_path) / (1024 * 1024):.2f} MB)"
+                    f"Successfully exported Prometheus metrics to "
+                    f"{archive_path} ({size_mb:.2f} MB)"
                 )
                 return archive_path
 
-        except Exception as e:  
-            logging.error(f"Failed to export Prometheus metrics via API: {str(e)}")
+        except Exception as e:
+            logging.error(
+                f"Failed to export Prometheus metrics via API: {str(e)}"
+            )
             return None
