@@ -1,13 +1,12 @@
 import time
 import unittest
 
-
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.k8s import AffectedPod, PodsStatus
 from krkn_lib.models.pod_monitor.models import (
-    PodEvent,
-    PodStatus,
     MonitoredPod,
+    PodEvent,
     PodsSnapshot,
+    PodStatus,
 )
 
 
@@ -147,9 +146,11 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         not_ready_event = PodEvent()
         not_ready_event.status = PodStatus.NOT_READY
         not_ready_event._timestamp = time.time() - 10
+        not_ready_event._server_timestamp = time.time() - 10
         ready_event = PodEvent()
         ready_event.status = PodStatus.READY
         ready_event._timestamp = time.time()
+        ready_event._server_timestamp = time.time()
         pod.status_changes.extend([not_ready_event, ready_event])
         snapshot.initial_pods = ["test-pod"]
         snapshot.pods = {"test-pod": pod}
@@ -219,11 +220,13 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         self.assertAlmostEqual(
             recovered_pod.pod_rescheduling_time, 10.0, delta=0.001
         )
+        # Readiness time is from pod added to ready: 10 seconds
         self.assertAlmostEqual(
-            recovered_pod.pod_readiness_time, 20.0, delta=0.001
+            recovered_pod.pod_readiness_time, 10.0, delta=0.001
         )
+        # Total is rescheduling + readiness: 10 + 10 = 20 seconds
         self.assertAlmostEqual(
-            recovered_pod.total_recovery_time, 30.0, delta=0.001
+            recovered_pod.total_recovery_time, 20.0, delta=0.001
         )
 
     def test_get_pods_status_deletion_scheduled_unrecovered_no_ready_podssnapshot(  # NOQA
