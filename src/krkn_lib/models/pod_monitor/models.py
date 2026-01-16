@@ -180,6 +180,7 @@ class PodsSnapshot:
                             ready_status.server_timestamp
                             - status_change.server_timestamp
                         )
+
                         recovery_time = round(recovery_time, 8)
                         pods_status.recovered.append(
                             AffectedPod(
