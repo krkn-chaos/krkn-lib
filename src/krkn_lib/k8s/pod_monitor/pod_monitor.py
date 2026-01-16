@@ -70,9 +70,6 @@ def _monitor_pods(
     retry_count = 0
     deleted_parent_pods = []
     restored_pods = []
-    # Track which initial pods are accounted for (either still
-    # ready themselves or replaced by a ready pod)
-    recovered_initial_pods = set()
     cluster_restored = False
 
     while retry_count <= max_retries:
@@ -138,41 +135,16 @@ def _monitor_pods(
                             if pod_name not in restored_pods:
                                 restored_pods.append(pod_name)
 
-                            # Track which initial pods are recovered:
-                            # - If this is an initial pod, mark it recovered
-                            # - If this is a new pod (ADDED), it replaces
-                            #   a deleted initial pod
-                            if pod_name in snapshot.initial_pods:
-                                # Original pod is ready
-                                recovered_initial_pods.add(pod_name)
-                            elif pod_name in snapshot.added_pods:
-                                # This is a replacement pod. Find which
-                                # initial pod it replaces by checking if
-                                # any initial pod was deleted
-                                for initial_pod in snapshot.initial_pods:
-                                    if (initial_pod in deleted_parent_pods
-                                        and initial_pod not in
-                                        recovered_initial_pods):
-                                        # Mark the initial pod as recovered
-                                        # by its replacement
-                                        recovered_initial_pods.add(
-                                            initial_pod
-                                        )
-                                        logging.debug(
-                                            f"Pod {pod_name} replaces "
-                                            f"{initial_pod}"
-                                        )
-                                        break
-
                             # Check if all initial pods are recovered
+                            # by counting ready pods
                             initial_pod_count = len(snapshot.initial_pods)
-                            recovered_count = len(recovered_initial_pods)
+                            ready_count = len(restored_pods)
 
-                            if recovered_count >= initial_pod_count:
+                            if ready_count >= initial_pod_count:
                                 cluster_restored = True
                                 logging.info(
                                     f"All initial pods recovered: "
-                                    f"{recovered_count}/{initial_pod_count}"
+                                    f"{ready_count}/{initial_pod_count}"
                                 )
                         else:
                             status = PodStatus.NOT_READY
