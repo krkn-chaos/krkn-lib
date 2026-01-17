@@ -237,7 +237,8 @@ class KrknKubernetes:
             minor_version = api_response.minor
             return major_version + "." + minor_version
         except ApiException as e:
-            print("Exception when calling VersionApi->get_code: %s\n" % e)
+            logging.error("Exception when calling VersionApi->get_code: %s", str(e))
+            raise e
 
     def get_host(self) -> str:
         """
