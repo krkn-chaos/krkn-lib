@@ -766,13 +766,13 @@ class KrknKubernetes:
         self, label_selector: str = None, field_selector: str = None
     ) -> list[[str, str]]:
         """
-        Return a list of tuples containing pod name [0] and namespace [1]
+        Return a list of lists containing pod name [0] and namespace [1]
 
         :param label_selector: filter by label_selector
             (optional default `None`)
         :param field_selector: filter results by config details
             select only running pods by setting "status.phase=Running"
-        :return: list of tuples pod,namespace
+        :return: list of lists [pod, namespace]
         """
         pods = []
         if label_selector:
