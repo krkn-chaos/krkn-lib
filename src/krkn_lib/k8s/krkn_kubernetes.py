@@ -1799,6 +1799,7 @@ class KrknKubernetes:
                     str(e),
                 )
                 raise e
+            node_ready_status = "False"
             for condition in node_info.status.conditions:
                 if condition.type == "KernelDeadlock":
                     node_kerneldeadlock_status = condition.status
