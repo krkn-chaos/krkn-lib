@@ -79,7 +79,8 @@ jobs:
         uses: redhat-chaos/actions/kind@main
       - name: Install poetry
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: get nodes
         run: |
           kubectl get nodes
@@ -197,7 +198,8 @@ jobs:
             python-version: 3.9
         - name: Install Poetry
           run: |
-            curl -sSL https://install.python-poetry.org | python3 -
+            curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
         - name: Install project dependencies
           run: poetry install --no-interaction
         - name: Generate documentation
