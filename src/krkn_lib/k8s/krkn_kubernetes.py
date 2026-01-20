@@ -2536,7 +2536,6 @@ class KrknKubernetes:
                     node_info.nodes_type = "unknown"
 
                 node_info.architecture = node.status.node_info.architecture
-                node_info.architecture = node.status.node_info.architecture
                 node_info.kernel_version = node.status.node_info.kernel_version
                 node_info.kubelet_version = (
                     node.status.node_info.kubelet_version
