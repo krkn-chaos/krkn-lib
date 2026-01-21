@@ -35,8 +35,7 @@ jobs:
     name: Formatting tests
     strategy:
       matrix:
-        #python-version: [ '3.9', '3.10', 'pypy3.9' ]
-        python-version: [ '3.9' ]
+        python-version: [ '3.11' ]
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -58,8 +57,7 @@ jobs:
     name: Build & Test
     strategy:
       matrix:
-        #python-version: [ '3.9', '3.10', 'pypy3.9' ]
-        python-version: [ '3.9' ]
+        python-version: [ '3.11' ]
     runs-on: ubuntu-latest
     needs: [check-secret]
     steps:
@@ -140,8 +138,8 @@ jobs:
           poetry run python3 -m coverage json
 
       - name: Publish coverage report to job summary
-    
-        if: ${{ matrix.python-version == '3.9'}}
+
+        if: ${{ matrix.python-version == '3.11'}}
         run: |
           poetry run html2text --ignore-images --ignore-links -b 0 htmlcov/index.html >> $GITHUB_STEP_SUMMARY
       - name: Update version number
@@ -195,7 +193,7 @@ jobs:
         - name: Set up Python
           uses: actions/setup-python@v4
           with:
-            python-version: 3.9
+            python-version: '3.11'
         - name: Install Poetry
           run: |
             curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
