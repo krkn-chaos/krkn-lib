@@ -159,10 +159,11 @@ class KrknKubernetes:
                 os.environ["HTTP_PROXY"] = http_proxy
                 self.client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
-                auth_string = proxy_auth.username + ":" + proxy_auth.password
-                self.client_config.proxy_headers = urllib3.util.make_headers(
-                    proxy_basic_auth=auth_string
-                )
+                if proxy_auth.username is not None and proxy_auth.password is not None:
+                    auth_string = proxy_auth.username + ":" + proxy_auth.password
+                    self.client_config.proxy_headers = urllib3.util.make_headers(
+                        proxy_basic_auth=auth_string
+                    )
 
             client.Configuration.set_default(self.client_config)
             self.watch_resource = watch.Watch()
