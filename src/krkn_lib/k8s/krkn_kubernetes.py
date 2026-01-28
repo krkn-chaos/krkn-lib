@@ -185,7 +185,7 @@ class KrknKubernetes:
         on other distributions
 
         *** IT MUST BE CONSIDERED A PRIVATE METHOD (CANNOT USE
-        *** DOUBLE UNDERSCORE TO MANTAIN IT VISIBLE ON SUB-CLASSES)
+        *** DOUBLE UNDERSCORE TO MAINTAIN IT VISIBLE ON SUB-CLASSES)
         *** USED IN KrknKubernetes and KrknOpenshift TO AUTODETECT
         *** THE CLUSTER TYPE
 
@@ -874,7 +874,7 @@ class KrknKubernetes:
             services.append(serv.metadata.name)
         return services
 
-    # Outputs a json blob with informataion about all pods in a given namespace
+    # Outputs a json blob with information about all pods in a given namespace
     def get_all_pod_info(
         self,
         namespace: str = "default",
@@ -978,7 +978,7 @@ class KrknKubernetes:
         :param command: command parameters list or full command string
             if the command must be piped to `bash -c`
             (in that case `base_command` parameter
-            must is omitted`)
+            must be omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command
@@ -1038,7 +1038,7 @@ class KrknKubernetes:
         :param command: command parameters list or full command string
             if the command must be piped to `bash -c`
             (in that case `base_command` parameter
-            must is omitted`)
+            must be omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command
@@ -1093,7 +1093,7 @@ class KrknKubernetes:
                 )
         except Exception as e:
             raise e
-        # apparently stream API doesn't rise an Exception
+        # apparently stream API doesn't raise an Exception
         # if the command fails to be executed
 
         if "OCI runtime exec failed" in ret:
@@ -2621,7 +2621,7 @@ class KrknKubernetes:
             sequential number of the archive assigned to the worker
             and the extension tar.b64
         :param queue: the queue from which the sequential
-            number wil be popped
+            number will be popped
         :param queue_size: total size of the queue
         :param downloaded_file_list: the list of
             archive number and local filename  downloaded
@@ -2743,7 +2743,7 @@ class KrknKubernetes:
             where the temporary archive
             will be stored (will be deleted once the download
             terminates, must be writable
-            and must have enough space to temporarly store the archive)
+            and must have enough space to temporarily store the archive)
         :param target_path: the path that will be archived
             and downloaded from the container
         :param archive_files_prefix: prefix string that will be added
@@ -3247,7 +3247,7 @@ class KrknKubernetes:
             default 5000
         :param port_name: the port name if the Service is pointing to
             a string name instead of a port number
-        :param stats_route: overrides the defautl route where the stats
+        :param stats_route: overrides the default route where the stats
             action will be mapped, change it only if you have a /stats
             route in your test_plan
         :return: a structure containing all the infos of the
@@ -3312,7 +3312,7 @@ class KrknKubernetes:
 
     def service_exists(self, service_name: str, namespace: str) -> bool:
         """
-        Checks wheter a kubernetes Service exist or not
+        Checks whether a kubernetes Service exist or not
         :param service_name: the name of the service to check
         :param namespace: the namespace where the service should exist
         :return: True if the service exists, False if not
