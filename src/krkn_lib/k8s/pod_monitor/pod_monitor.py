@@ -70,6 +70,7 @@ def _monitor_pods(
     retry_count = 0
     total_deletion_events = 0
     total_ready_events = 0
+    pods_became_not_ready = set()
 
     logging.info(
         f"Monitoring pods - tracking {len(snapshot.initial_pods)} initial pods"
@@ -189,6 +190,12 @@ def _monitor_pods(
                             if already_ready:
                                 # Skip duplicate READY event
                                 continue
+
+                        # Track NOT_READY events for restart scenarios
+                        if pod_event.status == PodStatus.NOT_READY:
+                            if pod_name in snapshot.initial_pods:
+                                pods_became_not_ready.add(pod_name)
+
                         snapshot.pods[pod_name].status_changes.append(
                             pod_event
                         )
@@ -196,8 +203,10 @@ def _monitor_pods(
                         # Track ready events for deletion comparison
                         if pod_event.status == PodStatus.READY:
                             total_ready_events += 1
+                            # Remove from not_ready set if pod recovered
+                            pods_became_not_ready.discard(pod_name)
 
-                    # Check if deletion events match ready events
+                    # Early exit condition 1: All deleted pods replaced
                     if (
                         total_deletion_events > 0
                         and total_deletion_events == total_ready_events
@@ -210,6 +219,31 @@ def _monitor_pods(
                         )
                         w.stop()
                         return snapshot
+
+                    # Early exit condition 2: All initially monitored
+                    # pods that became not ready are now ready again
+                    if (
+                        len(pods_became_not_ready) == 0
+                        and total_ready_events > 0
+                        and total_deletion_events == 0
+                    ):
+                        # Check if any initial pod had a NOT_READY event
+                        had_disruption = any(
+                            any(
+                                ev.status == PodStatus.NOT_READY
+                                for ev in snapshot.pods[p].status_changes
+                            )
+                            for p in snapshot.initial_pods
+                            if p in snapshot.pods
+                        )
+                        if had_disruption:
+                            logging.info(
+                                "All initially monitored pods that "
+                                "became not ready have recovered, "
+                                "stopping monitoring"
+                            )
+                            w.stop()
+                            return snapshot
 
             # If we exit the loop normally (timeout reached), we're done
             logging.info(

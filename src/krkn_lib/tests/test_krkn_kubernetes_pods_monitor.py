@@ -510,13 +510,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
     def test_monitor_stopping_earlier(self):
 
-        # tests that the monitor deadlines:
-        # - if the monitored pods status changes and is restored
-        #   before than the 120 seconds deadline the monitor returns earlier
-        #   the assertions checks that the monitor returns within 10 seconds
-        #   120 - (end-start) >= 110
-        # - if no change is made in the set of monitor pods the monitor is
-        #   forced to wait all the time set
+        # tests that the monitor exits early when a deleted pod is restored
+        # before the timeout deadline
 
         namespace = "test-ns-6-" + self.get_random_string(10)
         delayed_1 = "delayed-6-" + self.get_random_string(10)
@@ -539,13 +534,18 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             max_timeout=monitor_timeout,
             v1_client=self.lib_k8s.cli,
         )
+        # Delete the initial pod and deploy a replacement
+        self.background_delete_pod(delayed_1, namespace)
+        time.sleep(1)
         self.deploy_delayed_readiness_pod(
             delayed_respawn_1, namespace, pod_delay, label
         )
         _ = future.result()
         end_time = time.time()
 
+        # Should exit much earlier than 120s since pod recovered quickly
         self.assertGreater(monitor_timeout - (end_time - start_time), 110)
+        self.background_delete_ns(namespace)
 
     def test_monitor_forced_to_wait_with_no_status_change(self):
         # tests that the monitor deadlines:
