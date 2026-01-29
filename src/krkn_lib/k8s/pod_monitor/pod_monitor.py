@@ -52,7 +52,6 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
     max_retries: int = 3,
-    expected_ready_pods: int = None,
 ) -> PodsSnapshot:
     """
     Monitor pods with automatic retry on watch stream disconnection.
@@ -64,8 +63,6 @@ def _monitor_pods(
     :param namespace_pattern: Regex pattern for namespaces
     :param max_retries: Maximum number of retries on connection error
         (default: 3)
-    :param expected_ready_pods: Number of ready pods to wait for before
-        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return: PodsSnapshot with collected pod events
     """
 
@@ -76,8 +73,7 @@ def _monitor_pods(
     cluster_restored = False
 
     # Set the target number of ready pods
-    if expected_ready_pods is None:
-        expected_ready_pods = len(snapshot.initial_pods)
+    expected_ready_pods = len(snapshot.initial_pods)
 
     logging.info(
         f"Monitoring pods - waiting for {expected_ready_pods} "
@@ -360,7 +356,6 @@ def select_and_monitor_by_label(
     label_selector: str,
     max_timeout: int,
     v1_client: CoreV1Api,
-    expected_ready_pods: int = None,
 ) -> Future:
     """
     Monitors all the pods identified
@@ -377,8 +372,6 @@ def select_and_monitor_by_label(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
-    :param expected_ready_pods: Number of ready pods to wait for before
-        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -403,7 +396,6 @@ def select_and_monitor_by_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=None,
-        expected_ready_pods=expected_ready_pods,
     )
     return future
 
@@ -413,7 +405,6 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
     namespace_pattern: str,
     max_timeout: int,
     v1_client: CoreV1Api,
-    expected_ready_pods: int = None,
 ):
     """
     Monitors all the pods identified by a pod name regex pattern
@@ -436,8 +427,6 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
-    :param expected_ready_pods: Number of ready pods to wait for before
-        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -474,7 +463,6 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         max_timeout,
         name_pattern=pod_name_pattern,
         namespace_pattern=namespace_pattern,
-        expected_ready_pods=expected_ready_pods,
     )
     return future
 
@@ -484,7 +472,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
     label_selector: str,
     v1_client: CoreV1Api,
     max_timeout=30,
-    expected_ready_pods: int = None,
 ):
     """
     Monitors all the pods identified
@@ -507,8 +494,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
         If during the time frame the pods are not replaced
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
-    :param expected_ready_pods: Number of ready pods to wait for before
-        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -541,6 +526,5 @@ def select_and_monitor_by_namespace_pattern_and_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=namespace_pattern,
-        expected_ready_pods=expected_ready_pods,
     )
     return future
