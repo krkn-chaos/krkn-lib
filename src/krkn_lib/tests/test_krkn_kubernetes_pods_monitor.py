@@ -112,9 +112,14 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time >= pod_delay
         )
         self.assertEqual(len(pods_status.unrecovered), 0)
-        # Verify monitoring exited early (before timeout) since pod recovered
-        self.assertLess(elapsed, monitor_timeout,
-            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
+        # Verify monitoring exited early (before timeout)
+        # since pod recovered
+        self.assertLess(
+            elapsed,
+            monitor_timeout,
+            f"Monitor should have exited early when pod recovered, "
+            f"but took {elapsed}s vs {monitor_timeout}s timeout",
+        )
         self.background_delete_ns(namespace)
 
     def test_pods_by_namespace_pattern_and_label_same_name_respawn(
@@ -173,9 +178,14 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time >= pod_delay
         )
         self.assertEqual(len(pods_status.unrecovered), 0)
-        # Verify monitoring exited early (before timeout) since pod recovered
-        self.assertLess(elapsed, monitor_timeout,
-            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
+        # Verify monitoring exited early (before timeout)
+        # since pod recovered
+        self.assertLess(
+            elapsed,
+            monitor_timeout,
+            f"Monitor should have exited early when pod recovered, "
+            f"but took {elapsed}s vs {monitor_timeout}s timeout",
+        )
 
     def test_pods_by_label_respawn_timeout(self):
         # test pod will not recover before the timeout
@@ -326,9 +336,14 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertTrue(
             delayed_respawn_2 in [p.pod_name for p in pods_status.recovered]
         )
-        # Verify monitoring exited early (before timeout) since pods recovered
-        self.assertLess(elapsed, monitor_timeout,
-            f"Monitor should have exited early when pods recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
+        # Verify monitoring exited early (before timeout)
+        # since pods recovered
+        self.assertLess(
+            elapsed,
+            monitor_timeout,
+            f"Monitor should have exited early when pods recovered, "
+            f"but took {elapsed}s vs {monitor_timeout}s timeout",
+        )
         self.background_delete_ns(namespace)
 
     def test_pods_by_label_multiple_respawn_one_too_late(self):
@@ -439,9 +454,15 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertTrue(
             delayed_respawn_1 in [p.pod_name for p in pods_status.recovered]
         )
-        # Verify monitoring hit the timeout (one pod never recovered)
-        self.assertGreaterEqual(elapsed, monitor_timeout - 1,
-            f"Monitor should have hit timeout since one pod never recovered, but exited at {elapsed}s vs {monitor_timeout}s timeout")
+        # Verify monitoring hit the timeout
+        # (one pod never recovered)
+        self.assertGreaterEqual(
+            elapsed,
+            monitor_timeout - 1,
+            f"Monitor should have hit timeout since one pod never "
+            f"recovered, but exited at {elapsed}s vs "
+            f"{monitor_timeout}s timeout",
+        )
 
     def test_pods_becoming_not_ready(self):
         # test pod will never recover
@@ -478,9 +499,14 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time,
             pods_status.recovered[0].pod_readiness_time,
         )
-        # Verify monitoring exited early (before timeout) since pod recovered
-        self.assertLess(elapsed, monitor_timeout,
-            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
+        # Verify monitoring exited early (before timeout)
+        # since pod recovered
+        self.assertLess(
+            elapsed,
+            monitor_timeout,
+            f"Monitor should have exited early when pod recovered, "
+            f"but took {elapsed}s vs {monitor_timeout}s timeout",
+        )
 
     def test_monitor_stopping_earlier(self):
 

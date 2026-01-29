@@ -2,7 +2,6 @@ import logging
 import re
 import time
 import traceback
-import threading
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
@@ -17,54 +16,6 @@ from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
     PodStatus,
 )
-
-
-class CancellableFuture:
-    """
-    Wrapper around a Future that allows cancellation via a stop event.
-    When cancel() is called, it sets a threading event that the monitoring
-    thread checks to stop gracefully.
-    """
-    def __init__(self, future: Future, stop_event: threading.Event, snapshot: PodsSnapshot):
-        self._future = future
-        self._stop_event = stop_event
-        self._snapshot = snapshot
-
-    def cancel(self) -> bool:
-        """
-        Cancel the monitoring operation by setting the stop event.
-        Returns True if cancellation was successful.
-        """
-        logging.info("[CANCELLABLE] Setting stop event to cancel monitoring")
-        self._stop_event.set()
-        # Stop the watch if it exists in the snapshot
-        if hasattr(self._snapshot, '_watch') and self._snapshot._watch is not None:
-            logging.info("[CANCELLABLE] Stopping watch stream directly")
-            try:
-                self._snapshot._watch.stop()
-            except Exception as e:
-                logging.warning(f"[CANCELLABLE] Error stopping watch: {e}")
-        return True
-
-    def cancelled(self) -> bool:
-        """Check if the future was cancelled."""
-        return self._future.cancelled()
-
-    def done(self) -> bool:
-        """Check if the future is done."""
-        return self._future.done()
-
-    def result(self, timeout=None):
-        """Get the result of the future."""
-        return self._future.result(timeout=timeout)
-
-    def exception(self, timeout=None):
-        """Get any exception raised by the future."""
-        return self._future.exception(timeout=timeout)
-
-    def add_done_callback(self, fn):
-        """Add a callback to be called when the future completes."""
-        return self._future.add_done_callback(fn)
 
 
 def _select_pods(
@@ -101,7 +52,6 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
     max_retries: int = 3,
-    stop_event: threading.Event = None,
 ) -> PodsSnapshot:
     """
     Monitor pods with automatic retry on watch stream disconnection.
@@ -113,7 +63,6 @@ def _monitor_pods(
     :param namespace_pattern: Regex pattern for namespaces
     :param max_retries: Maximum number of retries on connection error
         (default: 3)
-    :param stop_event: Threading event to signal cancellation from the caller
     :return: PodsSnapshot with collected pod events
     """
 
@@ -127,11 +76,6 @@ def _monitor_pods(
     )
 
     while retry_count <= max_retries:
-        # Check if cancellation was requested
-        if stop_event and stop_event.is_set():
-            logging.info("Stop event detected, cancelling monitoring")
-            return snapshot
-
         try:
             # Calculate remaining timeout if retrying
             if retry_count > 0:
@@ -152,16 +96,8 @@ def _monitor_pods(
                 remain_timeout = max_timeout
 
             w = watch.Watch(return_type=V1Pod)
-            # Store watch reference in snapshot so cancel() can access it
-            snapshot._watch = w
 
             for e in w.stream(monitor_partial, timeout_seconds=remain_timeout):
-                # Check if cancellation was requested
-                if stop_event and stop_event.is_set():
-                    logging.info("Stop event detected, stopping watch")
-                    w.stop()
-                    snapshot._watch = None
-                    return snapshot
 
                 match_name = True
                 match_namespace = True
@@ -222,7 +158,7 @@ def _monitor_pods(
                     # Create PodEvent with both timestamps set at once
                     pod_event = PodEvent(
                         timestamp=client_timestamp,
-                        server_timestamp=server_timestamp
+                        server_timestamp=server_timestamp,
                     )
                     pod_event.status = status
 
@@ -241,8 +177,8 @@ def _monitor_pods(
 
                     # skips events out of the snapshot
                     if pod_name in snapshot.pods:
-                        # Skip duplicate READY events to ensure consistent
-                        # timing measurements
+                        # Skip duplicate READY events to ensure
+                        # consistent timing measurements
                         if pod_event.status == PodStatus.READY:
                             already_ready = any(
                                 event.status == PodStatus.READY
@@ -262,19 +198,24 @@ def _monitor_pods(
                             total_ready_events += 1
 
                     # Check if deletion events match ready events
-                    if total_deletion_events > 0 and total_deletion_events == total_ready_events:
+                    if (
+                        total_deletion_events > 0
+                        and total_deletion_events == total_ready_events
+                    ):
                         logging.info(
-                            f"Deletion events ({total_deletion_events}) match READY events ({total_ready_events}), "
-                            "all disrupted pods have been restored, stopping monitoring"
+                            f"Deletion events ({total_deletion_events}) "
+                            f"match READY events ({total_ready_events}), "
+                            "all disrupted pods have been restored, "
+                            "stopping monitoring"
                         )
                         w.stop()
-                        snapshot._watch = None
                         return snapshot
 
             # If we exit the loop normally (timeout reached), we're done
-            logging.info("Watch stream completed normally (timeout reached)")
+            logging.info(
+                "Watch stream completed normally (timeout reached)"
+            )
             w.stop()
-            snapshot._watch = None
             return snapshot
 
         except ProtocolError as e:
@@ -282,16 +223,16 @@ def _monitor_pods(
 
             if retry_count > max_retries:
                 logging.warning(
-                    f"Watch stream connection broken after {max_retries}"
-                    f"retries. ProtocolError: {e}. Returning snapshot "
-                    "with data collected so far."
+                    f"Watch stream connection broken after "
+                    f"{max_retries} retries. ProtocolError: {e}. "
+                    "Returning snapshot with data collected so far."
                 )
                 break
 
             # Log retry attempt
             logging.info(
-                f"Watch stream connection broken (ProtocolError): {e}. "
-                f"Retry {retry_count}/{max_retries} in progress..."
+                f"Watch stream connection broken (ProtocolError): "
+                f"{e}. Retry {retry_count}/{max_retries} in progress..."
             )
             backoff_time = 1
 
@@ -314,7 +255,10 @@ def _monitor_pods(
 
         retry_count += 1
 
-    logging.info(f"Exiting monitoring loop, returning snapshot with {len(snapshot.pods)} pods")
+    logging.info(
+        f"Exiting monitoring loop, returning snapshot with "
+        f"{len(snapshot.pods)} pods"
+    )
     return snapshot
 
 
@@ -344,20 +288,24 @@ def _get_pod_ready_timestamp(pod: V1Pod) -> float:
     """
     if pod.status.conditions:
         for condition in pod.status.conditions:
-            if condition.type == "Ready" and condition.status == "True":
+            if (
+                condition.type == "Ready"
+                and condition.status == "True"
+            ):
                 if condition.last_transition_time:
-                    # Convert Kubernetes datetime to Unix timestamp
-                    # in seconds
+                    # Convert Kubernetes datetime to Unix
+                    # timestamp in seconds
                     ts = condition.last_transition_time.timestamp()
                     logging.info(
-                        f"Pod {pod.metadata.name} ready timestamp: "
-                        f"{ts} (from condition)"
+                        f"Pod {pod.metadata.name} ready "
+                        f"timestamp: {ts} (from condition)"
                     )
                     return ts
     # Fallback to current time if not available
     fallback = time.time()
     logging.info(
-        f"Pod {pod.metadata.name} ready timestamp fallback: " f"{fallback}"
+        f"Pod {pod.metadata.name} ready timestamp fallback: "
+        f"{fallback}"
     )
     return fallback
 
@@ -388,11 +336,14 @@ def _get_pod_creation_timestamp(pod: V1Pod) -> float:
     """
     if pod.metadata.creation_timestamp:
         ts = pod.metadata.creation_timestamp.timestamp()
-        logging.info(f"Pod {pod.metadata.name} creation timestamp: {ts}")
+        logging.info(
+            f"Pod {pod.metadata.name} creation timestamp: {ts}"
+        )
         return ts
     fallback = time.time()
     logging.info(
-        f"Pod {pod.metadata.name} creation timestamp fallback: " f"{fallback}"
+        f"Pod {pod.metadata.name} creation timestamp fallback: "
+        f"{fallback}"
     )
     return fallback
 
@@ -401,7 +352,7 @@ def select_and_monitor_by_label(
     label_selector: str,
     max_timeout: int,
     v1_client: CoreV1Api,
-) -> CancellableFuture:
+) -> Future:
     """
     Monitors all the pods identified
     by a label selector and collects infos about the
@@ -418,7 +369,7 @@ def select_and_monitor_by_label(
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
     :return:
-        a CancellableFuture which result (PodsSnapshot) must be
+        a Future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
 
     """
@@ -428,9 +379,6 @@ def select_and_monitor_by_label(
         field_selector="status.phase=Running",
     )
     snapshot = _select_pods(select_partial)
-
-    # Create stop event for cancellation
-    stop_event = threading.Event()
 
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
@@ -445,9 +393,8 @@ def select_and_monitor_by_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=None,
-        stop_event=stop_event,
     )
-    return CancellableFuture(future, stop_event, snapshot)
+    return future
 
 
 def select_and_monitor_by_name_pattern_and_namespace_pattern(
@@ -478,7 +425,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
     :return:
-        a CancellableFuture which result (PodsSnapshot) must be
+        a Future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
 
     """
@@ -502,9 +449,6 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         namespace_pattern=namespace_pattern,
     )
 
-    # Create stop event for cancellation
-    stop_event = threading.Event()
-
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
         resource_version=snapshot.resource_version,
@@ -517,9 +461,8 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         max_timeout,
         name_pattern=pod_name_pattern,
         namespace_pattern=namespace_pattern,
-        stop_event=stop_event,
     )
-    return CancellableFuture(future, stop_event, snapshot)
+    return future
 
 
 def select_and_monitor_by_namespace_pattern_and_label(
@@ -550,7 +493,7 @@ def select_and_monitor_by_namespace_pattern_and_label(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :return:
-        a CancellableFuture which result (PodsSnapshot) must be
+        a Future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
 
     """
@@ -569,9 +512,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
         namespace_pattern=namespace_pattern,
     )
 
-    # Create stop event for cancellation
-    stop_event = threading.Event()
-
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
         resource_version=snapshot.resource_version,
@@ -585,6 +525,5 @@ def select_and_monitor_by_namespace_pattern_and_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=namespace_pattern,
-        stop_event=stop_event,
     )
-    return CancellableFuture(future, stop_event, snapshot)
+    return future
