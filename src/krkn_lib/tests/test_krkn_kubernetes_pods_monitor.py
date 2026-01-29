@@ -71,6 +71,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             continue
         time.sleep(3)
 
+        start_time = time.time()
         future = select_and_monitor_by_name_pattern_and_namespace_pattern(
             pod_name_pattern="^delayed-1-.*",
             namespace_pattern=f"^{namespace_random_pattern}-.*",
@@ -95,6 +96,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         time.sleep(3)
 
         snapshot = future.result()
+        end_time = time.time()
+        elapsed = end_time - start_time
+
         print(f"\nRunning test ID: {self.id()}")
         print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
@@ -108,6 +112,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time >= pod_delay
         )
         self.assertEqual(len(pods_status.unrecovered), 0)
+        # Verify monitoring exited early (before timeout) since pod recovered
+        self.assertLess(elapsed, monitor_timeout,
+            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
         self.background_delete_ns(namespace)
 
     def test_pods_by_namespace_pattern_and_label_same_name_respawn(
@@ -127,6 +134,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         monitor_timeout = 45
         pod_delay = 0
 
+        start_time = time.time()
         future = select_and_monitor_by_namespace_pattern_and_label(
             namespace_pattern="^test-ns-2-.*",
             label_selector=f"test={label}",
@@ -149,6 +157,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         time.sleep(3)
 
         snapshot = future.result()
+        end_time = time.time()
+        elapsed = end_time - start_time
+
         # print(f"\nRunning test ID: {self.id()}")
         # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
@@ -162,6 +173,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time >= pod_delay
         )
         self.assertEqual(len(pods_status.unrecovered), 0)
+        # Verify monitoring exited early (before timeout) since pod recovered
+        self.assertLess(elapsed, monitor_timeout,
+            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
 
     def test_pods_by_label_respawn_timeout(self):
         # test pod will not recover before the timeout
@@ -269,6 +283,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         monitor_timeout = 20
         pod_delay = 2
 
+        start_time = time.time()
         future = select_and_monitor_by_label(
             label_selector=f"test={label}",
             max_timeout=monitor_timeout,
@@ -292,6 +307,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         )
 
         snapshot = future.result()
+        end_time = time.time()
+        elapsed = end_time - start_time
+
         # print(f"\nRunning test ID: {self.id()}")
         # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
@@ -308,6 +326,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertTrue(
             delayed_respawn_2 in [p.pod_name for p in pods_status.recovered]
         )
+        # Verify monitoring exited early (before timeout) since pods recovered
+        self.assertLess(elapsed, monitor_timeout,
+            f"Monitor should have exited early when pods recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
         self.background_delete_ns(namespace)
 
     def test_pods_by_label_multiple_respawn_one_too_late(self):
@@ -392,6 +413,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         monitor_timeout = 10
         pod_delay = 1
+        start_time = time.time()
         future = select_and_monitor_by_label(
             label_selector=f"test={label}",
             max_timeout=monitor_timeout,
@@ -404,6 +426,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             delayed_respawn_1, namespace, pod_delay, label
         )
         snapshot = future.result()
+        end_time = time.time()
+        elapsed = end_time - start_time
+
         # print(f"\nRunning test ID: {self.id()}")
         # print(json.dumps(snapshot.to_dict(), indent=True))
         pods_status = snapshot.get_pods_status()
@@ -414,6 +439,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
         self.assertTrue(
             delayed_respawn_1 in [p.pod_name for p in pods_status.recovered]
         )
+        # Verify monitoring hit the timeout (one pod never recovered)
+        self.assertGreaterEqual(elapsed, monitor_timeout - 1,
+            f"Monitor should have hit timeout since one pod never recovered, but exited at {elapsed}s vs {monitor_timeout}s timeout")
 
     def test_pods_becoming_not_ready(self):
         # test pod will never recover
@@ -428,6 +456,7 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         monitor_timeout = 20
 
+        start_time = time.time()
         future = select_and_monitor_by_name_pattern_and_namespace_pattern(
             delayed_1,
             namespace,
@@ -437,6 +466,8 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
 
         self.lib_k8s.exec_cmd_in_pod(["kill 1"], delayed_1, namespace)
         snapshot = future.result()
+        end_time = time.time()
+        elapsed = end_time - start_time
 
         pods_status = snapshot.get_pods_status()
         self.background_delete_ns(namespace)
@@ -447,6 +478,9 @@ class TestKrknKubernetesPodsMonitor(BaseTest):
             pods_status.recovered[0].total_recovery_time,
             pods_status.recovered[0].pod_readiness_time,
         )
+        # Verify monitoring exited early (before timeout) since pod recovered
+        self.assertLess(elapsed, monitor_timeout,
+            f"Monitor should have exited early when pod recovered, but took {elapsed}s vs {monitor_timeout}s timeout")
 
     def test_monitor_stopping_earlier(self):
 
