@@ -757,7 +757,7 @@ class KrknKubernetes:
 
     def get_all_pods(
         self, label_selector: str = None, field_selector: str = None
-    ) -> list[[str, str]]:
+    ) -> list[tuple[str, str]]:
         """
         Return a list of tuples containing pod name [0] and namespace [1]
 
@@ -785,7 +785,7 @@ class KrknKubernetes:
             )
         for ret_list in ret:
             for pod in ret_list.items:
-                pods.append([pod.metadata.name, pod.metadata.namespace])
+                pods.append((pod.metadata.name, pod.metadata.namespace))
         return pods
 
     def get_namespaced_net_policy(self, namespace):
