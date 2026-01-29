@@ -52,6 +52,7 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
     max_retries: int = 3,
+    expected_ready_pods: int = None,
 ) -> PodsSnapshot:
     """
     Monitor pods with automatic retry on watch stream disconnection.
@@ -63,6 +64,8 @@ def _monitor_pods(
     :param namespace_pattern: Regex pattern for namespaces
     :param max_retries: Maximum number of retries on connection error
         (default: 3)
+    :param expected_ready_pods: Number of ready pods to wait for before
+        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return: PodsSnapshot with collected pod events
     """
 
@@ -71,6 +74,15 @@ def _monitor_pods(
     deleted_parent_pods = []
     restored_pods = []
     cluster_restored = False
+
+    # Set the target number of ready pods
+    if expected_ready_pods is None:
+        expected_ready_pods = len(snapshot.initial_pods)
+
+    logging.info(
+        f"Monitoring pods - waiting for {expected_ready_pods} "
+        f"ready pods (initial pods: {len(snapshot.initial_pods)})"
+    )
 
     while retry_count <= max_retries:
         try:
@@ -135,16 +147,14 @@ def _monitor_pods(
                             if pod_name not in restored_pods:
                                 restored_pods.append(pod_name)
 
-                            # Check if all initial pods are recovered
-                            # by counting ready pods
-                            initial_pod_count = len(snapshot.initial_pods)
+                            # Check if expected number of pods are ready
                             ready_count = len(restored_pods)
 
-                            if ready_count >= initial_pod_count:
+                            if ready_count >= expected_ready_pods:
                                 cluster_restored = True
                                 logging.info(
-                                    f"All initial pods recovered: "
-                                    f"{ready_count}/{initial_pod_count}"
+                                    f"Expected ready pods reached: "
+                                    f"{ready_count}/{expected_ready_pods}"
                                 )
                         else:
                             status = PodStatus.NOT_READY
@@ -183,15 +193,6 @@ def _monitor_pods(
                             snapshot.pods[pod_name].namespace = (
                                 pod.metadata.namespace
                             )
-                    # Check if cluster is restored and stop monitoring
-                    # early. This check must happen before skipping
-                    # duplicate events to ensure we exit promptly.
-                    if cluster_restored:
-                        logging.info(
-                            "Cluster restored, stopping monitoring"
-                        )
-                        w.stop()
-                        return snapshot
 
                     # skips events out of the snapshot
                     if pod_name in snapshot.pods:
@@ -206,15 +207,32 @@ def _monitor_pods(
                             )
                             if already_ready:
                                 # Skip duplicate READY event, but still
-                                # check cluster_restored above
+                                # check cluster_restored below
+                                if cluster_restored:
+                                    logging.info(
+                                        "Cluster restored, stopping monitoring"
+                                    )
+                                    w.stop()
+                                    return snapshot
                                 continue
                         snapshot.pods[pod_name].status_changes.append(
                             pod_event
                         )
 
+                    # Check if cluster is restored and stop monitoring
+                    # early. This check happens after processing the event
+                    # to ensure we capture the final READY state.
+                    if cluster_restored:
+                        logging.info(
+                            "Cluster restored, stopping monitoring"
+                        )
+                        w.stop()
+                        return snapshot
+
             # If we exit the loop normally (timeout reached), we're done
             logging.info("Watch stream completed normally")
-            break
+            w.stop()
+            return snapshot
 
         except ProtocolError as e:
 
@@ -342,6 +360,7 @@ def select_and_monitor_by_label(
     label_selector: str,
     max_timeout: int,
     v1_client: CoreV1Api,
+    expected_ready_pods: int = None,
 ) -> Future:
     """
     Monitors all the pods identified
@@ -358,6 +377,8 @@ def select_and_monitor_by_label(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
+    :param expected_ready_pods: Number of ready pods to wait for before
+        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -382,6 +403,7 @@ def select_and_monitor_by_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=None,
+        expected_ready_pods=expected_ready_pods,
     )
     return future
 
@@ -391,6 +413,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
     namespace_pattern: str,
     max_timeout: int,
     v1_client: CoreV1Api,
+    expected_ready_pods: int = None,
 ):
     """
     Monitors all the pods identified by a pod name regex pattern
@@ -413,6 +436,8 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
+    :param expected_ready_pods: Number of ready pods to wait for before
+        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -449,6 +474,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         max_timeout,
         name_pattern=pod_name_pattern,
         namespace_pattern=namespace_pattern,
+        expected_ready_pods=expected_ready_pods,
     )
     return future
 
@@ -458,6 +484,7 @@ def select_and_monitor_by_namespace_pattern_and_label(
     label_selector: str,
     v1_client: CoreV1Api,
     max_timeout=30,
+    expected_ready_pods: int = None,
 ):
     """
     Monitors all the pods identified
@@ -480,6 +507,8 @@ def select_and_monitor_by_namespace_pattern_and_label(
         If during the time frame the pods are not replaced
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
+    :param expected_ready_pods: Number of ready pods to wait for before
+        stopping monitoring. If None, defaults to len(snapshot.initial_pods)
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -512,5 +541,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=namespace_pattern,
+        expected_ready_pods=expected_ready_pods,
     )
     return future
