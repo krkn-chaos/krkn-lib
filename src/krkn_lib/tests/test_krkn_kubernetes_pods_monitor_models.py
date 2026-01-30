@@ -404,7 +404,8 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         self.assertTrue(len(status.recovered), 1)
         self.assertTrue(status.recovered[0].pod_readiness_time > 0)
         # Tests a real case where the pod has been rescheduled before
-        # The event of the deletion has been emitted measuring a negative
-        # rescheduling time.
-        self.assertTrue(status.recovered[0].pod_rescheduling_time < 0)
+        # The event of the deletion has been emitted. This would have
+        # measured a negative rescheduling time, but we now clamp to 0
+        # to handle timing anomalies gracefully.
+        self.assertEqual(status.recovered[0].pod_rescheduling_time, 0)
         self.assertTrue(status.recovered[0].total_recovery_time > 0)

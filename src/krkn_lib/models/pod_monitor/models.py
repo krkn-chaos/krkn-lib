@@ -181,7 +181,8 @@ class PodsSnapshot:
                             - status_change.server_timestamp
                         )
 
-                        recovery_time = round(recovery_time, 8)
+                        # Ensure non-negative time (handle clock skew)
+                        recovery_time = max(0, round(recovery_time, 8))
                         pods_status.recovered.append(
                             AffectedPod(
                                 pod_name=pod.name,
@@ -244,10 +245,14 @@ class PodsSnapshot:
                                 )
                             )
                         else:
-                            # Use server-side timestamp for deletion to
-                            # match ADDED/READY timestamps and get accurate
-                            # Kubernetes timing
-                            deletion_ts = status_change.server_timestamp
+                            # For DELETED events, use client timestamp (when we
+                            # observed pod was gone) for more accurate timing.
+                            # For DELETION_SCHEDULED, use server timestamp
+                            # (deletionTimestamp).
+                            if status_change.status == PodStatus.DELETED:
+                                deletion_ts = status_change.timestamp
+                            else:
+                                deletion_ts = status_change.server_timestamp
 
                             logging.info(
                                 f"Pod {rescheduled_pod.name} recovery "
@@ -261,7 +266,12 @@ class PodsSnapshot:
                             # Calculate rescheduling time (time from
                             # deletion to pod added)
                             rescheduling_time = (
-                                round(rescheduled_start_ts - deletion_ts, 8)
+                                max(
+                                    0,
+                                    round(
+                                        rescheduled_start_ts - deletion_ts, 8
+                                    ),
+                                )
                                 if rescheduled_start_ts
                                 else None
                             )
@@ -270,16 +280,21 @@ class PodsSnapshot:
                             # rescheduling time to get actual readiness
                             # time
                             total_from_deletion = (
-                                round(rescheduled_ready_ts - deletion_ts, 8)
+                                max(
+                                    0, round(rescheduled_ready_ts - deletion_ts, 8)
+                                )
                                 if rescheduled_ready_ts
                                 else None
                             )
                             # Readiness time is the time from pod added
                             # to pod ready
                             readiness_time = (
-                                round(
-                                    total_from_deletion - rescheduling_time,
-                                    8,
+                                max(
+                                    0,
+                                    round(
+                                        total_from_deletion - rescheduling_time,
+                                        8,
+                                    ),
                                 )
                                 if total_from_deletion is not None
                                 and rescheduling_time is not None
@@ -303,7 +318,8 @@ class PodsSnapshot:
                                     pod_readiness_time=readiness_time,
                                     total_recovery_time=(
                                         rescheduling_time + readiness_time
-                                        if rescheduling_time and readiness_time
+                                        if rescheduling_time is not None
+                                        and readiness_time is not None
                                         else None
                                     ),
                                 )
