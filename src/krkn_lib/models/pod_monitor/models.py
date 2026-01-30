@@ -262,9 +262,7 @@ class PodsSnapshot:
                             # Calculate rescheduling time (time from
                             # deletion to pod added)
                             rescheduling_time = (
-                                    round(
-                                        rescheduled_start_ts - deletion_ts, 8
-                                    )
+                                round(rescheduled_start_ts - deletion_ts, 8)
                                 if rescheduled_start_ts
                                 else None
                             )
@@ -273,20 +271,17 @@ class PodsSnapshot:
                             # rescheduling time to get actual readiness
                             # time
                             total_from_deletion = (
-                                    round(
-                                        rescheduled_ready_ts - deletion_ts, 8
-                                    )
+                                round(rescheduled_ready_ts - deletion_ts, 8)
                                 if rescheduled_ready_ts
                                 else None
                             )
                             # Readiness time is the time from pod added
                             # to pod ready
                             readiness_time = (
-                                    round(
-                                        total_from_deletion
-                                        - rescheduling_time,
-                                        8,
-                                    )
+                                round(
+                                    total_from_deletion - rescheduling_time,
+                                    8,
+                                )
                                 if total_from_deletion is not None
                                 and rescheduling_time is not None
                                 else None
@@ -294,7 +289,7 @@ class PodsSnapshot:
                             # Total recovery time is from deletion to ready
                             total_time = total_from_deletion
 
-                            logging.info(
+                            logging.debug(
                                 f"Pod {rescheduled_pod.name} recovery times: "
                                 f"rescheduling={rescheduling_time}s, "
                                 f"readiness={readiness_time}s, "
