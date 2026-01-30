@@ -193,10 +193,13 @@ class PodsSnapshot:
                         )
                     break
 
-                # if there's a DELETION_SCHEDULED events
+                # if there's a DELETION_SCHEDULED or DELETED event
                 # looks for the rescheduled pod
                 # and calculates its scheduling and readiness time
-                if status_change.status == PodStatus.DELETION_SCHEDULED:
+                if status_change.status in (
+                    PodStatus.DELETION_SCHEDULED,
+                    PodStatus.DELETED,
+                ):
                     rescheduled_pod = self._find_rescheduled_pod(pod_name)
                     if not rescheduled_pod:
                         pods_status.unrecovered.append(
