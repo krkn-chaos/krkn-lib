@@ -149,7 +149,6 @@ def _monitor_pods(
                             server_timestamp = (
                                 _get_pod_deletion_timestamp(pod)
                             )
-                        total_deletion_events += 1
                     elif event_type == "ADDED":
                         status = PodStatus.ADDED
                         server_timestamp = (
@@ -199,6 +198,10 @@ def _monitor_pods(
                         snapshot.pods[pod_name].status_changes.append(
                             pod_event
                         )
+
+                        # Track deletion events for recovery comparison
+                        if pod_event.status == PodStatus.DELETED:
+                            total_deletion_events += 1
 
                         # Track ready events for deletion comparison
                         if pod_event.status == PodStatus.READY:
