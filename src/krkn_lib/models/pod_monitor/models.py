@@ -205,14 +205,11 @@ class PodsSnapshot:
                             )
                         )
                     else:
-                        # Use client-side timestamps for both ADDED and
-                        # READY events. Server-side timestamps may be from
-                        # the original pod or have clock skew issues.
-                        # Client timestamps reflect when we actually
-                        # observed the events during monitoring.
+                        # Use server-side timestamps for both ADDED and
+                        # READY events to get accurate Kubernetes timing
                         rescheduled_start_ts = next(
                             map(
-                                lambda e: e.timestamp,  # Use client timestamp
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.ADDED,
                                     rescheduled_pod.status_changes,
@@ -220,11 +217,11 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        # Use client-side timestamp for READY to capture
-                        # when we observed it ready
+                        # Use server-side timestamp for READY to get
+                        # accurate Kubernetes timing
                         rescheduled_ready_ts = next(
                             map(
-                                lambda e: e.timestamp,  # Use client timestamp
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.READY,
                                     rescheduled_pod.status_changes,
@@ -244,13 +241,12 @@ class PodsSnapshot:
                                 )
                             )
                         else:
-                            # Use client-side timestamp for deletion to
-                            # match ADDED/READY timestamps. This ensures
-                            # all timestamps are from the same source
-                            # (watch events)
-                            deletion_ts = status_change.timestamp
+                            # Use server-side timestamp for deletion to
+                            # match ADDED/READY timestamps and get accurate
+                            # Kubernetes timing
+                            deletion_ts = status_change.server_timestamp
 
-                            logging.debug(
+                            logging.info(
                                 f"Pod {rescheduled_pod.name} recovery "
                                 f"calculation: deletion_ts={deletion_ts}, "
                                 f"rescheduled_start_ts="
