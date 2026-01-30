@@ -6,6 +6,7 @@ metadata:
   name: {{name}}
   namespace: {{namespace}}
 spec:
+  terminationGracePeriodSeconds: 1
   containers:
   - name: readiness
     image: busybox
