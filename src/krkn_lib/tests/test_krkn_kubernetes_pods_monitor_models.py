@@ -187,21 +187,23 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         parent_pod = MonitoredPod()
         parent_pod.name = "parent-pod"
         parent_pod.namespace = "parent-ns"
-        deletion_event = PodEvent()
+        deletion_ts = time.time() - 20
+        deletion_event = PodEvent(
+            timestamp=deletion_ts, server_timestamp=deletion_ts
+        )
         deletion_event.status = PodStatus.DELETION_SCHEDULED
-        deletion_event._timestamp = time.time() - 20
         parent_pod.status_changes.append(deletion_event)
 
         rescheduled_pod = MonitoredPod()
         rescheduled_pod.name = "rescheduled-pod"
         rescheduled_pod.namespace = "parent-ns"
-        added_event = PodEvent()
+        added_ts = time.time() - 10
+        added_event = PodEvent(timestamp=added_ts, server_timestamp=added_ts)
         added_event.status = PodStatus.ADDED
         added_event.parent = "parent-pod"
-        added_event._timestamp = time.time() - 10
-        ready_event = PodEvent()
+        ready_ts = time.time()
+        ready_event = PodEvent(timestamp=ready_ts, server_timestamp=ready_ts)
         ready_event.status = PodStatus.READY
-        ready_event._timestamp = time.time()
         rescheduled_pod.status_changes.extend([added_event, ready_event])
 
         snapshot.initial_pods = ["parent-pod"]
