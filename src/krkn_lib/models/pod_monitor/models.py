@@ -2,9 +2,9 @@ import json
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.k8s import AffectedPod, PodsStatus
 
 
 class PodStatus(Enum):

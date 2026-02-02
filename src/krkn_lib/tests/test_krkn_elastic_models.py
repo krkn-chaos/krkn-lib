@@ -1,9 +1,9 @@
+import datetime
 import uuid
 
 from krkn_lib.models.elastic.models import ElasticChaosRunTelemetry
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
-import datetime
 
 
 class TestKrknElasticModels(BaseTest):
@@ -222,9 +222,7 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(
             elastic_telemetry.virt_checks[0].ip_address, "0.0.0.0"
         )
-        self.assertEqual(
-            elastic_telemetry.virt_checks[0].new_ip_address, ""
-        )
+        self.assertEqual(elastic_telemetry.virt_checks[0].new_ip_address, "")
         self.assertEqual(
             elastic_telemetry.virt_checks[2].new_ip_address, "0.0.0.3"
         )

@@ -1,13 +1,12 @@
 import time
 import unittest
 
-
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.k8s import AffectedPod, PodsStatus
 from krkn_lib.models.pod_monitor.models import (
-    PodEvent,
-    PodStatus,
     MonitoredPod,
+    PodEvent,
     PodsSnapshot,
+    PodStatus,
 )
 
 
