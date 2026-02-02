@@ -4,6 +4,7 @@ import logging
 import os
 import threading
 from queue import Queue
+from typing import Optional
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.ocp import KrknOpenshift
@@ -42,14 +43,28 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         self,
         telemetry_config: dict,
         request_id: str,
+        start_timestamp: Optional[int] = None,
+        end_timestamp: Optional[int] = None,
+        prometheus_url: Optional[str] = None,
+        prometheus_bearer_token: Optional[str] = None,
     ) -> list[(int, str)]:
         """
-        Downloads the Openshift prometheus metrics
+        Downloads the Openshift prometheus metrics.
+        Attempts API-based collection first (if parameters provided),
+        then falls back to filesystem backup.
 
         :param telemetry_config: krkn telemetry conf section
             will be stored
         :param request_id: uuid of the session that will represent the
             temporary archive files
+        :param start_timestamp: (Optional) Start time for API-based collection
+            (Unix timestamp in seconds)
+        :param end_timestamp: (Optional) End time for API-based collection
+            (Unix timestamp in seconds)
+        :param prometheus_url: (Optional) Prometheus API URL for API-based
+            collection
+        :param prometheus_bearer_token: (Optional) Bearer token for
+            Prometheus API authentication
         :return: the list of the archive number and filenames downloaded
         """
         prometheus_ocp_pod_name = "prometheus-k8s-0"
@@ -62,6 +77,11 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             prometheus_ocp_pod_name,
             prometheus_ocp_container_name,
             prometheus_ocp_namespace,
+            "/prometheus",
+            start_timestamp,
+            end_timestamp,
+            prometheus_url,
+            prometheus_bearer_token,
         )
 
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
