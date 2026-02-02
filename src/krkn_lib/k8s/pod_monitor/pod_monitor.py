@@ -217,21 +217,36 @@ def _monitor_pods(
 
                         # Early exit condition 1: All deleted pods
                         # replaced
-                        if (
-                            len(deleted_parent_pods) > 0
-                            and len(deleted_parent_pods) == len(restored_pods) or 
-                            cluster_restored
-                        ):
+                        if cluster_restored:
                             logging.debug(
-                                f"Deletion events "
-                                f"({len(deleted_parent_pods)}) "
-                                f"match READY events "
-                                f"({len(restored_pods)}), "
-                                "all disrupted pods restored, "
-                                "stopping monitoring"
+                                "Cluster restored: all initial pods "
+                                "have recovered, stopping monitoring"
                             )
                             w.stop()
                             return snapshot
+
+                        if (
+                            len(deleted_parent_pods) > 0
+                            and len(deleted_parent_pods) == len(restored_pods)
+                        ):
+                            # Check that restored pods are actually new pods
+                            # (not just initial pods that stayed ready)
+                            # by verifying they have ADDED events
+                            new_pods_count = sum(
+                                1 for pod_name in restored_pods
+                                if pod_name in snapshot.added_pods
+                            )
+                            if new_pods_count == len(deleted_parent_pods):
+                                logging.debug(
+                                    f"Deletion events "
+                                    f"({len(deleted_parent_pods)}) "
+                                    f"match new READY pods "
+                                    f"({new_pods_count}), "
+                                    "all disrupted pods restored, "
+                                    "stopping monitoring"
+                                )
+                                w.stop()
+                                return snapshot
 
                         # Early exit condition 2: All initially monitored
                         # pods that became not ready are now ready again
