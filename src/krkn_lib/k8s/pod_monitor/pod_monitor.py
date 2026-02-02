@@ -68,13 +68,15 @@ def _monitor_pods(
 
     start_time = time.time()
     retry_count = 0
-    total_deletion_events = 0
-    total_ready_events = 0
+    deleted_parent_pods = []
+    restored_pods = []
     pods_became_not_ready = set()
+    cluster_restored = False
 
     logging.info(
         f"Monitoring pods - tracking {len(snapshot.initial_pods)} initial pods"
     )
+    inital_pod_len = len(snapshot.initial_pods)
 
     while retry_count <= max_retries:
         try:
@@ -137,6 +139,8 @@ def _monitor_pods(
                             server_timestamp = (
                                 _get_pod_ready_timestamp(pod)
                             )
+                            if len(restored_pods) >= inital_pod_len:
+                                cluster_restored = True
                         else:
                             status = PodStatus.NOT_READY
                             # For NOT_READY, use client timestamp
@@ -201,25 +205,28 @@ def _monitor_pods(
 
                         # Track deletion events for recovery comparison
                         if pod_event.status == PodStatus.DELETED:
-                            total_deletion_events += 1
+                            if pod_name not in deleted_parent_pods:
+                                deleted_parent_pods.append(pod_name)
 
                         # Track ready events for deletion comparison
                         if pod_event.status == PodStatus.READY:
-                            total_ready_events += 1
+                            if pod_name not in restored_pods:
+                                restored_pods.append(pod_name)
                             # Remove from not_ready set if pod recovered
                             pods_became_not_ready.discard(pod_name)
 
                         # Early exit condition 1: All deleted pods
                         # replaced
                         if (
-                            total_deletion_events > 0
-                            and total_deletion_events == total_ready_events
+                            len(deleted_parent_pods) > 0
+                            and len(deleted_parent_pods) == len(restored_pods) or 
+                            cluster_restored
                         ):
                             logging.debug(
                                 f"Deletion events "
-                                f"({total_deletion_events}) "
+                                f"({len(deleted_parent_pods)}) "
                                 f"match READY events "
-                                f"({total_ready_events}), "
+                                f"({len(restored_pods)}), "
                                 "all disrupted pods restored, "
                                 "stopping monitoring"
                             )
@@ -230,8 +237,8 @@ def _monitor_pods(
                         # pods that became not ready are now ready again
                         if (
                             len(pods_became_not_ready) == 0
-                            and total_ready_events > 0
-                            and total_deletion_events == 0
+                            and len(restored_pods) > 0
+                            and len(deleted_parent_pods) == 0
                         ):
                             # Check if any initial pod had NOT_READY
                             had_disruption = any(
