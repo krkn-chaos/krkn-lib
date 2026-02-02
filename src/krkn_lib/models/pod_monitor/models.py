@@ -175,10 +175,9 @@ class PodsSnapshot:
 
                         # pod stayed ready but was restarted
                         # or has a failed container
-                        # Use server_timestamp for accurate measurement
+                        # Use client timestamp for consistent measurement
                         recovery_time = (
-                            ready_status.server_timestamp
-                            - status_change.server_timestamp
+                            ready_status.timestamp - status_change.timestamp
                         )
 
                         # Ensure non-negative time (handle clock skew)
@@ -209,11 +208,12 @@ class PodsSnapshot:
                             )
                         )
                     else:
-                        # Use server-side timestamps for both ADDED and
-                        # READY events to get accurate Kubernetes timing
+                        # Use client timestamp for ADDED event (when we
+                        # observed pod was added) for accurate timing comparison
+                        # with deletion timestamp
                         rescheduled_start_ts = next(
                             map(
-                                lambda e: e.server_timestamp,
+                                lambda e: e.timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.ADDED,
                                     rescheduled_pod.status_changes,
@@ -221,11 +221,11 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        # Use server-side timestamp for READY to get
-                        # accurate Kubernetes timing
+                        # Use client timestamp for READY event (when we
+                        # observed pod became ready) for consistent timing
                         rescheduled_ready_ts = next(
                             map(
-                                lambda e: e.server_timestamp,
+                                lambda e: e.timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.READY,
                                     rescheduled_pod.status_changes,
