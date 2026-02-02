@@ -1,12 +1,7 @@
 import logging
 import re
-<<<<<<< HEAD
 import time
 import traceback
-=======
-import threading
-import time
->>>>>>> baa57c3 (pod monitor cancellation)
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
