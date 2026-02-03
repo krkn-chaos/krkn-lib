@@ -175,7 +175,9 @@ class PodsSnapshot:
 
                         # pod stayed ready but was restarted
                         # or has a failed container
-                        # Use client timestamp for consistent measurement
+                        # Use client timestamps for both NOT_READY and READY
+                        # in this case since NOT_READY doesn't have a proper
+                        # server timestamp, keeping same clock source
                         recovery_time = (
                             ready_status.timestamp - status_change.timestamp
                         )
@@ -208,12 +210,11 @@ class PodsSnapshot:
                             )
                         )
                     else:
-                        # Use client timestamp for ADDED event (when we
-                        # observed pod was added) for accurate timing comparison
-                        # with deletion timestamp
+                        # Use server timestamp for ADDED event (pod creation time)
+                        # for consistent comparison with deletion timestamp
                         rescheduled_start_ts = next(
                             map(
-                                lambda e: e.timestamp,
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.ADDED,
                                     rescheduled_pod.status_changes,
@@ -221,11 +222,11 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        # Use client timestamp for READY event (when we
-                        # observed pod became ready) for consistent timing
+                        # Use server timestamp for READY event (ready condition time)
+                        # for consistent timing with deletion and creation timestamps
                         rescheduled_ready_ts = next(
                             map(
-                                lambda e: e.timestamp,
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.READY,
                                     rescheduled_pod.status_changes,
@@ -265,27 +266,38 @@ class PodsSnapshot:
 
                             # Calculate rescheduling time (time from
                             # deletion to pod added)
-                            rescheduling_time = (
-                                max(
-                                    0,
-                                    round(
-                                        rescheduled_start_ts - deletion_ts, 8
-                                    ),
-                                )
-                                if rescheduled_start_ts
-                                else None
-                            )
+                            if rescheduled_start_ts:
+                                raw_rescheduling = rescheduled_start_ts - deletion_ts
+                                if raw_rescheduling < 0:
+                                    logging.warning(
+                                        f"Clock skew detected for pod "
+                                        f"{rescheduled_pod.name}: deletion_ts "
+                                        f"({deletion_ts}) is after "
+                                        f"rescheduled_start_ts "
+                                        f"({rescheduled_start_ts}). "
+                                        f"Using 0 for rescheduling time."
+                                    )
+                                rescheduling_time = max(0, round(raw_rescheduling, 8))
+                            else:
+                                rescheduling_time = None
                             # Calculate total readiness time (time from
                             # deletion to pod ready). Then subtract
                             # rescheduling time to get actual readiness
                             # time
-                            total_from_deletion = (
-                                max(
-                                    0, round(rescheduled_ready_ts - deletion_ts, 8)
-                                )
-                                if rescheduled_ready_ts
-                                else None
-                            )
+                            if rescheduled_ready_ts:
+                                raw_total = rescheduled_ready_ts - deletion_ts
+                                if raw_total < 0:
+                                    logging.warning(
+                                        f"Clock skew detected for pod "
+                                        f"{rescheduled_pod.name}: deletion_ts "
+                                        f"({deletion_ts}) is after "
+                                        f"rescheduled_ready_ts "
+                                        f"({rescheduled_ready_ts}). "
+                                        f"Using 0 for total recovery time."
+                                    )
+                                total_from_deletion = max(0, round(raw_total, 8))
+                            else:
+                                total_from_deletion = None
                             # Readiness time is the time from pod added
                             # to pod ready
                             readiness_time = (
