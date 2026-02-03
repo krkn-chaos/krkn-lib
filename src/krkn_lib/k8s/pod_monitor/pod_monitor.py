@@ -132,16 +132,16 @@ def _monitor_pods(
 
                     if event_type == "MODIFIED":
                         if pod.metadata.deletion_timestamp is not None:
-                            
                             status = PodStatus.DELETION_SCHEDULED
                             if pod_name not in deleted_parent_pods:
                                 deleted_parent_pods.append(pod_name)
                                 server_timestamp = (
                                     _get_pod_deletion_timestamp(pod)
                                 )
-                                logging.info("server timestamp" + str(server_timestamp
-                                                                  ))
-                            
+                                logging.info(
+                                    "server timestamp"
+                                    + str(server_timestamp)
+                                )
                         elif _is_pod_ready(pod):
                             logging.info('pod is ready')
                             status = PodStatus.READY
@@ -309,7 +309,7 @@ def _monitor_pods(
     return snapshot
 
 
-def _get_pod_ready_timestamp(pod: V1Pod) -> float: 
+def _get_pod_ready_timestamp(pod: V1Pod) -> float:
     """
     Extract the server-side timestamp when the pod became ready.
     Uses the lastTransitionTime from the Ready condition when status
@@ -339,6 +339,7 @@ def _get_pod_ready_timestamp(pod: V1Pod) -> float:
         f"{fallback}"
     )
     return fallback
+
 
 def _is_pod_ready(pod: V1Pod) -> bool:
     if not pod.status.container_statuses:
