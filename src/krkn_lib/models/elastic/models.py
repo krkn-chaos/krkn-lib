@@ -127,6 +127,11 @@ class ElasticVirtChecks(InnerDoc):
     duration = Float()
 
 
+class ElasticErrorLog(InnerDoc):
+    timestamp = Text()
+    message = Text()
+
+
 class ElasticChaosRunTelemetry(Document):
     scenarios = Nested(ElasticScenarioTelemetry, multi=True)
     node_summary_infos = Nested(ElasticNodeInfo, multi=True)
@@ -145,6 +150,7 @@ class ElasticChaosRunTelemetry(Document):
     health_checks = Nested(ElasticHealthChecks, multi=True)
     virt_checks = Nested(ElasticVirtChecks, multi=True)
     post_virt_checks = Nested(ElasticVirtChecks, multi=True)
+    error_logs = Nested(ElasticErrorLog, multi=True)
 
     class Index:
         name = "chaos_run_telemetry"
@@ -293,3 +299,14 @@ class ElasticChaosRunTelemetry(Document):
         self.job_status = chaos_run_telemetry.job_status
         self.major_version = chaos_run_telemetry.major_version
         self.build_url = chaos_run_telemetry.build_url
+
+        if chaos_run_telemetry.error_logs:
+            self.error_logs = [
+                ElasticErrorLog(
+                    timestamp=error.get('timestamp'),
+                    message=error.get('message')
+                )
+                for error in chaos_run_telemetry.error_logs
+            ]
+        else:
+            self.error_logs = None
