@@ -143,9 +143,11 @@ def _monitor_pods(
                                 cluster_restored = True
                         else:
                             status = PodStatus.NOT_READY
-                            # For NOT_READY, use client timestamp
-                            # since there's no specific server timestamp
-                            server_timestamp = client_timestamp
+                            # For NOT_READY, use server timestamp from Ready
+                            # condition's lastTransitionTime when status=False
+                            server_timestamp = (
+                                _get_pod_not_ready_timestamp(pod)
+                            )
 
                     elif event_type == "DELETED":
                         status = PodStatus.DELETED
@@ -369,6 +371,38 @@ def _get_pod_ready_timestamp(pod: V1Pod) -> float:
     fallback = time.time()
     logging.debug(
         f"Pod {pod.metadata.name} ready timestamp fallback: "
+        f"{fallback}"
+    )
+    return fallback
+
+
+def _get_pod_not_ready_timestamp(pod: V1Pod) -> float:
+    """
+    Extract the server-side timestamp when the pod became not ready.
+    Uses the lastTransitionTime from the Ready condition when status
+    is False.
+
+    :param pod: V1Pod object
+    :return: Unix timestamp (float) when pod became not ready,
+        or current time if not available
+    """
+    if pod.status.conditions:
+        for condition in pod.status.conditions:
+            if (
+                condition.type == "Ready"
+                and condition.status == "False"
+            ):
+                if condition.last_transition_time:
+                    ts = condition.last_transition_time.timestamp()
+                    logging.debug(
+                        f"Pod {pod.metadata.name} not ready "
+                        f"timestamp: {ts} (from Ready condition)"
+                    )
+                    return ts
+    # Fallback to current time if not available
+    fallback = time.time()
+    logging.debug(
+        f"Pod {pod.metadata.name} not ready timestamp fallback: "
         f"{fallback}"
     )
     return fallback

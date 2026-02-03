@@ -175,11 +175,10 @@ class PodsSnapshot:
 
                         # pod stayed ready but was restarted
                         # or has a failed container
-                        # Use client timestamps for both NOT_READY and READY
-                        # in this case since NOT_READY doesn't have a proper
-                        # server timestamp, keeping same clock source
+                        # Use server timestamps for both NOT_READY and READY
+                        # for consistent timing measurement
                         recovery_time = (
-                            ready_status.timestamp - status_change.timestamp
+                            ready_status.server_timestamp - status_change.server_timestamp
                         )
 
                         # Ensure non-negative time (handle clock skew)
