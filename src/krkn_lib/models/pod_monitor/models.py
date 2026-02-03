@@ -8,6 +8,92 @@ from typing import Any, Optional
 from krkn_lib.models.k8s import AffectedPod, PodsStatus
 
 
+# Tolerance for timestamp precision issues (10ms)
+TIMESTAMP_TOLERANCE = 0.01
+
+
+def _validate_time_difference(
+    end_ts: float,
+    start_ts: float,
+    pod_name: str,
+    metric_name: str
+) -> float:
+    """
+    Validate and sanitize time difference between timestamps.
+
+    :param end_ts: End timestamp
+    :param start_ts: Start timestamp
+    :param pod_name: Pod name for logging
+    :param metric_name: Name of metric being calculated (for logging)
+    :return: Non-negative time difference (clamped to 0 if negative)
+    """
+    raw_diff = end_ts - start_ts
+
+    if raw_diff < 0:
+        if raw_diff < -TIMESTAMP_TOLERANCE:
+            # Significant negative value - log error
+            logging.error(
+                f"Invalid timestamp ordering for pod {pod_name}: "
+                f"end timestamp ({end_ts}) is {abs(raw_diff):.3f}s "
+                f"before start timestamp ({start_ts}) for {metric_name}. "
+                f"This indicates a data integrity issue. Using 0."
+            )
+        else:
+            # Small negative value - likely precision issue
+            logging.debug(
+                f"Minor timestamp precision issue for pod {pod_name}: "
+                f"{metric_name} = {raw_diff:.6f}s "
+                f"(within {TIMESTAMP_TOLERANCE}s tolerance). Treating as 0."
+            )
+
+    return max(0, round(raw_diff, 8))
+
+
+def _get_last_ready_timestamp(
+    pod_status_changes: list,
+    pod_name: str,
+    creation_ts: Optional[float] = None
+) -> Optional[float]:
+    """
+    Extract and validate the last (most recent) READY timestamp from pod status changes.
+
+    :param pod_status_changes: List of PodEvent objects
+    :param pod_name: Pod name for logging
+    :param creation_ts: Optional creation timestamp for validation
+    :return: Validated ready timestamp or None
+    """
+    # Get the LAST (most recent) READY event
+    ready_events = [e for e in pod_status_changes if e.status == PodStatus.READY]
+
+    if not ready_events:
+        return None
+
+    ready_ts = ready_events[-1].server_timestamp
+
+    # Validate timestamp is not in the future (allow 1s tolerance for clock sync)
+    current_time = time.time()
+    if ready_ts > current_time + 1:
+        logging.error(
+            f"Pod {pod_name} has ready timestamp in the future: "
+            f"{ready_ts} vs current {current_time}. "
+            f"Future offset: {ready_ts - current_time:.3f}s. "
+            f"Clock synchronization issue detected. Clamping to current time."
+        )
+        ready_ts = current_time
+
+    # Validate ready timestamp is after creation timestamp
+    if creation_ts and ready_ts < creation_ts:
+        logging.error(
+            f"Pod {pod_name} has ready timestamp ({ready_ts}) "
+            f"before creation timestamp ({creation_ts}). "
+            f"Difference: {creation_ts - ready_ts:.3f}s. "
+            f"Adjusting ready timestamp to match creation timestamp."
+        )
+        ready_ts = creation_ts
+
+    return ready_ts
+
+
 class PodStatus(Enum):
     UNDEFINED = 0
     READY = 1
@@ -144,19 +230,26 @@ class PodsSnapshot:
                 ),
                 None,
             )
+            logging.info('found pod' + str(found_pod))
             if found_pod and v.name not in self._found_rescheduled_pods:
                 # just pick rescheduled pods once
                 # keeping the parent for future uses
                 self._found_rescheduled_pods[v.name] = parent
+
+                logging.info('found rescheduled pod' + str(self._found_rescheduled_pods[v.name]))
                 return v
+        logging.info("none reschedueld")
         return None
 
     def get_pods_status(self) -> PodsStatus:
 
         pods_status = PodsStatus()
+        logging.info('initial change' + str(self.initial_pods))
         for pod_name in self.initial_pods:
             pod = self.pods[pod_name]
+            logging.info('status change' + str(pod.status_changes))
             for status_change in pod.status_changes:
+                logging.info('status change' + str(status_change))
                 if status_change.status == PodStatus.NOT_READY:
                     ready_status = next(
                         filter(
@@ -182,7 +275,7 @@ class PodsSnapshot:
                         )
 
                         # Ensure non-negative time (handle clock skew)
-                        recovery_time = max(0, round(recovery_time, 8))
+                        recovery_time = round(recovery_time, 8)
                         pods_status.recovered.append(
                             AffectedPod(
                                 pod_name=pod.name,
@@ -198,7 +291,6 @@ class PodsSnapshot:
                 # looks for the rescheduled pod
                 # and calculates its scheduling and readiness time
                 if status_change.status in (
-                    PodStatus.DELETION_SCHEDULED,
                     PodStatus.DELETED,
                 ):
                     rescheduled_pod = self._find_rescheduled_pod(pod_name)
@@ -221,22 +313,14 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        # Use server timestamp for READY event (ready condition time)
-                        # for consistent timing with deletion and creation timestamps
-                        rescheduled_ready_ts = next(
-                            map(
-                                lambda e: e.server_timestamp,
-                                filter(
-                                    lambda s: s.status == PodStatus.READY,
-                                    rescheduled_pod.status_changes,
-                                ),
-                            ),
-                            None,
+                        logging.info("rescheduled_start_ts" + str(rescheduled_start_ts))
+                        # Get and validate the most recent READY timestamp
+                        rescheduled_ready_ts = _get_last_ready_timestamp(
+                            rescheduled_pod.status_changes,
+                            rescheduled_pod.name,
+                            rescheduled_start_ts
                         )
-                        # the pod might be rescheduled correctly
-                        # but do not become ready in the expected time
-                        # so it must be marked as `unrecovered` in that
-                        # case
+                        logging.info("rescheduled_ready ts" + str(rescheduled_ready_ts))
                         if not rescheduled_ready_ts:
                             pods_status.unrecovered.append(
                                 AffectedPod(
@@ -260,88 +344,28 @@ class PodsSnapshot:
                                 f"{rescheduled_ready_ts}"
                             )
 
-                            # Calculate rescheduling time (time from
-                            # deletion to pod added)
-                            if rescheduled_start_ts:
-                                raw_rescheduling = rescheduled_start_ts - deletion_ts
-
-                                # Validate timestamp ordering
-                                if raw_rescheduling < 0:
-                                    # Tolerance for very small negative values (< 10ms)
-                                    # which might be due to timestamp precision
-                                    TOLERANCE = 0.01  # 10ms
-
-                                    if raw_rescheduling < -TOLERANCE:
-                                        # Significant negative value - log detailed warning
-                                        logging.error(
-                                            f"Invalid timestamp ordering for pod "
-                                            f"{rescheduled_pod.name}: "
-                                            f"deletion_ts ({deletion_ts}) is "
-                                            f"{abs(raw_rescheduling):.3f}s after "
-                                            f"rescheduled_start_ts ({rescheduled_start_ts}). "
-                                            f"This indicates a data integrity issue. "
-                                            f"Using 0 for rescheduling time."
-                                        )
-                                    else:
-                                        # Small negative value - likely precision issue
-                                        logging.debug(
-                                            f"Minor timestamp precision issue for pod "
-                                            f"{rescheduled_pod.name}: "
-                                            f"rescheduling time {raw_rescheduling:.6f}s "
-                                            f"(within {TOLERANCE}s tolerance). "
-                                            f"Treating as 0."
-                                        )
-
-                                rescheduling_time = max(0, round(raw_rescheduling, 8))
-                            else:
-                                rescheduling_time = None
-                            # Calculate total readiness time (time from
-                            # deletion to pod ready). Then subtract
-                            # rescheduling time to get actual readiness
-                            # time
-                            if rescheduled_ready_ts:
-                                raw_total = rescheduled_ready_ts - deletion_ts
-
-                                # Validate timestamp ordering
-                                if raw_total < 0:
-                                    # Tolerance for very small negative values (< 10ms)
-                                    TOLERANCE = 0.01  # 10ms
-
-                                    if raw_total < -TOLERANCE:
-                                        # Significant negative value - log detailed warning
-                                        logging.error(
-                                            f"Invalid timestamp ordering for pod "
-                                            f"{rescheduled_pod.name}: "
-                                            f"deletion_ts ({deletion_ts}) is "
-                                            f"{abs(raw_total):.3f}s after "
-                                            f"rescheduled_ready_ts ({rescheduled_ready_ts}). "
-                                            f"This indicates a data integrity issue. "
-                                            f"Using 0 for total recovery time."
-                                        )
-                                    else:
-                                        # Small negative value - likely precision issue
-                                        logging.debug(
-                                            f"Minor timestamp precision issue for pod "
-                                            f"{rescheduled_pod.name}: "
-                                            f"total recovery time {raw_total:.6f}s "
-                                            f"(within {TOLERANCE}s tolerance). "
-                                            f"Treating as 0."
-                                        )
-
-                                total_from_deletion = max(0, round(raw_total, 8))
-                            else:
-                                total_from_deletion = None
-
-                            # Additional validation: ensure rescheduled pod
-                            # timestamps are logically ordered
-                            if (rescheduled_start_ts and rescheduled_ready_ts
-                                and rescheduled_ready_ts < rescheduled_start_ts):
-                                logging.warning(
-                                    f"Pod {rescheduled_pod.name} has ready timestamp "
-                                    f"({rescheduled_ready_ts}) before creation "
-                                    f"timestamp ({rescheduled_start_ts}). "
-                                    f"Difference: {rescheduled_start_ts - rescheduled_ready_ts:.3f}s"
+                            # Calculate rescheduling time (time from deletion to pod added)
+                            rescheduling_time = (
+                                _validate_time_difference(
+                                    rescheduled_start_ts,
+                                    deletion_ts,
+                                    rescheduled_pod.name,
+                                    "rescheduling time"
                                 )
+                                if rescheduled_start_ts
+                                else None
+                            )
+                            # Calculate total recovery time (time from deletion to pod ready)
+                            total_from_deletion = (
+                                _validate_time_difference(
+                                    rescheduled_ready_ts,
+                                    deletion_ts,
+                                    rescheduled_pod.name,
+                                    "total recovery time"
+                                )
+                                if rescheduled_ready_ts
+                                else None
+                            )
 
                             # Readiness time is the time from pod added
                             # to pod ready
