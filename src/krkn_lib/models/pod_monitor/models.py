@@ -55,7 +55,8 @@ def _get_last_ready_timestamp(
     creation_ts: Optional[float] = None
 ) -> Optional[float]:
     """
-    Extract and validate the last (most recent) READY timestamp from pod status changes.
+    Extract and validate the last (most recent) READY timestamp
+    from pod status changes.
 
     :param pod_status_changes: List of PodEvent objects
     :param pod_name: Pod name for logging
@@ -63,23 +64,20 @@ def _get_last_ready_timestamp(
     :return: Validated ready timestamp or None
     """
     # Get the LAST (most recent) READY event
-    ready_events = [e for e in pod_status_changes if e.status == PodStatus.READY]
+    ready_events = [
+        e for e in pod_status_changes
+        if e.status == PodStatus.READY
+    ]
 
     if not ready_events:
         return None
 
     ready_ts = ready_events[-1].server_timestamp
 
-    # Validate timestamp is not in the future (allow 1s tolerance for clock sync)
-    current_time = time.time()
-    if ready_ts > current_time + 1:
-        logging.error(
-            f"Pod {pod_name} has ready timestamp in the future: "
-            f"{ready_ts} vs current {current_time}. "
-            f"Future offset: {ready_ts - current_time:.3f}s. "
-            f"Clock synchronization issue detected. Clamping to current time."
-        )
-        ready_ts = current_time
+    # Only validate against other Kubernetes timestamps
+    # (not time.time()) since all K8s timestamps come from
+    # the same server clock source. Comparing to time.time()
+    # can cause false warnings due to clock drift.
 
     # Validate ready timestamp is after creation timestamp
     if creation_ts and ready_ts < creation_ts:
@@ -87,7 +85,8 @@ def _get_last_ready_timestamp(
             f"Pod {pod_name} has ready timestamp ({ready_ts}) "
             f"before creation timestamp ({creation_ts}). "
             f"Difference: {creation_ts - ready_ts:.3f}s. "
-            f"Adjusting ready timestamp to match creation timestamp."
+            f"Adjusting ready timestamp to match "
+            f"creation timestamp."
         )
         ready_ts = creation_ts
 
@@ -236,7 +235,10 @@ class PodsSnapshot:
                 # keeping the parent for future uses
                 self._found_rescheduled_pods[v.name] = parent
 
-                logging.info('found rescheduled pod' + str(self._found_rescheduled_pods[v.name]))
+                logging.info(
+                    'found rescheduled pod'
+                    + str(self._found_rescheduled_pods[v.name])
+                )
                 return v
         logging.info("none reschedueld")
         return None
@@ -268,10 +270,11 @@ class PodsSnapshot:
 
                         # pod stayed ready but was restarted
                         # or has a failed container
-                        # Use server timestamps for both NOT_READY and READY
-                        # for consistent timing measurement
+                        # Use server timestamps for both NOT_READY
+                        # and READY for consistent timing measurement
                         recovery_time = (
-                            ready_status.server_timestamp - status_change.server_timestamp
+                            ready_status.server_timestamp
+                            - status_change.server_timestamp
                         )
 
                         # Ensure non-negative time (handle clock skew)
@@ -301,8 +304,9 @@ class PodsSnapshot:
                             )
                         )
                     else:
-                        # Use server timestamp for ADDED event (pod creation time)
-                        # for consistent comparison with deletion timestamp
+                        # Use server timestamp for ADDED event
+                        # (pod creation time) for consistent
+                        # comparison with deletion timestamp
                         rescheduled_start_ts = next(
                             map(
                                 lambda e: e.server_timestamp,
@@ -313,14 +317,21 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        logging.info("rescheduled_start_ts" + str(rescheduled_start_ts))
-                        # Get and validate the most recent READY timestamp
+                        logging.info(
+                            "rescheduled_start_ts"
+                            + str(rescheduled_start_ts)
+                        )
+                        # Get and validate the most recent
+                        # READY timestamp
                         rescheduled_ready_ts = _get_last_ready_timestamp(
                             rescheduled_pod.status_changes,
                             rescheduled_pod.name,
                             rescheduled_start_ts
                         )
-                        logging.info("rescheduled_ready ts" + str(rescheduled_ready_ts))
+                        logging.info(
+                            "rescheduled_ready ts"
+                            + str(rescheduled_ready_ts)
+                        )
                         if not rescheduled_ready_ts:
                             pods_status.unrecovered.append(
                                 AffectedPod(
@@ -344,7 +355,8 @@ class PodsSnapshot:
                                 f"{rescheduled_ready_ts}"
                             )
 
-                            # Calculate rescheduling time (time from deletion to pod added)
+                            # Calculate rescheduling time
+                            # (time from deletion to pod added)
                             rescheduling_time = (
                                 _validate_time_difference(
                                     rescheduled_start_ts,
@@ -355,7 +367,8 @@ class PodsSnapshot:
                                 if rescheduled_start_ts
                                 else None
                             )
-                            # Calculate total recovery time (time from deletion to pod ready)
+                            # Calculate total recovery time
+                            # (time from deletion to pod ready)
                             total_from_deletion = (
                                 _validate_time_difference(
                                     rescheduled_ready_ts,
@@ -373,7 +386,8 @@ class PodsSnapshot:
                                 max(
                                     0,
                                     round(
-                                        total_from_deletion - rescheduling_time,
+                                        total_from_deletion
+                                        - rescheduling_time,
                                         8,
                                     ),
                                 )
