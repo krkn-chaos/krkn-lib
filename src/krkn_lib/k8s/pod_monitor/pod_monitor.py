@@ -106,6 +106,8 @@ def _monitor_pods(
                 match_namespace = True
                 event_type = e["type"]
                 pod = e["object"]
+                with open("e.json", "a") as f:
+                    f.write(str(e))
 
                 if namespace_pattern:
                     match = re.match(namespace_pattern, pod.metadata.namespace)
@@ -130,15 +132,23 @@ def _monitor_pods(
 
                     if event_type == "MODIFIED":
                         if pod.metadata.deletion_timestamp is not None:
+                            
                             status = PodStatus.DELETION_SCHEDULED
-                            server_timestamp = (
-                                _get_pod_deletion_timestamp(pod)
-                            )
+                            if pod_name not in deleted_parent_pods:
+                                deleted_parent_pods.append(pod_name)
+                                server_timestamp = (
+                                    _get_pod_deletion_timestamp(pod)
+                                )
+                                logging.info("server timestamp" + str(server_timestamp
+                                                                  ))
+                            
                         elif _is_pod_ready(pod):
+                            logging.info('pod is ready')
                             status = PodStatus.READY
-                            server_timestamp = (
-                                _get_pod_ready_timestamp(pod)
-                            )
+                            if pod_name not in restored_pods:
+                                restored_pods.append(pod_name)
+                            # Use client timestamp when event occurred
+                            server_timestamp = (_get_pod_ready_timestamp(pod))
                             if len(restored_pods) >= inital_pod_len:
                                 cluster_restored = True
                         else:
@@ -183,39 +193,10 @@ def _monitor_pods(
 
                     # skips events out of the snapshot
                     if pod_name in snapshot.pods:
-                        # Skip duplicate READY events to ensure
-                        # consistent timing measurements
-                        if pod_event.status == PodStatus.READY:
-                            already_ready = any(
-                                event.status == PodStatus.READY
-                                for event in snapshot.pods[
-                                    pod_name
-                                ].status_changes
-                            )
-                            if already_ready:
-                                # Skip duplicate READY event
-                                continue
-
-                        # Track NOT_READY events for restart scenarios
-                        if pod_event.status == PodStatus.NOT_READY:
-                            if pod_name in snapshot.initial_pods:
-                                pods_became_not_ready.add(pod_name)
 
                         snapshot.pods[pod_name].status_changes.append(
                             pod_event
                         )
-
-                        # Track deletion events for recovery comparison
-                        if pod_event.status == PodStatus.DELETED:
-                            if pod_name not in deleted_parent_pods:
-                                deleted_parent_pods.append(pod_name)
-
-                        # Track ready events for deletion comparison
-                        if pod_event.status == PodStatus.READY:
-                            if pod_name not in restored_pods:
-                                restored_pods.append(pod_name)
-                            # Remove from not_ready set if pod recovered
-                            pods_became_not_ready.discard(pod_name)
 
                         # Early exit condition 1: All deleted pods
                         # replaced
@@ -239,7 +220,7 @@ def _monitor_pods(
                                 if pod_name in snapshot.added_pods
                             )
                             if new_pods_count == len(deleted_parent_pods):
-                                logging.debug(
+                                logging.info(
                                     f"Deletion events "
                                     f"({len(deleted_parent_pods)}) "
                                     f"match new READY pods "
@@ -328,25 +309,11 @@ def _monitor_pods(
     return snapshot
 
 
-def _is_pod_ready(pod: V1Pod) -> bool:
-    if not pod.status.container_statuses:
-        return False
-    for status in pod.status.container_statuses:
-        if not status.ready:
-            return False
-    return True
-
-
-def _is_pod_terminating(pod: V1Pod) -> bool:
-    if pod.metadata.deletion_timestamp is not None:
-        return True
-    return False
-
-
-def _get_pod_ready_timestamp(pod: V1Pod) -> float:
+def _get_pod_ready_timestamp(pod: V1Pod) -> float: 
     """
     Extract the server-side timestamp when the pod became ready.
-    Uses the lastTransitionTime from the Ready condition in pod status.
+    Uses the lastTransitionTime from the Ready condition when status
+    is False.
 
     :param pod: V1Pod object
     :return: Unix timestamp (float) when pod became ready,
@@ -359,21 +326,27 @@ def _get_pod_ready_timestamp(pod: V1Pod) -> float:
                 and condition.status == "True"
             ):
                 if condition.last_transition_time:
-                    # Convert Kubernetes datetime to Unix
-                    # timestamp in seconds
                     ts = condition.last_transition_time.timestamp()
                     logging.info(
                         f"Pod {pod.metadata.name} ready "
-                        f"timestamp: {ts} (from condition)"
+                        f"timestamp: {ts} (from Ready condition)"
                     )
                     return ts
     # Fallback to current time if not available
     fallback = time.time()
-    logging.debug(
+    logging.info(
         f"Pod {pod.metadata.name} ready timestamp fallback: "
         f"{fallback}"
     )
     return fallback
+
+def _is_pod_ready(pod: V1Pod) -> bool:
+    if not pod.status.container_statuses:
+        return False
+    for status in pod.status.container_statuses:
+        if not status.ready:
+            return False
+    return True
 
 
 def _get_pod_not_ready_timestamp(pod: V1Pod) -> float:
@@ -394,14 +367,14 @@ def _get_pod_not_ready_timestamp(pod: V1Pod) -> float:
             ):
                 if condition.last_transition_time:
                     ts = condition.last_transition_time.timestamp()
-                    logging.debug(
+                    logging.info(
                         f"Pod {pod.metadata.name} not ready "
                         f"timestamp: {ts} (from Ready condition)"
                     )
                     return ts
     # Fallback to current time if not available
     fallback = time.time()
-    logging.debug(
+    logging.info(
         f"Pod {pod.metadata.name} not ready timestamp fallback: "
         f"{fallback}"
     )
@@ -419,8 +392,15 @@ def _get_pod_deletion_timestamp(pod: V1Pod) -> float:
     """
     if pod.metadata.deletion_timestamp:
         ts = pod.metadata.deletion_timestamp.timestamp()
+        logging.info(
+            f"Pod {pod.metadata.name} deletion timestamp: {ts}"
+        )
         return ts
     fallback = time.time()
+    logging.info(
+        f"Pod {pod.metadata.name} deletion timestamp fallback: "
+        f"{fallback}"
+    )
     return fallback
 
 
