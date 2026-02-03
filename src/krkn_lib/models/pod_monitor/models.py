@@ -245,14 +245,11 @@ class PodsSnapshot:
                                 )
                             )
                         else:
-                            # For DELETED events, use client timestamp (when we
-                            # observed pod was gone) for more accurate timing.
-                            # For DELETION_SCHEDULED, use server timestamp
-                            # (deletionTimestamp).
-                            if status_change.status == PodStatus.DELETED:
-                                deletion_ts = status_change.timestamp
-                            else:
-                                deletion_ts = status_change.server_timestamp
+                            # Always use server timestamp (deletionTimestamp)
+                            # for consistency with other Kubernetes timestamps.
+                            # Both DELETED and DELETION_SCHEDULED events have
+                            # pod.metadata.deletion_timestamp from Kubernetes.
+                            deletion_ts = status_change.server_timestamp
 
                             logging.info(
                                 f"Pod {rescheduled_pod.name} recovery "
