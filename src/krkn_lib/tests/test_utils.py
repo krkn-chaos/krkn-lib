@@ -29,11 +29,10 @@ class UtilFunctionTests(BaseTest):
         test_workdir = os.path.join(workdir_basepath, workdir)
         os.mkdir(test_workdir)
         test_string = "Tester McTesty!"
-        with tempfile.NamedTemporaryFile(
-            dir=test_workdir
-        ) as src, tempfile.NamedTemporaryFile(
-            dir=test_workdir
-        ) as dst:  # NOQA
+        with (
+            tempfile.NamedTemporaryFile(dir=test_workdir) as src,
+            tempfile.NamedTemporaryFile(dir=test_workdir) as dst,
+        ):  # NOQA
             with open(src.name, "w+") as source, open(dst.name, "w+") as dest:
                 encoded_test_byte = base64.b64encode(
                     test_string.encode("utf-8")

@@ -326,7 +326,7 @@ class AffectedNodeStatus:
         match_found = []
         for affected_node in self.affected_nodes:
             counter2 = counter + 1
-            for aff_node2 in self.affected_nodes[counter + 1:]:  # fmt: skip
+            for aff_node2 in self.affected_nodes[counter + 1 :]:  # noqa: E203
                 if affected_node.node_name == aff_node2.node_name:
                     match_found.append(counter2)
                     cur_node = self.affected_nodes[counter]

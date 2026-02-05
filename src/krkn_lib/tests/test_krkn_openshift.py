@@ -23,7 +23,6 @@ from krkn_lib.ocp.krkn_openshift import KrknOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
 
-
 # ==============================================================================
 # UNIT TESTS (Mocked - No external dependencies)
 # ==============================================================================
@@ -256,7 +255,9 @@ class TestGetCloudInfrastructure(unittest.TestCase):
         self.assertEqual(result, "Unknown")
 
     @patch.object(KrknOpenshift, "api_client", new_callable=PropertyMock)
-    def test_get_cloud_infrastructure_no_api_client(self, mock_api_client_prop):
+    def test_get_cloud_infrastructure_no_api_client(
+        self, mock_api_client_prop
+    ):
         """Test when api_client is None."""
         mock_api_client_prop.return_value = None
 
@@ -344,9 +345,7 @@ class TestGetPrometheusApiConnectionData(unittest.TestCase):
                     "items": [
                         {
                             "metadata": {"name": "prometheus-k8s"},
-                            "spec": {
-                                "host": host
-                            },
+                            "spec": {"host": host},
                         }
                     ]
                 }
@@ -503,7 +502,9 @@ class TestFilterMustGatherOcpLogFolder(unittest.TestCase):
                 [r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+"],
             )
 
-        self.assertIn("Log destination dir do not exist", str(context.exception))
+        self.assertIn(
+            "Log destination dir do not exist", str(context.exception)
+        )
 
 
 # ==============================================================================

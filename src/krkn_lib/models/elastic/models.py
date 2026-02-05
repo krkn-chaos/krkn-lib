@@ -1,6 +1,7 @@
 import datetime
 
 from elasticsearch_dsl import (
+    Boolean,
     Date,
     Document,
     Float,
@@ -9,7 +10,6 @@ from elasticsearch_dsl import (
     Keyword,
     Nested,
     Text,
-    Boolean,
 )
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry

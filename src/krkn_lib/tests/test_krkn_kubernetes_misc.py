@@ -6,11 +6,11 @@ import time
 import unittest
 
 import yaml
+from kubernetes.client import ApiException
+from tzlocal import get_localzone
 
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.tests import BaseTest
-from tzlocal import get_localzone
-from kubernetes.client import ApiException
 
 
 class KrknKubernetesTestsMisc(BaseTest):
@@ -232,7 +232,7 @@ class KrknKubernetesTestsMisc(BaseTest):
             ["application/json"]
         )
         path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
-        (data) = self.lib_k8s.api_client.call_api(
+        data = self.lib_k8s.api_client.call_api(
             path,
             "GET",
             path_params,

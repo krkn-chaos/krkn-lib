@@ -432,9 +432,7 @@ class TestSetParametersBase64(unittest.TestCase):
 
         try:
             scenario_telemetry = ScenarioTelemetry()
-            self.telemetry.set_parameters_base64(
-                scenario_telemetry, temp_path
-            )
+            self.telemetry.set_parameters_base64(scenario_telemetry, temp_path)
 
             decoded = base64.b64decode(
                 scenario_telemetry.parameters_base64.encode()

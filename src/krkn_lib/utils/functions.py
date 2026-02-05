@@ -25,9 +25,10 @@ def decode_base64_file(source_filename: str, destination_filename: str):
     :param source_filename: source base64 encoded file
     :param destination_filename: destination decoded file
     """
-    with open(source_filename, "rb") as encoded_source, open(
-        destination_filename, "wb"
-    ) as target:
+    with (
+        open(source_filename, "rb") as encoded_source,
+        open(destination_filename, "wb") as target,
+    ):
         with Base64IO(encoded_source) as source:
             for line in source:
                 target.write(line)

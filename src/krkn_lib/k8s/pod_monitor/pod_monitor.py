@@ -7,13 +7,13 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial
 
 from kubernetes import watch
-from kubernetes.client import V1Pod, CoreV1Api
+from kubernetes.client import CoreV1Api, V1Pod
 from urllib3.exceptions import ProtocolError
 
 from krkn_lib.models.pod_monitor.models import (
-    PodsSnapshot,
     MonitoredPod,
     PodEvent,
+    PodsSnapshot,
     PodStatus,
 )
 
@@ -80,7 +80,9 @@ def _monitor_pods(
                 remain_timeout = max(1, int(max_timeout - elapsed))
                 logging.info("remain timeout " + str(remain_timeout))
                 if remain_timeout <= 0:
-                    logging.info("Maximum timeout reached, stopping monitoring")
+                    logging.info(
+                        "Maximum timeout reached, stopping monitoring"
+                    )
                     break
                 logging.info(
                     "Reconnecting watch stream"
@@ -132,7 +134,7 @@ def _monitor_pods(
                         pod_event.status = PodStatus.ADDED
 
                     if pod_event.status == PodStatus.ADDED:
-                        
+
                         if pod_name not in snapshot.added_pods:
                             snapshot.added_pods.append(pod_name)
                         # in case a pod is respawn with the same name
@@ -194,7 +196,7 @@ def _monitor_pods(
             logging.error("Error in monitor pods: " + str(e))
             logging.error("Stack trace:\n%s", traceback.format_exc())
             raise Exception(e)
-        
+
         retry_count += 1
 
     return snapshot

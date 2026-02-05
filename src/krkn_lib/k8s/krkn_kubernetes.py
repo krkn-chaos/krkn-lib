@@ -159,10 +159,15 @@ class KrknKubernetes:
                 os.environ["HTTP_PROXY"] = http_proxy
                 self.client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
-                if proxy_auth.username is not None and proxy_auth.password is not None:
-                    auth_string = proxy_auth.username + ":" + proxy_auth.password
-                    self.client_config.proxy_headers = urllib3.util.make_headers(
-                        proxy_basic_auth=auth_string
+                if (
+                    proxy_auth.username is not None
+                    and proxy_auth.password is not None
+                ):
+                    auth_string = (
+                        proxy_auth.username + ":" + proxy_auth.password
+                    )
+                    self.client_config.proxy_headers = (
+                        urllib3.util.make_headers(proxy_basic_auth=auth_string)
                     )
 
             client.Configuration.set_default(self.client_config)
@@ -238,7 +243,9 @@ class KrknKubernetes:
             minor_version = api_response.minor
             return major_version + "." + minor_version
         except ApiException as e:
-            logging.error("Exception when calling VersionApi->get_code: %s", str(e))
+            logging.error(
+                "Exception when calling VersionApi->get_code: %s", str(e)
+            )
             raise e
 
     def get_host(self) -> str:
@@ -1488,7 +1495,9 @@ class KrknKubernetes:
             raise
         return vmis_list
 
-    def create_vmi(self, name: str, namespace: str, vm_name: str, vmi_body: dict) -> Optional[Dict]:
+    def create_vmi(
+        self, name: str, namespace: str, vm_name: str, vmi_body: dict
+    ) -> Optional[Dict]:
         """
         Create a Virtual Machine Instance by name and namespace.
 
@@ -1508,7 +1517,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error creating VMI {name}: {e}")
@@ -1517,7 +1528,9 @@ class KrknKubernetes:
             logging.error(f"Unexpected error creating VMI {name}: {e}")
             raise
 
-    def patch_vm(self, name: str, namespace: str, vm_body: dict) -> Optional[Dict]:
+    def patch_vm(
+        self, name: str, namespace: str, vm_body: dict
+    ) -> Optional[Dict]:
         """
         Patch a Virtual Machine by name and namespace.
 
@@ -1538,7 +1551,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VM {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VM {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error patching VM {name}: {e}")
@@ -1547,7 +1562,9 @@ class KrknKubernetes:
             logging.error(f"Unexpected error patching VM {name}: {e}")
             raise
 
-    def patch_vmi(self, name: str, namespace: str, vmi_body: dict) -> Optional[Dict]:
+    def patch_vmi(
+        self, name: str, namespace: str, vmi_body: dict
+    ) -> Optional[Dict]:
         """
         Patch a Virtual Machine Instance by name and namespace.
 
@@ -1568,7 +1585,9 @@ class KrknKubernetes:
             return vmi
         except ApiException as e:
             if e.status == 404:
-                logging.warning(f"VMI {name} not found in namespace {namespace}")
+                logging.warning(
+                    f"VMI {name} not found in namespace {namespace}"
+                )
                 return None
             else:
                 logging.error(f"Error patching VMI {name}: {e}")
@@ -1614,7 +1633,7 @@ class KrknKubernetes:
         except Exception as e:
             logging.error(f"Unexpected error getting VM {regex_name}: {e}")
             raise
-    
+
     def get_snapshot(self, name: str, namespace: str) -> Optional[Dict]:
         """
         Get a Snapshot by name and namespace.
@@ -1665,12 +1684,14 @@ class KrknKubernetes:
                     name=name, namespace=namespace, vm_name=vm_name
                 )
             )
-            snapshot = self.custom_object_client.create_namespaced_custom_object(
-                group="snapshot.kubevirt.io",
-                version="v1beta1",
-                namespace=namespace,
-                plural="virtualmachinesnapshots",
-                body=ss_body,
+            snapshot = (
+                self.custom_object_client.create_namespaced_custom_object(
+                    group="snapshot.kubevirt.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="virtualmachinesnapshots",
+                    body=ss_body,
+                )
             )
             return snapshot
         except ApiException as e:
@@ -1770,9 +1791,7 @@ class KrknKubernetes:
                 plural="virtualmachinesnapshots",
                 name=snapshot_name,
             )
-            logging.info(
-                f"Snapshot '{snapshot_name}' deleted successfully."
-            )
+            logging.info(f"Snapshot '{snapshot_name}' deleted successfully.")
         except Exception as e:
             logging.warning(
                 "Failed to delete snapshot, "
@@ -2375,7 +2394,7 @@ class KrknKubernetes:
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
-                        (data) = self.api_client.call_api(
+                        data = self.api_client.call_api(
                             path,
                             "GET",
                             path_params,
@@ -3009,7 +3028,7 @@ class KrknKubernetes:
             ["application/json"]
         )
         try:
-            (data) = self.api_client.call_api(
+            data = self.api_client.call_api(
                 path,
                 "POST",
                 path_params,
@@ -3428,7 +3447,7 @@ class KrknKubernetes:
             ["application/json"]
         )
         path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
-        (data) = self.api_client.call_api(
+        data = self.api_client.call_api(
             path,
             "GET",
             path_params,

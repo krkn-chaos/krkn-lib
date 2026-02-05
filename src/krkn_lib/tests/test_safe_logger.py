@@ -347,7 +347,9 @@ class TestSafeLoggerWorkerThread(unittest.TestCase):
         # Worker thread should be running
         import threading
 
-        threads = [t for t in threading.enumerate() if t.name == "SafeLogWriter"]
+        threads = [
+            t for t in threading.enumerate() if t.name == "SafeLogWriter"
+        ]
         # Should have at least one SafeLogWriter thread
         self.assertGreater(len(threads), 0)
         # All SafeLogWriter threads should be daemon threads

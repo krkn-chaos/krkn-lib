@@ -1,15 +1,16 @@
 import logging
+import os
 import random
 import re
 import time
-import os
 import unittest
 
+from kubernetes import config
+from kubernetes.client import ApiException
+
+from krkn_lib.k8s import ApiRequestException, KrknKubernetes
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
-from kubernetes import config
-from krkn_lib.k8s import ApiRequestException, KrknKubernetes
-from kubernetes.client import ApiException
 
 
 class KrknKubernetesTestsGet(BaseTest):
