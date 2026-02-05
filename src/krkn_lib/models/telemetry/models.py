@@ -557,6 +557,10 @@ class ChaosRunTelemetry:
     """
     Build url if run in CI
     """
+    error_logs: list[dict] = None
+    """
+    Error logs collected during chaos run
+    """
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
@@ -569,6 +573,7 @@ class ChaosRunTelemetry:
         )
         self.health_checks = list[HealthCheck]()
         self.virt_checks = list[VirtCheck]()
+        self.error_logs = []
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -608,6 +613,7 @@ class ChaosRunTelemetry:
             )
             self.job_status = json_dict.get("job_status")
             self.build_url = json_dict.get("build_url")
+            self.error_logs = json_dict.get("error_logs")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
