@@ -12,71 +12,6 @@ from krkn_lib.models.k8s import AffectedPod, PodsStatus
 TIMESTAMP_TOLERANCE = 0.01
 
 
-def _validate_time_difference(
-    end_ts: float,
-    start_ts: float,
-    pod_name: str,
-    metric_name: str
-) -> float:
-    """
-    Validate and sanitize time difference between timestamps.
-
-    :param end_ts: End timestamp
-    :param start_ts: Start timestamp
-    :param pod_name: Pod name for logging
-    :param metric_name: Name of metric being calculated (for logging)
-    :return: Non-negative time difference (clamped to 0 if negative)
-    """
-    raw_diff = end_ts - start_ts
-
-    if raw_diff < 0:
-        if raw_diff < -TIMESTAMP_TOLERANCE:
-            # Significant negative value - log error
-            logging.error(
-                f"Invalid timestamp ordering for pod {pod_name}: "
-                f"end timestamp ({end_ts}) is {abs(raw_diff):.3f}s "
-                f"before start timestamp ({start_ts}) for {metric_name}. "
-                f"This indicates a data integrity issue. Using 0."
-            )
-        else:
-            # Small negative value - likely precision issue
-            logging.debug(
-                f"Minor timestamp precision issue for pod {pod_name}: "
-                f"{metric_name} = {raw_diff:.6f}s "
-                f"(within {TIMESTAMP_TOLERANCE}s tolerance). Treating as 0."
-            )
-
-    return max(0, round(raw_diff, 8))
-
-
-def _get_last_ready_timestamp(
-    pod_status_changes: list,
-    pod_name: str,
-    creation_ts: Optional[float] = None
-) -> Optional[float]:
-    """
-    Extract and validate the last (most recent) READY timestamp
-    from pod status changes.
-
-    :param pod_status_changes: List of PodEvent objects
-    :param pod_name: Pod name for logging
-    :param creation_ts: Optional creation timestamp for validation
-    :return: Validated ready timestamp or None
-    """
-    # Get the LAST (most recent) READY event
-    ready_events = [
-        e for e in pod_status_changes
-        if e.status == PodStatus.READY
-    ]
-
-    if not ready_events:
-        return None
-
-    ready_ts = ready_events[-1].server_timestamp
-
-    return ready_ts
-
-
 class PodStatus(Enum):
     UNDEFINED = 0
     READY = 1
@@ -247,7 +182,7 @@ class PodsSnapshot:
                         # or has a failed container
                         # Use server timestamps for both NOT_READY
                         # and READY for consistent timing measurement
-                        recovery_time = (
+                        recovery_time = abs(
                             ready_status.server_timestamp
                             - status_change.server_timestamp
                         )
@@ -329,16 +264,15 @@ class PodsSnapshot:
                                 f"{rescheduled_ready_ts}"
                             )
 
-                            rescheduling_time = (
+                            rescheduling_time = abs(
                                 rescheduled_start_ts - deletion_ts
                                 if rescheduled_start_ts
-                                else None
+                                else 0
                             )
-                            logging.info("rescheduled " + str(rescheduled_start_ts) + str(rescheduling_time) )
-                            readiness_time = (
+                            readiness_time = abs(
                                 rescheduled_ready_ts - status_change.server_timestamp
                                 if rescheduled_ready_ts
-                                else None
+                                else 0
                             )
 
 
