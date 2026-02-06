@@ -148,7 +148,7 @@ def _monitor_pods(
                             if pod_name not in restored_pods:
                                 restored_pods.append(pod_name)
                             # Use client timestamp when event occurred
-                            server_timestamp = (_get_pod_ready_timestamp(pod))
+                            server_timestamp = (_get_pod_ready_timestamp(pod, start_time))
                             if len(restored_pods) >= inital_pod_len:
                                 cluster_restored = True
                         else:
@@ -156,7 +156,7 @@ def _monitor_pods(
                             # For NOT_READY, use server timestamp from Ready
                             # condition's lastTransitionTime when status=False
                             server_timestamp = (
-                                _get_pod_not_ready_timestamp(pod)
+                                _get_pod_not_ready_timestamp(pod, start_time)
                             )
 
                     elif event_type == "DELETED":
@@ -309,7 +309,7 @@ def _monitor_pods(
     return snapshot
 
 
-def _get_pod_ready_timestamp(pod: V1Pod) -> float:
+def _get_pod_ready_timestamp(pod: V1Pod, start_time: time) -> float:
     """
     Extract the server-side timestamp when the pod became ready.
     Uses the lastTransitionTime from the Ready condition when status
@@ -331,7 +331,11 @@ def _get_pod_ready_timestamp(pod: V1Pod) -> float:
                         f"Pod {pod.metadata.name} ready "
                         f"timestamp: {ts} (from Ready condition)"
                     )
-                    return ts
+                    logging.info("start time" + str(start_time))
+                    logging.info('ready ts' + str(ts))
+                    if start_time < ts:
+                        logging.info('starttime < ts ready')
+                        return ts
     # Fallback to current time if not available
     fallback = time.time()
     logging.info(
@@ -350,7 +354,7 @@ def _is_pod_ready(pod: V1Pod) -> bool:
     return True
 
 
-def _get_pod_not_ready_timestamp(pod: V1Pod) -> float:
+def _get_pod_not_ready_timestamp(pod: V1Pod, start_time) -> float:
     """
     Extract the server-side timestamp when the pod became not ready.
     Uses the lastTransitionTime from the Ready condition when status
@@ -372,7 +376,9 @@ def _get_pod_not_ready_timestamp(pod: V1Pod) -> float:
                         f"Pod {pod.metadata.name} not ready "
                         f"timestamp: {ts} (from Ready condition)"
                     )
-                    return ts
+                    if start_time < ts:
+                        logging.info("start time < ts- not ready")
+                        return ts
     # Fallback to current time if not available
     fallback = time.time()
     logging.info(
@@ -396,7 +402,8 @@ def _get_pod_deletion_timestamp(pod: V1Pod) -> float:
         logging.info(
             f"Pod {pod.metadata.name} deletion timestamp: {ts}"
         )
-        return ts
+        if ts < time.time():
+            return ts
     fallback = time.time()
     logging.info(
         f"Pod {pod.metadata.name} deletion timestamp fallback: "
