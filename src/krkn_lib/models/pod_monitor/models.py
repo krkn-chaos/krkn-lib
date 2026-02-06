@@ -182,7 +182,7 @@ class PodsSnapshot:
                         # or has a failed container
                         # Use server timestamps for both NOT_READY
                         # and READY for consistent timing measurement
-                        recovery_time = abs(
+                        recovery_time = (
                             ready_status.server_timestamp
                             - status_change.server_timestamp
                         )
@@ -264,18 +264,21 @@ class PodsSnapshot:
                                 f"{rescheduled_ready_ts}"
                             )
 
-                            rescheduling_time = abs(
+                            rescheduling_time = (
                                 rescheduled_start_ts - deletion_ts
                                 if rescheduled_start_ts
                                 else 0
                             )
-                            readiness_time = abs(
-                                rescheduled_ready_ts - status_change.server_timestamp
+                            readiness_time = (
+                                rescheduled_ready_ts - deletion_ts
                                 if rescheduled_ready_ts
                                 else 0
                             )
 
-
+                            if rescheduling_time < 0:
+                                rescheduling_time = 0
+                            if readiness_time < 0: 
+                                readiness_time = 0
                             pods_status.recovered.append(
                                 AffectedPod(
                                     pod_name=rescheduled_pod.name,
