@@ -271,6 +271,7 @@ class PodsSnapshot:
                 if status_change.status in (
                     PodStatus.DELETION_SCHEDULED,
                 ):
+                    
                     rescheduled_pod = self._find_rescheduled_pod(pod_name)
                     if not rescheduled_pod:
                         pods_status.unrecovered.append(
@@ -294,10 +295,15 @@ class PodsSnapshot:
                         )
                         # Get and validate the most recent
                         # READY timestamp
-                        rescheduled_ready_ts = _get_last_ready_timestamp(
-                            rescheduled_pod.status_changes,
-                            rescheduled_pod.name,
-                            rescheduled_start_ts
+                        rescheduled_ready_ts = next(
+                            map(
+                                lambda e: e.server_timestamp,
+                                filter(
+                                    lambda s: s.status == PodStatus.READY,
+                                    rescheduled_pod.status_changes,
+                                ),
+                            ),
+                            None,
                         )
 
                         if not rescheduled_ready_ts:
@@ -323,16 +329,15 @@ class PodsSnapshot:
                                 f"{rescheduled_ready_ts}"
                             )
 
-                            # Calculate rescheduling time
-                            # (time from deletion to pod added)
                             rescheduling_time = (
-                                _validate_time_difference(
-                                    rescheduled_start_ts,
-                                    deletion_ts,
-                                    rescheduled_pod.name,
-                                    "rescheduling time"
-                                )
+                                rescheduled_start_ts - deletion_ts
                                 if rescheduled_start_ts
+                                else None
+                            )
+                            logging.info("rescheduled " + str(rescheduled_start_ts) + str(rescheduling_time) )
+                            readiness_time = (
+                                rescheduled_ready_ts - status_change.server_timestamp
+                                if rescheduled_ready_ts
                                 else None
                             )
 
@@ -342,11 +347,11 @@ class PodsSnapshot:
                                     pod_name=rescheduled_pod.name,
                                     namespace=rescheduled_pod.namespace,
                                     pod_rescheduling_time=rescheduling_time,
-                                    pod_readiness_time=rescheduled_ready_ts,
+                                    pod_readiness_time=readiness_time,
                                     total_recovery_time=(
-                                        rescheduling_time + rescheduled_ready_ts
+                                        rescheduling_time + readiness_time
                                         if rescheduling_time is not None
-                                        and rescheduled_ready_ts is not None
+                                        and readiness_time is not None
                                         else None
                                     ),
                                 )
