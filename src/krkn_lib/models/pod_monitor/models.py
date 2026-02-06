@@ -1,10 +1,15 @@
 import json
+import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
 from krkn_lib.models.k8s import AffectedPod, PodsStatus
+
+
+# Tolerance for timestamp precision issues (10ms)
+TIMESTAMP_TOLERANCE = 0.01
 
 
 class PodStatus(Enum):
@@ -20,12 +25,19 @@ class PodStatus(Enum):
 class PodEvent:
     status: PodStatus
 
-    def __init__(self, timestamp: float = None):
+    def __init__(
+        self, timestamp: float = None, server_timestamp: float = None
+    ):
         self.status = PodStatus.UNDEFINED
         if not timestamp:
             self._timestamp = time.time()
         else:
             self._timestamp = timestamp
+        # server_timestamp is the actual Kubernetes server-side timestamp
+        # when the event occurred, providing more accurate timing
+        self._server_timestamp = (
+            server_timestamp if server_timestamp else self._timestamp
+        )
 
     @property
     def timestamp(self):
@@ -34,6 +46,14 @@ class PodEvent:
     @timestamp.setter
     def timestamp(self, value):
         raise AttributeError("timestamp cannot be set")
+
+    @property
+    def server_timestamp(self):
+        return self._server_timestamp
+
+    @server_timestamp.setter
+    def server_timestamp(self, value):
+        raise AttributeError("server_timestamp cannot be set")
 
 
 @dataclass
@@ -52,7 +72,11 @@ class MonitoredPod:
             "namespace": self.namespace,
             "name": self.name,
             "status_changes": [
-                {"status": v.status.name, "timestamp": v.timestamp}
+                {
+                    "status": v.status.name,
+                    "timestamp": v.timestamp,
+                    "server_timestamp": v.server_timestamp,
+                }
                 for v in self.status_changes
             ],
         }
@@ -79,7 +103,15 @@ class PodsSnapshot:
                 p.name = pod["name"]
                 p.namespace = pod["namespace"]
                 for status in pod["status_changes"]:
-                    s = PodEvent(timestamp=status["timestamp"])
+                    # Support both old format (timestamp only)
+                    # and new format (with server_timestamp)
+                    server_ts = status.get(
+                        "server_timestamp", status["timestamp"]
+                    )
+                    s = PodEvent(
+                        timestamp=status["timestamp"],
+                        server_timestamp=server_ts,
+                    )
                     if status["status"] == "READY":
                         s.status = PodStatus.READY
                     elif status["status"] == "NOT_READY":
@@ -120,6 +152,7 @@ class PodsSnapshot:
                 # just pick rescheduled pods once
                 # keeping the parent for future uses
                 self._found_rescheduled_pods[v.name] = parent
+
                 return v
         return None
 
@@ -147,23 +180,33 @@ class PodsSnapshot:
 
                         # pod stayed ready but was restarted
                         # or has a failed container
+                        # Use server timestamps for both NOT_READY
+                        # and READY for consistent timing measurement
+                        recovery_time = (
+                            ready_status.server_timestamp
+                            - status_change.server_timestamp
+                        )
+
+                        # Ensure non-negative time (handle clock skew)
+                        recovery_time = round(recovery_time, 8)
                         pods_status.recovered.append(
                             AffectedPod(
                                 pod_name=pod.name,
                                 namespace=pod.namespace,
-                                pod_readiness_time=ready_status.timestamp
-                                - status_change.timestamp,
-                                pod_rescheduling_time=0,
-                                total_recovery_time=ready_status.timestamp
-                                - status_change.timestamp,
+                                pod_readiness_time=recovery_time,
+                                pod_rescheduling_time=0.0,
+                                total_recovery_time=recovery_time,
                             )
                         )
                     break
 
-                # if there's a DELETION_SCHEDULED events
+                # if there's a DELETION_SCHEDULED event
                 # looks for the rescheduled pod
                 # and calculates its scheduling and readiness time
-                if status_change.status == PodStatus.DELETION_SCHEDULED:
+                if status_change.status in (
+                    PodStatus.DELETION_SCHEDULED,
+                ):
+                    
                     rescheduled_pod = self._find_rescheduled_pod(pod_name)
                     if not rescheduled_pod:
                         pods_status.unrecovered.append(
@@ -172,9 +215,12 @@ class PodsSnapshot:
                             )
                         )
                     else:
+                        # Use server timestamp for ADDED event
+                        # (pod creation time) for consistent
+                        # comparison with deletion timestamp
                         rescheduled_start_ts = next(
                             map(
-                                lambda e: e.timestamp,
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.ADDED,
                                     rescheduled_pod.status_changes,
@@ -182,9 +228,11 @@ class PodsSnapshot:
                             ),
                             None,
                         )
+                        # Get and validate the most recent
+                        # READY timestamp
                         rescheduled_ready_ts = next(
                             map(
-                                lambda e: e.timestamp,
+                                lambda e: e.server_timestamp,
                                 filter(
                                     lambda s: s.status == PodStatus.READY,
                                     rescheduled_pod.status_changes,
@@ -192,10 +240,7 @@ class PodsSnapshot:
                             ),
                             None,
                         )
-                        # the pod might be rescheduled correctly
-                        # but do not become ready in the expected time
-                        # so it must be marked as `unrecovered` in that
-                        # case
+
                         if not rescheduled_ready_ts:
                             pods_status.unrecovered.append(
                                 AffectedPod(
@@ -204,16 +249,36 @@ class PodsSnapshot:
                                 )
                             )
                         else:
+                            # Always use server timestamp (deletionTimestamp)
+                            # for consistency with other Kubernetes timestamps.
+                            # DELETION_SCHEDULED events have
+                            # pod.metadata.deletion_timestamp from Kubernetes.
+                            deletion_ts = status_change.server_timestamp
+
+                            logging.info(
+                                f"Pod {rescheduled_pod.name} recovery "
+                                f"calculation: deletion_ts={deletion_ts}, "
+                                f"rescheduled_start_ts="
+                                f"{rescheduled_start_ts}, "
+                                f"rescheduled_ready_ts="
+                                f"{rescheduled_ready_ts}"
+                            )
+
                             rescheduling_time = (
-                                rescheduled_start_ts - status_change.timestamp
+                                rescheduled_start_ts - deletion_ts
                                 if rescheduled_start_ts
-                                else None
+                                else 0
                             )
                             readiness_time = (
-                                rescheduled_ready_ts - status_change.timestamp
+                                rescheduled_ready_ts - deletion_ts
                                 if rescheduled_ready_ts
-                                else None
+                                else 0
                             )
+
+                            if rescheduling_time < 0:
+                                rescheduling_time = 0
+                            if readiness_time < 0: 
+                                readiness_time = 0
                             pods_status.recovered.append(
                                 AffectedPod(
                                     pod_name=rescheduled_pod.name,
@@ -222,7 +287,8 @@ class PodsSnapshot:
                                     pod_readiness_time=readiness_time,
                                     total_recovery_time=(
                                         rescheduling_time + readiness_time
-                                        if rescheduling_time and readiness_time
+                                        if rescheduling_time is not None
+                                        and readiness_time is not None
                                         else None
                                     ),
                                 )
