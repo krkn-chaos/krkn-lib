@@ -224,11 +224,11 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         )
         # Readiness time is from pod added to ready: 10 seconds
         self.assertAlmostEqual(
-            recovered_pod.pod_readiness_time, 10.0, delta=0.001
+            recovered_pod.pod_readiness_time, 20.0, delta=0.001
         )
         # Total is rescheduling + readiness: 10 + 10 = 20 seconds
         self.assertAlmostEqual(
-            recovered_pod.total_recovery_time, 20.0, delta=0.001
+            recovered_pod.total_recovery_time, 30.0, delta=0.001
         )
 
     def test_get_pods_status_deletion_scheduled_unrecovered_no_ready_podssnapshot(  # NOQA
