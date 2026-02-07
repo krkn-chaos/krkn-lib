@@ -1,5 +1,6 @@
 import logging
 import re
+import threading
 import time
 import traceback
 from concurrent.futures import Future
@@ -52,19 +53,27 @@ def _monitor_pods(
     name_pattern: str = None,
     namespace_pattern: str = None,
     max_retries: int = 3,
+    stop_event: threading.Event = None,
 ) -> PodsSnapshot:
     """
     Monitor pods with automatic retry on watch stream disconnection.
 
     :param monitor_partial: Partial function for monitoring pods
+        (without resource_version)
     :param snapshot: Snapshot to populate with pod events
     :param max_timeout: Maximum time to monitor (seconds)
     :param name_pattern: Regex pattern for pod names
     :param namespace_pattern: Regex pattern for namespaces
     :param max_retries: Maximum number of retries on connection error
         (default: 3)
+    :param stop_event: Optional threading.Event to signal early termination
     :return: PodsSnapshot with collected pod events
     """
+
+    if stop_event is not None and not isinstance(stop_event, threading.Event):
+        raise TypeError(
+            "stop_event must be a threading.Event instance or None"
+        )
 
     start_time = time.time()
     retry_count = 0
@@ -73,28 +82,44 @@ def _monitor_pods(
     cluster_restored = False
 
     while retry_count <= max_retries:
+        # Check if stop event is set before each iteration
+        if stop_event and stop_event.is_set():
+            return snapshot
+
+        # Calculate remaining timeout at start of each iteration
+        elapsed = time.time() - start_time
+        remain_timeout = max(1, int(max_timeout - elapsed))
+        if remain_timeout <= 0:
+            logging.info("Maximum timeout reached, stopping monitoring")
+            break
+
         try:
-            # Calculate remaining timeout if retrying
+            # Log reconnection info if retrying
             if retry_count > 0:
-                elapsed = time.time() - start_time
-                remain_timeout = max(1, int(max_timeout - elapsed))
                 logging.info("remain timeout " + str(remain_timeout))
-                if remain_timeout <= 0:
-                    logging.info(
-                        "Maximum timeout reached, stopping monitoring"
-                    )
-                    break
                 logging.info(
                     "Reconnecting watch stream"
                     f"(attempt {retry_count}/{max_retries}),"
                     f"remaining timeout: {remain_timeout}s"
                 )
-            else:
-                remain_timeout = max_timeout
 
             w = watch.Watch(return_type=V1Pod)
 
-            for e in w.stream(monitor_partial, timeout_seconds=remain_timeout):
+            # Use short watch intervals when stop_event is provided
+            # for responsive interrupts
+            if stop_event:
+                watch_timeout = min(5, remain_timeout)
+            else:
+                watch_timeout = remain_timeout
+
+            # Build watch call with current resource_version
+            # to avoid duplicate events
+            current_rv = snapshot.resource_version
+            for e in w.stream(
+                monitor_partial,
+                resource_version=current_rv,
+                timeout_seconds=watch_timeout,
+            ):
                 match_name = True
                 match_namespace = True
                 event_type = e["type"]
@@ -106,6 +131,11 @@ def _monitor_pods(
                 if name_pattern:
                     match = re.match(name_pattern, pod.metadata.name)
                     match_name = match is not None
+
+                # Update resource_version from each event
+                # to avoid duplicates on watch restart
+                if pod.metadata.resource_version:
+                    snapshot.resource_version = pod.metadata.resource_version
 
                 if match_name and match_namespace:
                     pod_event = PodEvent()
@@ -154,12 +184,23 @@ def _monitor_pods(
                     # that has been deleted or not ready
                     # have been restored, if True the
                     # monitoring is stopped earlier
+                    # Check if stop event is set during monitoring
+                    if stop_event and stop_event.is_set():
+                        w.stop()
+                        return snapshot
+
                     if cluster_restored:
                         logging.info("Cluster restored, stopping monitoring")
                         w.stop()
                         return snapshot
 
-            # If we exit the loop normally (timeout reached), we're done
+            # If we exit the for loop normally (watch timeout reached)
+            # With short intervals for stop_event, continue looping
+            # until max_timeout
+            if stop_event:
+                elapsed = time.time() - start_time
+                if elapsed < max_timeout:
+                    continue  # Continue with next short interval
             logging.info("Watch stream completed normally")
             break
 
@@ -167,9 +208,9 @@ def _monitor_pods(
 
             if retry_count > max_retries:
                 logging.warning(
-                    f"Watch stream connection broken after {max_retries}"
-                    f"retries. ProtocolError: {e}. Returning snapshot "
-                    "with data collected so far."
+                    f"Watch stream connection broken after "
+                    f"{max_retries} retries. ProtocolError: {e}. "
+                    "Returning snapshot with data collected so far."
                 )
                 break
 
@@ -221,6 +262,7 @@ def select_and_monitor_by_label(
     label_selector: str,
     max_timeout: int,
     v1_client: CoreV1Api,
+    stop_event: threading.Event = None,
 ) -> Future:
     """
     Monitors all the pods identified
@@ -237,6 +279,7 @@ def select_and_monitor_by_label(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
+    :param stop_event: Optional threading.Event to signal early termination
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -250,7 +293,6 @@ def select_and_monitor_by_label(
     snapshot = _select_pods(select_partial)
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
-        resource_version=snapshot.resource_version,
         label_selector=label_selector,
     )
     pool = ThreadPoolExecutor(max_workers=1)
@@ -261,6 +303,7 @@ def select_and_monitor_by_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=None,
+        stop_event=stop_event,
     )
     return future
 
@@ -270,6 +313,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
     namespace_pattern: str,
     max_timeout: int,
     v1_client: CoreV1Api,
+    stop_event: threading.Event = None,
 ):
     """
     Monitors all the pods identified by a pod name regex pattern
@@ -292,6 +336,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
     :param v1_client: kubernetes V1Api client
+    :param stop_event: Optional threading.Event to signal early termination
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -318,7 +363,6 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
     )
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
-        resource_version=snapshot.resource_version,
     )
     pool = ThreadPoolExecutor(max_workers=1)
     future = pool.submit(
@@ -328,6 +372,7 @@ def select_and_monitor_by_name_pattern_and_namespace_pattern(
         max_timeout,
         name_pattern=pod_name_pattern,
         namespace_pattern=namespace_pattern,
+        stop_event=stop_event,
     )
     return future
 
@@ -337,6 +382,7 @@ def select_and_monitor_by_namespace_pattern_and_label(
     label_selector: str,
     v1_client: CoreV1Api,
     max_timeout=30,
+    stop_event: threading.Event = None,
 ):
     """
     Monitors all the pods identified
@@ -359,6 +405,7 @@ def select_and_monitor_by_namespace_pattern_and_label(
         If during the time frame the pods are not replaced
         at all the error field of the PodsStatus structure will be
         valorized with an exception.
+    :param stop_event: Optional threading.Event to signal early termination
     :return:
         a future which result (PodsSnapshot) must be
         gathered to obtain the pod infos.
@@ -380,7 +427,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
     )
     monitor_partial = partial(
         v1_client.list_pod_for_all_namespaces,
-        resource_version=snapshot.resource_version,
         label_selector=label_selector,
     )
     pool = ThreadPoolExecutor(max_workers=1)
@@ -391,5 +437,6 @@ def select_and_monitor_by_namespace_pattern_and_label(
         max_timeout,
         name_pattern=None,
         namespace_pattern=namespace_pattern,
+        stop_event=stop_event,
     )
     return future
