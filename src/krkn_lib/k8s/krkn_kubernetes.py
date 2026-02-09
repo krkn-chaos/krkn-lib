@@ -1955,13 +1955,14 @@ class KrknKubernetes:
                         )
                     )
 
-                for i, container in enumerate(
-                    response.status.container_statuses
-                ):
-                    container_list[i].ready = container.ready
-                    container_list[i].containerId = (
-                        response.status.container_statuses[i].container_id
-                    )
+                if response.status.container_statuses:
+                    for i, container in enumerate(
+                        response.status.container_statuses
+                    ):
+                        container_list[i].ready = container.ready
+                        container_list[i].containerId = (
+                            response.status.container_statuses[i].container_id
+                        )
 
                 # Create a list of volumes associated with the pod
                 volume_list = []
