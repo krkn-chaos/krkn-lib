@@ -4,9 +4,28 @@ import logging
 import math
 import time
 
+import requests
 import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
-from elasticsearch_dsl import Search
+
+try:
+    from opensearchpy import (
+        OpenSearch,
+        NotFoundError as OpenSearchNotFoundError,
+    )
+    OPENSEARCH_AVAILABLE = True
+except ImportError:
+    # Try alternative import path
+    try:
+        from opensearch_py import (
+            OpenSearch,
+            NotFoundError as OpenSearchNotFoundError,
+        )
+        OPENSEARCH_AVAILABLE = True
+    except ImportError:
+        OPENSEARCH_AVAILABLE = False
+        OpenSearch = None
+        OpenSearchNotFoundError = None
 
 from krkn_lib.models.elastic.models import (
     ElasticAlert,
@@ -19,6 +38,7 @@ from krkn_lib.utils.safe_logger import SafeLogger
 
 class KrknElastic:
     es = None
+    backend_type = None  # 'elasticsearch' or 'opensearch'
 
     def __init__(
         self,
@@ -31,34 +51,152 @@ class KrknElastic:
     ):
         es_logger = logging.getLogger("elasticsearch")
         es_logger.setLevel(logging.WARNING)
+        opensearch_logger = logging.getLogger("opensearch")
+        opensearch_logger.setLevel(logging.WARNING)
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         urllib3.disable_warnings(DeprecationWarning)
         es_transport_logger = logging.getLogger("elastic_transport.transport")
         es_transport_logger.setLevel(logging.CRITICAL)
         self.safe_logger = safe_logger
+
         try:
             if not elastic_url:
                 raise Exception("elastic search url is not valid")
             if not elastic_port:
                 raise Exception("elastic port is not valid")
-            # create Elasticsearch object
 
             credentials = (
                 (username, password) if username and password else None
             )
-            self.es = Elasticsearch(
-                f"{elastic_url}:{elastic_port}",
-                http_auth=credentials,
-                verify_certs=verify_certs,
-                ssl_show_warn=False,
+
+            # Auto-detect backend type
+            self.backend_type = self._detect_backend(
+                elastic_url, elastic_port, credentials, verify_certs
             )
+            self.safe_logger.info(
+                f"Auto-detected backend: {self.backend_type}"
+            )
+
+            # Create the appropriate client based on backend type
+            if self.backend_type == "opensearch":
+                if not OPENSEARCH_AVAILABLE:
+                    raise Exception(
+                        "OpenSearch backend requested but "
+                        "opensearch-py is not installed. "
+                        "Install it with: pip install opensearch-py"
+                    )
+                # Parse host from URL
+                host = elastic_url.replace("https://", "")
+                host = host.replace("http://", "")
+                self.es = OpenSearch(
+                    hosts=[{"host": host, "port": elastic_port}],
+                    http_auth=credentials,
+                    use_ssl=elastic_url.startswith("https"),
+                    verify_certs=verify_certs,
+                    ssl_show_warn=False,
+                )
+            elif self.backend_type == "elasticsearch":
+                self.es = Elasticsearch(
+                    f"{elastic_url}:{elastic_port}",
+                    http_auth=credentials,
+                    verify_certs=verify_certs,
+                    ssl_show_warn=False,
+                )
         except Exception as e:
             self.safe_logger.error(
-                "Failed to initialize elasticsearch: %s" % e
+                "Failed to initialize %s: %s" % (self.backend_type, e)
             )
             raise e
 
-    def upload_data_to_elasticsearch(self, item: dict, index: str = "") -> int:
+    def _detect_backend(
+        self,
+        elastic_url: str,
+        elastic_port: int,
+        credentials: tuple = None,
+        verify_certs: bool = False,
+    ) -> str:
+        """
+        Auto-detect whether the backend is Elasticsearch or OpenSearch
+        by querying the cluster info endpoint.
+
+        :param elastic_url: The URL of the search backend
+        :param elastic_port: The port of the search backend
+        :param credentials: Optional tuple of (username, password)
+        :param verify_certs: Whether to verify SSL certificates
+        :return: "elasticsearch" or "opensearch"
+        """
+        # Build the info endpoint URL
+        base_url = f"{elastic_url}:{elastic_port}"
+        info_url = f"{base_url}/"
+
+        try:
+            # Make a request to the info endpoint
+            auth = credentials if credentials else None
+            response = requests.get(
+                info_url,
+                auth=auth,
+                verify=verify_certs,
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                info = response.json()
+
+                # Check for OpenSearch-specific fields
+                if "version" in info:
+                    version_info = info["version"]
+
+                    # OpenSearch includes "distribution" field
+                    if "distribution" in version_info:
+                        distribution = version_info["distribution"].lower()
+                        if "opensearch" in distribution:
+                            return "opensearch"
+
+                    # Check build_type or other OpenSearch indicators
+                    if "build_type" in version_info:
+                        build_type = version_info.get("build_type", "").lower()
+                        if "opensearch" in build_type:
+                            return "opensearch"
+
+                    # Check tagline (OpenSearch has different tagline)
+                    tagline = info.get("tagline", "").lower()
+                    if "opensearch" in tagline:
+                        return "opensearch"
+
+                    # Check cluster name for opensearch indicators
+                    cluster_name = info.get("cluster_name", "").lower()
+                    if "opensearch" in cluster_name:
+                        return "opensearch"
+
+                # Default to ES if no OpenSearch indicators found
+                self.safe_logger.info(
+                    "No OpenSearch indicators found, using Elasticsearch"
+                )
+                return "elasticsearch"
+
+        except Exception as e:
+            self.safe_logger.warning(
+                f"Failed to auto-detect backend type: {e}. "
+                f"Defaulting to Elasticsearch"
+            )
+            return "elasticsearch"
+
+    def _is_not_found_error(self, exception: Exception) -> bool:
+        """
+        Helper method to check if an exception is a NotFoundError
+        for either Elasticsearch or OpenSearch
+        """
+        if isinstance(exception, NotFoundError):
+            return True
+        if (OPENSEARCH_AVAILABLE and
+            OpenSearchNotFoundError and
+            isinstance(exception, OpenSearchNotFoundError)):
+            return True
+        return False
+
+    def upload_data_to_elasticsearch(
+        self, item: dict, index: str = ""
+    ) -> int:
         """uploads captured data in item dictionary to Elasticsearch
 
 
@@ -147,7 +285,9 @@ class KrknElastic:
             raise Exception("index cannot be None or empty")
         try:
             time_start = time.time()
-            alert.save(using=self.es, index=index)
+            # Use to_dict() and low-level index() for compatibility
+            # with both Elasticsearch and OpenSearch
+            self.es.index(index=index, body=alert.to_dict())
             return int(time.time() - time_start)
         except Exception as e:
             self.safe_logger.error(f"Push alert exception: {e}")
@@ -166,7 +306,9 @@ class KrknElastic:
             raise Exception("index cannot be None or empty")
         try:
             time_start = time.time()
-            metric.save(using=self.es, index=index)
+            # Use to_dict() and low-level index() for compatibility
+            # with both Elasticsearch and OpenSearch
+            self.es.index(index=index, body=metric.to_dict())
             return int(time.time() - time_start)
         except Exception as e:
             print("error" + str(e))
@@ -179,7 +321,9 @@ class KrknElastic:
         try:
             elastic_chaos = ElasticChaosRunTelemetry(telemetry)
             time_start = time.time()
-            elastic_chaos.save(using=self.es, index=index)
+            # Use to_dict() and low-level index() for compatibility
+            # with both Elasticsearch and OpenSearch
+            self.es.index(index=index, body=elastic_chaos.to_dict())
             return int(time.time() - time_start)
         except Exception as e:
             self.safe_logger.info(f"Elastic push telemetry error: {e}")
@@ -195,19 +339,30 @@ class KrknElastic:
             has been found)
         """
         try:
-            search = Search(using=self.es, index=index).filter(
-                "match", run_uuid=run_uuid
-            )
-            result = search.execute()
+            # Use raw search query instead of DSL
+            # (works with both ES and OpenSearch)
+            query = {
+                "query": {
+                    "match": {
+                        "run_uuid": run_uuid
+                    }
+                }
+            }
+            result = self.es.search(index=index, body=query)
             documents = [
-                ElasticChaosRunTelemetry(**hit.to_dict()) for hit in result
+                ElasticChaosRunTelemetry(**hit["_source"])
+                for hit in result["hits"]["hits"]
             ]
-        except NotFoundError:
-            self.safe_logger.error("Search telemetry not found")
-            return []
+        except Exception as e:
+            if self._is_not_found_error(e):
+                self.safe_logger.error("Search telemetry not found")
+                return []
+            raise
         return documents
 
-    def search_alert(self, run_uuid: str, index: str) -> list[ElasticAlert]:
+    def search_alert(
+        self, run_uuid: str, index: str
+    ) -> list[ElasticAlert]:
         """
         Searches ElasticAlerts by run_uuid
         :param run_uuid: the Krkn run id to search
@@ -217,17 +372,30 @@ class KrknElastic:
             has been found)
         """
         try:
-            search = Search(using=self.es, index=index).filter(
-                "match", run_uuid=run_uuid
-            )
-            result = search.execute()
-            documents = [ElasticAlert(**hit.to_dict()) for hit in result]
-        except NotFoundError:
-            self.safe_logger.error("Search alert not found")
-            return []
+            # Use raw search query instead of DSL
+            # (works with both ES and OpenSearch)
+            query = {
+                "query": {
+                    "match": {
+                        "run_uuid": run_uuid
+                    }
+                }
+            }
+            result = self.es.search(index=index, body=query)
+            documents = [
+                ElasticAlert(**hit["_source"])
+                for hit in result["hits"]["hits"]
+            ]
+        except Exception as e:
+            if self._is_not_found_error(e):
+                self.safe_logger.error("Search alert not found")
+                return []
+            raise
         return documents
 
-    def search_metric(self, run_uuid: str, index: str) -> list[ElasticMetric]:
+    def search_metric(
+        self, run_uuid: str, index: str
+    ) -> list[ElasticMetric]:
         """
         Searches ElasticMetric by run_uuid
         :param run_uuid: the Krkn run id to search
@@ -237,12 +405,23 @@ class KrknElastic:
             has been found)
         """
         try:
-            search = Search(using=self.es, index=index).filter(
-                "match", run_uuid=run_uuid
-            )
-            result = search.execute()
-            documents = [ElasticMetric(**hit.to_dict()) for hit in result]
-        except NotFoundError:
-            self.safe_logger.error("Search metric not found")
-            return []
+            # Use raw search query instead of DSL
+            # (works with both ES and OpenSearch)
+            query = {
+                "query": {
+                    "match": {
+                        "run_uuid": run_uuid
+                    }
+                }
+            }
+            result = self.es.search(index=index, body=query)
+            documents = [
+                ElasticMetric(**hit["_source"])
+                for hit in result["hits"]["hits"]
+            ]
+        except Exception as e:
+            if self._is_not_found_error(e):
+                self.safe_logger.error("Search metric not found")
+                return []
+            raise
         return documents
