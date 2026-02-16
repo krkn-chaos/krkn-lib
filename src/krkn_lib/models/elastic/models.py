@@ -35,6 +35,18 @@ class ElasticAlert(Document):
         self.alert = alert
         self.created_at = created_at
 
+    def to_dict(self, **kwargs):
+        """Override to_dict to ensure ISO 8601 datetime format"""
+        d = super().to_dict(**kwargs)
+        # Convert datetime objects or string dates to ISO 8601 format
+        if 'created_at' in d and d['created_at'] is not None:
+            if isinstance(d['created_at'], datetime.datetime):
+                d['created_at'] = d['created_at'].isoformat()
+            elif isinstance(d['created_at'], str) and ' ' in d['created_at']:
+                # Fix space-separated datetime strings to ISO format
+                d['created_at'] = d['created_at'].replace(' ', 'T')
+        return d
+
 
 class ElasticMetric(Document):
     run_uuid = Keyword()
@@ -47,6 +59,18 @@ class ElasticMetric(Document):
     ):
         super().__init__(**kwargs)
         self.run_uuid = run_uuid
+
+    def to_dict(self, **kwargs):
+        """Override to_dict to ensure ISO 8601 datetime format"""
+        d = super().to_dict(**kwargs)
+        # Convert datetime objects or string dates to ISO 8601 format
+        if 'timestamp' in d and d['timestamp'] is not None:
+            if isinstance(d['timestamp'], datetime.datetime):
+                d['timestamp'] = d['timestamp'].isoformat()
+            elif isinstance(d['timestamp'], str) and ' ' in d['timestamp']:
+                # Fix space-separated datetime strings to ISO format
+                d['timestamp'] = d['timestamp'].replace(' ', 'T')
+        return d
 
 
 # Telemetry models
@@ -176,9 +200,13 @@ class ElasticChaosRunTelemetry(Document):
                         ElasticAffectedPod(
                             pod_name=pod.pod_name,
                             namespace=pod.namespace,
-                            total_recovery_time=pod.total_recovery_time,
+                            total_recovery_time=(
+                                pod.total_recovery_time
+                            ),
                             pod_readiness_time=pod.pod_readiness_time,
-                            pod_rescheduling_time=pod.pod_rescheduling_time,
+                            pod_rescheduling_time=(
+                                pod.pod_rescheduling_time
+                            ),
                         )
                         for pod in sc.affected_pods.recovered
                     ],
@@ -219,7 +247,9 @@ class ElasticChaosRunTelemetry(Document):
             for info in chaos_run_telemetry.node_summary_infos
         ]
         self.node_taints = [
-            ElasticTaint(key=taint.key, value=taint.value, effect=taint.effect)
+            ElasticTaint(
+                key=taint.key, value=taint.value, effect=taint.effect
+            )
             for taint in chaos_run_telemetry.node_taints
         ]
         self.kubernetes_objects_count = (
@@ -292,7 +322,9 @@ class ElasticChaosRunTelemetry(Document):
 
         self.timestamp = chaos_run_telemetry.timestamp
         self.total_node_count = chaos_run_telemetry.total_node_count
-        self.cloud_infrastructure = chaos_run_telemetry.cloud_infrastructure
+        self.cloud_infrastructure = (
+            chaos_run_telemetry.cloud_infrastructure
+        )
         self.cloud_type = chaos_run_telemetry.cloud_type
         self.cluster_version = chaos_run_telemetry.cluster_version
         self.run_uuid = chaos_run_telemetry.run_uuid
@@ -310,3 +342,34 @@ class ElasticChaosRunTelemetry(Document):
             ]
         else:
             self.error_logs = None
+
+    def to_dict(self, **kwargs):
+        """Override to_dict to ensure ISO 8601 datetime format"""
+        d = super().to_dict(**kwargs)
+        # Recursively convert datetime objects to ISO 8601 format
+        d = self._convert_datetimes_to_iso(d)
+        return d
+
+    @staticmethod
+    def _convert_datetimes_to_iso(obj):
+        """Recursively convert datetime objects to ISO 8601 strings"""
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        elif isinstance(obj, str) and ' ' in obj and len(obj) >= 19:
+            # Fix space-separated datetime strings to ISO format
+            # Check if it looks like a datetime (has space, length >= 19)
+            try:
+                # Try to parse and reformat
+                datetime.datetime.strptime(obj[:19], '%Y-%m-%d %H:%M:%S')
+                return obj.replace(' ', 'T')
+            except ValueError:
+                # Not a datetime string, return as-is
+                return obj
+        elif isinstance(obj, dict):
+            return {k: ElasticChaosRunTelemetry._convert_datetimes_to_iso(v)
+                    for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [ElasticChaosRunTelemetry._convert_datetimes_to_iso(item)
+                    for item in obj]
+        else:
+            return obj
