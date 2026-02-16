@@ -629,5 +629,15 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "error_logs": [
+                {
+                    "timestamp": "2023-05-22T14:55:05Z",
+                    "message": "Pod pod1 failed to start: ImagePullBackOff"
+                },
+                {
+                    "timestamp": "2023-05-22T14:55:10Z",
+                    "message": "Node kind-control-plane became NotReady"
+                }
+            ],
         }
         return example_data
