@@ -70,7 +70,15 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                     "running_time":0.0,
                     "terminating_time":0.0
                 }
-            ]
+            ],
+            "overall_resiliency_report":{
+                "scenarios":{
+                    "test": 85
+                },
+                "resiliency_score":85,
+                "passed_slos":3,
+                "total_slos":4
+            }
         }
         """  # NOQA
         # wrong base64 format
@@ -140,6 +148,22 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertTrue(isinstance(telemetry.cluster_events, list))
         self.assertTrue(isinstance(telemetry.cluster_events[0], ClusterEvent))
 
+        # Test ResiliencyReport
+        self.assertIsNotNone(telemetry.overall_resiliency_report)
+        self.assertEqual(
+            telemetry.overall_resiliency_report.resiliency_score, 85
+        )
+        self.assertEqual(
+            telemetry.overall_resiliency_report.passed_slos, 3
+        )
+        self.assertEqual(
+            telemetry.overall_resiliency_report.total_slos, 4
+        )
+        self.assertIsNotNone(telemetry.overall_resiliency_report.scenarios)
+        self.assertEqual(
+            telemetry.overall_resiliency_report.scenarios.get("test"), 85
+        )
+
         json_str = telemetry.to_json()
         self.assertIsNotNone(json_str)
 
@@ -165,6 +189,14 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                 hasattr(telemetry_empty_constructor, "parameters_base64")
             )
             self.assertTrue(hasattr(telemetry_empty_constructor, "parameters"))
+            self.assertTrue(
+                hasattr(
+                    telemetry_empty_constructor, "overall_resiliency_report"
+                )
+            )
+            self.assertIsNotNone(
+                telemetry_empty_constructor.overall_resiliency_report
+            )
         except Exception:
             self.fail("constructor raised Exception unexpectedly!")
 

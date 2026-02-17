@@ -139,6 +139,36 @@ class TestKrknElasticModels(BaseTest):
             0,
         )
 
+        # overall_resiliency_report
+        self.assertIsNotNone(
+            elastic_telemetry.scenarios[0].overall_resiliency_report
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .overall_resiliency_report.resiliency_score,
+            90,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .overall_resiliency_report.passed_slos,
+            4,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .overall_resiliency_report.total_slos,
+            5,
+        )
+        self.assertIsNotNone(
+            elastic_telemetry.scenarios[0]
+            .overall_resiliency_report.scenarios
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .overall_resiliency_report.scenarios.to_dict()
+            .get("example_scenario.yaml"),
+            95,
+        )
+
         # node_summary_infos
         self.assertEqual(len(elastic_telemetry.node_summary_infos), 1)
 
