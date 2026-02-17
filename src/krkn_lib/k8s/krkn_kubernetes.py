@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import tempfile
 import threading
 import time
 import warnings
@@ -86,6 +87,7 @@ class KrknKubernetes:
     def __init__(
         self,
         kubeconfig_path: str,
+        kubeconfig_string: str = None,
         request_chunk_size: int = 250,
     ):
         """
@@ -108,6 +110,12 @@ class KrknKubernetes:
         )
 
         self.request_chunk_size = request_chunk_size
+
+        if kubeconfig_string is not None:
+            with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
+                f.write(kubeconfig_string)
+                f.flush()
+                kubeconfig_path = f.name
 
         if kubeconfig_path is not None:
             self.__initialize_config(kubeconfig_path)
