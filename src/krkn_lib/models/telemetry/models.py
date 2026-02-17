@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import AffectedNode, PodsStatus
+from krkn_lib.models.k8s import AffectedNode, PodsStatus, ResiliencyReport
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [
@@ -89,6 +89,10 @@ class ScenarioTelemetry:
     """
     Cluster events collected during the chaos run
     """
+    overall_resiliency_report: ResiliencyReport
+    """
+    Resiliency score and report
+    """
 
     def set_cluster_events(self, events: list[ClusterEvent]):
         """
@@ -134,6 +138,17 @@ class ScenarioTelemetry:
             else:
                 self.cluster_events = []
 
+            if json_object.get("overall_resiliency_report"):
+                report_data = json_object.get("overall_resiliency_report")
+                self.overall_resiliency_report = ResiliencyReport(
+                    json_object=report_data,
+                    resiliency_score=report_data.get("resiliency_score", 0),
+                    passed_slos=report_data.get("passed_slos", 0),
+                    total_slos=report_data.get("total_slos", 0)
+                )
+            else:
+                self.overall_resiliency_report = ResiliencyReport()
+
             if (
                 self.parameters_base64 is not None
                 and self.parameters_base64 != ""
@@ -165,6 +180,7 @@ class ScenarioTelemetry:
             self.affected_pods = PodsStatus()
             self.affected_nodes = []
             self.cluster_events = []
+            self.overall_resiliency_report = ResiliencyReport()
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -557,6 +573,10 @@ class ChaosRunTelemetry:
     """
     Build url if run in CI
     """
+    error_logs: list[dict] = None
+    """
+    Error logs collected during chaos run
+    """
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
@@ -569,6 +589,7 @@ class ChaosRunTelemetry:
         )
         self.health_checks = list[HealthCheck]()
         self.virt_checks = list[VirtCheck]()
+        self.error_logs = []
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -608,6 +629,7 @@ class ChaosRunTelemetry:
             )
             self.job_status = json_dict.get("job_status")
             self.build_url = json_dict.get("build_url")
+            self.error_logs = json_dict.get("error_logs")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

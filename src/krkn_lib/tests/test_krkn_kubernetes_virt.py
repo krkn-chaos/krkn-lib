@@ -27,7 +27,7 @@ Usage:
     python -m coverage run -a -m unittest src.krkn_lib.tests.test_krkn_kubernetes_virt -v
 
 Assisted By: Claude Code
-""" # NOQA
+"""  # NOQA
 
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
@@ -204,9 +204,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=[namespace],
         ):
             # Configure the mock to return vmis
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.return_value = vmis_response
 
             # get_vmis returns a list
@@ -231,9 +229,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=[namespace],
         ):
             # Configure the mock to raise 404
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = api_exception
 
             result = self.lib_k8s.get_vmis(regex_name, namespace)
@@ -257,9 +253,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=namespaces,
         ):
             # Configure mock for different responses
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = [
                 vmis_response_1,
                 vmis_response_2,
@@ -297,9 +291,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=[namespace],
         ):
             # Configure the mock to return vms
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.return_value = vms_response
 
             result = self.lib_k8s.get_vms(regex_name, namespace)
@@ -322,9 +314,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=[namespace],
         ):
             # Configure the mock to raise 404
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = api_exception
 
             result = self.lib_k8s.get_vms(regex_name, namespace)
@@ -347,9 +337,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             return_value=namespaces,
         ):
             # Configure mock for different responses
-            mock_list = (
-                self.mock_custom_client.list_namespaced_custom_object
-            )
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = [
                 vms_response_1,
                 vms_response_2,
@@ -371,9 +359,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
 
         # Configure the mock to return expected response
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.return_value = expected_response
 
         result = self.lib_k8s.delete_vm(vm_name, namespace)
@@ -394,9 +380,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         result = self.lib_k8s.delete_vm(vm_name, namespace)
@@ -409,9 +393,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         with self.assertRaises(ApiException):
@@ -423,9 +405,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
 
         # Configure the mock to return None (success)
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.return_value = None
 
         result = self.lib_k8s.delete_vmi(vmi_name, namespace)
@@ -447,9 +427,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         result = self.lib_k8s.delete_vmi(vmi_name, namespace)
@@ -463,9 +441,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         result = self.lib_k8s.delete_vmi(vmi_name, namespace)
@@ -532,9 +508,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
 
         # Configure the mock to return None (success)
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.return_value = None
 
         # Should not raise any exception
@@ -555,9 +529,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         # Should not raise exception
@@ -570,9 +542,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_delete = (
-            self.mock_custom_client.delete_namespaced_custom_object
-        )
+        mock_delete = self.mock_custom_client.delete_namespaced_custom_object
         mock_delete.side_effect = api_exception
 
         # Should not raise exception
@@ -595,9 +565,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
 
         # Configure the mock to return expected_vmi
-        mock_create = (
-            self.mock_custom_client.create_namespaced_custom_object
-        )
+        mock_create = self.mock_custom_client.create_namespaced_custom_object
         mock_create.return_value = expected_vmi
 
         result = self.lib_k8s.create_vmi(
@@ -622,9 +590,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_create = (
-            self.mock_custom_client.create_namespaced_custom_object
-        )
+        mock_create = self.mock_custom_client.create_namespaced_custom_object
         mock_create.side_effect = api_exception
 
         result = self.lib_k8s.create_vmi(
@@ -641,15 +607,11 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_create = (
-            self.mock_custom_client.create_namespaced_custom_object
-        )
+        mock_create = self.mock_custom_client.create_namespaced_custom_object
         mock_create.side_effect = api_exception
 
         with self.assertRaises(ApiException):
-            self.lib_k8s.create_vmi(
-                vmi_name, namespace, vm_name, vmi_body
-            )
+            self.lib_k8s.create_vmi(vmi_name, namespace, vm_name, vmi_body)
 
     def test_patch_vm_success(self):
         """Test patch_vm successfully patches a VM"""
@@ -667,9 +629,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
 
         # Configure the mock to return expected_vm
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.return_value = expected_vm
 
         result = self.lib_k8s.patch_vm(vm_name, namespace, vm_body)
@@ -692,9 +652,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.side_effect = api_exception
 
         result = self.lib_k8s.patch_vm(vm_name, namespace, vm_body)
@@ -708,9 +666,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.side_effect = api_exception
 
         with self.assertRaises(ApiException):
@@ -735,9 +691,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
 
         # Configure the mock to return expected_vmi
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.return_value = expected_vmi
 
         result = self.lib_k8s.patch_vmi(vmi_name, namespace, vmi_body)
@@ -760,9 +714,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=404)
 
         # Configure the mock to raise 404
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.side_effect = api_exception
 
         result = self.lib_k8s.patch_vmi(vmi_name, namespace, vmi_body)
@@ -776,9 +728,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         api_exception = ApiException(status=500)
 
         # Configure the mock to raise 500
-        mock_patch = (
-            self.mock_custom_client.patch_namespaced_custom_object
-        )
+        mock_patch = self.mock_custom_client.patch_namespaced_custom_object
         mock_patch.side_effect = api_exception
 
         with self.assertRaises(ApiException):

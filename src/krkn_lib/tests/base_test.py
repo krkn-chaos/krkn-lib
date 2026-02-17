@@ -540,6 +540,14 @@ class BaseTest(unittest.TestCase):
                             "terminating_time": 0,
                         }
                     ],
+                    "overall_resiliency_report": {
+                        "scenarios": {
+                            "example_scenario.yaml": 95
+                        },
+                        "resiliency_score": 90,
+                        "passed_slos": 4,
+                        "total_slos": 5,
+                    },
                 }
             ],
             "node_summary_infos": [
@@ -583,7 +591,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:34.555878",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.348474,
-                    "new_ip_address": ""
+                    "new_ip_address": "",
                 },
                 {
                     "node_name": "h27-r660",
@@ -594,7 +602,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:34.759105",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.145247,
-                    "new_ip_address": ""
+                    "new_ip_address": "",
                 },
                 {
                     "node_name": "h10-r660",
@@ -605,7 +613,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:35.308957",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 19.595395,
-                    "new_ip_address": "0.0.0.3"
+                    "new_ip_address": "0.0.0.3",
                 },
             ],
             "post_virt_checks": [
@@ -618,7 +626,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:55.904352",
                     "end_timestamp": "2025-03-12T14:57:55.904352",
                     "duration": 0.00,
-                    "new_ip_address": ""
+                    "new_ip_address": "",
                 }
             ],
             "total_node_count": 3,
@@ -629,5 +637,15 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "error_logs": [
+                {
+                    "timestamp": "2023-05-22T14:55:05Z",
+                    "message": "Pod pod1 failed to start: ImagePullBackOff"
+                },
+                {
+                    "timestamp": "2023-05-22T14:55:10Z",
+                    "message": "Node kind-control-plane became NotReady"
+                }
+            ],
         }
         return example_data

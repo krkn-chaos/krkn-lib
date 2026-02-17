@@ -326,7 +326,7 @@ class AffectedNodeStatus:
         match_found = []
         for affected_node in self.affected_nodes:
             counter2 = counter + 1
-            for aff_node2 in self.affected_nodes[counter + 1:]:  # fmt: skip
+            for aff_node2 in self.affected_nodes[counter + 1 :]:  # noqa: E203
                 if affected_node.node_name == aff_node2.node_name:
                     match_found.append(counter2)
                     cur_node = self.affected_nodes[counter]
@@ -380,3 +380,40 @@ class NodeResources:
         self.memory = 0
         self.cpu = 0
         self.disk_space = 0
+
+class ResiliencyReport:
+    """
+    Resiliency report containing scenario scores and SLO metrics
+    """
+
+    scenarios: dict[str, int]
+    """
+    Dictionary mapping scenario names to their resiliency scores
+    """
+    resiliency_score: int
+    """
+    Overall resiliency score across all scenarios
+    """
+    passed_slos: int
+    """
+    Number of SLOs that passed
+    """
+    total_slos: int
+    """
+    Total number of SLOs evaluated
+    """
+
+    def __init__(
+        self,
+        json_object: dict = None,
+        resiliency_score: int = 0,
+        passed_slos: int = 0,
+        total_slos: int = 0
+    ):
+        self.scenarios = {}
+        self.resiliency_score = resiliency_score
+        self.passed_slos = passed_slos
+        self.total_slos = total_slos
+        if json_object and "scenarios" in json_object:
+            self.scenarios = json_object["scenarios"]
+

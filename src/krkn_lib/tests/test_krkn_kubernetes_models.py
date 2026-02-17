@@ -1,10 +1,10 @@
-from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.k8s import (
     AffectedNode,
     AffectedNodeStatus,
     AffectedPod,
     PodsStatus,
 )
+from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.tests import BaseTest
 
 
