@@ -9,7 +9,7 @@ homepage = "https://github.com/redhat-chaos/krkn"
 #packages = [{include= "src/krkn_lib"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.11"
 kubernetes ="34.1.0"
 sphinxnotes-markdown-builder="^0.5.6"
 requests="^2.29.0"
@@ -20,9 +20,10 @@ tzlocal = "5.1"
 pytz = "^2023.3"
 PyYAML = "6.0.1"
 prometheus-api-client = "^0.5.4"
-elasticsearch = "7.13.4"
+elasticsearch = "7.17.13"
 elasticsearch-dsl = "7.4.1"
-wheel = "^0.42.0"
+opensearch-py = ">=2.0.0,<2.8.0"
+wheel = "0.46.2"
 cython = "3.0"
 numpy= "1.26.4"
 deprecation="2.1.0"
@@ -35,7 +36,7 @@ boto3 = "^1.28.12"
 
 [tool.black]
 line-length = 79
-target-version = ['py37', 'py38']
+target-version = ['py311', 'py312']
 include = '\.pyi?$'
 exclude = '''
 /(

@@ -20,9 +20,11 @@ class KrknOpenshift(KrknKubernetes):
     def __init__(
         self,
         kubeconfig_path: str = None,
+        kubeconfig_string: str = None,
     ):
         super().__init__(
             kubeconfig_path=kubeconfig_path,
+            kubeconfig_string=kubeconfig_string,
         )
 
     def get_clusterversion_string(self) -> str:
@@ -65,7 +67,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/infrastructures/cluster"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -111,7 +113,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/infrastructures/cluster"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -147,7 +149,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/networks"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -440,7 +442,7 @@ class KrknOpenshift(KrknKubernetes):
                 ["application/json"]
             )
 
-            (data) = self.api_client.call_api(
+            data = self.api_client.call_api(
                 path,
                 "GET",
                 path_params,

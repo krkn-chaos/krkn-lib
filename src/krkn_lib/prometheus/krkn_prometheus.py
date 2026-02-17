@@ -50,7 +50,7 @@ class KrknPrometheus:
         query: str,
         start_time: datetime = None,
         end_time: datetime = None,
-        granularity: int = 10
+        granularity: int = 10,
     ) -> list[dict[str:any]]:
         """
         Executes a query to the Prometheus API in PromQL languag,

@@ -17,12 +17,12 @@ import os
 import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import Mock, PropertyMock, patch
 
 from krkn_lib.ocp.krkn_openshift import KrknOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
-
 
 # ==============================================================================
 # UNIT TESTS (Mocked - No external dependencies)
@@ -49,6 +49,18 @@ class TestKrknOpenshiftInit(unittest.TestCase):
         finally:
             if os.path.exists(temp_kubeconfig):
                 os.unlink(temp_kubeconfig)
+
+    def test_init_with_kubeconfig_string(self):
+        """Test initialization with kubeconfig"""
+        kubeconfig = os.environ.get(
+            "KUBECONFIG", str(Path.home() / ".kube" / "config")
+        )
+        path = Path(kubeconfig)
+        kubeconfig_content = path.read_text(encoding="utf-8")
+
+        ocp = KrknOpenshift(kubeconfig_string=kubeconfig_content)
+        nodes = ocp.list_nodes()
+        self.assertTrue(len(nodes) > 0)
 
     @patch("krkn_lib.k8s.krkn_kubernetes.config")
     def test_init_without_kubeconfig(self, mock_config):
@@ -256,7 +268,9 @@ class TestGetCloudInfrastructure(unittest.TestCase):
         self.assertEqual(result, "Unknown")
 
     @patch.object(KrknOpenshift, "api_client", new_callable=PropertyMock)
-    def test_get_cloud_infrastructure_no_api_client(self, mock_api_client_prop):
+    def test_get_cloud_infrastructure_no_api_client(
+        self, mock_api_client_prop
+    ):
         """Test when api_client is None."""
         mock_api_client_prop.return_value = None
 
@@ -344,9 +358,7 @@ class TestGetPrometheusApiConnectionData(unittest.TestCase):
                     "items": [
                         {
                             "metadata": {"name": "prometheus-k8s"},
-                            "spec": {
-                                "host": host
-                            },
+                            "spec": {"host": host},
                         }
                     ]
                 }
@@ -503,7 +515,9 @@ class TestFilterMustGatherOcpLogFolder(unittest.TestCase):
                 [r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z).+"],
             )
 
-        self.assertIn("Log destination dir do not exist", str(context.exception))
+        self.assertIn(
+            "Log destination dir do not exist", str(context.exception)
+        )
 
 
 # ==============================================================================

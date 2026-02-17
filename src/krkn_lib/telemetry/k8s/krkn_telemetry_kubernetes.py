@@ -504,7 +504,7 @@ class KrknTelemetryKubernetes:
         :param uploaded_file_list: uploaded file list shared between threads
         :param max_retries: maximum number of retries from config.yaml.
             If 0 will retry indefinitely.
-        :param remote_file_prefix: the prefix that will given to the file
+        :param remote_file_prefix: the prefix that will be given to the file
             in the S3 bucket along with the progressive number
             (if is a multiple file archive)
         :param remote_file_extension: the extension of the remote

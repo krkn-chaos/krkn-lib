@@ -1,13 +1,12 @@
 import time
 import unittest
 
-
-from krkn_lib.models.k8s import PodsStatus, AffectedPod
+from krkn_lib.models.k8s import AffectedPod, PodsStatus
 from krkn_lib.models.pod_monitor.models import (
-    PodEvent,
-    PodStatus,
     MonitoredPod,
+    PodEvent,
     PodsSnapshot,
+    PodStatus,
 )
 
 
@@ -186,21 +185,23 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         parent_pod = MonitoredPod()
         parent_pod.name = "parent-pod"
         parent_pod.namespace = "parent-ns"
-        deletion_event = PodEvent()
+        deletion_ts = time.time() - 20
+        deletion_event = PodEvent(
+            timestamp=deletion_ts
+        )
         deletion_event.status = PodStatus.DELETION_SCHEDULED
-        deletion_event._timestamp = time.time() - 20
         parent_pod.status_changes.append(deletion_event)
 
         rescheduled_pod = MonitoredPod()
         rescheduled_pod.name = "rescheduled-pod"
         rescheduled_pod.namespace = "parent-ns"
-        added_event = PodEvent()
+        added_ts = time.time() - 10
+        added_event = PodEvent(timestamp=added_ts)
         added_event.status = PodStatus.ADDED
         added_event.parent = "parent-pod"
-        added_event._timestamp = time.time() - 10
-        ready_event = PodEvent()
+        ready_ts = time.time()
+        ready_event = PodEvent(timestamp=ready_ts)
         ready_event.status = PodStatus.READY
-        ready_event._timestamp = time.time()
         rescheduled_pod.status_changes.extend([added_event, ready_event])
 
         snapshot.initial_pods = ["parent-pod"]
@@ -219,9 +220,11 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         self.assertAlmostEqual(
             recovered_pod.pod_rescheduling_time, 10.0, delta=0.001
         )
+        # Readiness time is from pod added to ready: 10 seconds
         self.assertAlmostEqual(
             recovered_pod.pod_readiness_time, 20.0, delta=0.001
         )
+        # Total is rescheduling + readiness: 10 + 10 = 20 seconds
         self.assertAlmostEqual(
             recovered_pod.total_recovery_time, 30.0, delta=0.001
         )
@@ -399,7 +402,8 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         self.assertTrue(len(status.recovered), 1)
         self.assertTrue(status.recovered[0].pod_readiness_time > 0)
         # Tests a real case where the pod has been rescheduled before
-        # The event of the deletion has been emitted measuring a negative
-        # rescheduling time.
-        self.assertTrue(status.recovered[0].pod_rescheduling_time < 0)
+        # The event of the deletion has been emitted. This would have
+        # measured a negative rescheduling time, but we now clamp to 0
+        # to handle timing anomalies gracefully.
+        self.assertEqual(status.recovered[0].pod_rescheduling_time, 0)
         self.assertTrue(status.recovered[0].total_recovery_time > 0)
