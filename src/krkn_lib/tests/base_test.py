@@ -540,6 +540,14 @@ class BaseTest(unittest.TestCase):
                             "terminating_time": 0,
                         }
                     ],
+                    "overall_resiliency_report": {
+                        "scenarios": {
+                            "example_scenario.yaml": 95
+                        },
+                        "resiliency_score": 90,
+                        "passed_slos": 4,
+                        "total_slos": 5,
+                    },
                 }
             ],
             "node_summary_infos": [

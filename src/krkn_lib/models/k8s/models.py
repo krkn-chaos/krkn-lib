@@ -380,3 +380,40 @@ class NodeResources:
         self.memory = 0
         self.cpu = 0
         self.disk_space = 0
+
+class ResiliencyReport:
+    """
+    Resiliency report containing scenario scores and SLO metrics
+    """
+
+    scenarios: dict[str, int]
+    """
+    Dictionary mapping scenario names to their resiliency scores
+    """
+    resiliency_score: int
+    """
+    Overall resiliency score across all scenarios
+    """
+    passed_slos: int
+    """
+    Number of SLOs that passed
+    """
+    total_slos: int
+    """
+    Total number of SLOs evaluated
+    """
+
+    def __init__(
+        self,
+        json_object: dict = None,
+        resiliency_score: int = 0,
+        passed_slos: int = 0,
+        total_slos: int = 0
+    ):
+        self.scenarios = {}
+        self.resiliency_score = resiliency_score
+        self.passed_slos = passed_slos
+        self.total_slos = total_slos
+        if json_object and "scenarios" in json_object:
+            self.scenarios = json_object["scenarios"]
+

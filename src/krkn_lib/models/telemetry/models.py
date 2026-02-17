@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import AffectedNode, PodsStatus
+from krkn_lib.models.k8s import AffectedNode, PodsStatus, ResiliencyReport
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [
@@ -89,6 +89,10 @@ class ScenarioTelemetry:
     """
     Cluster events collected during the chaos run
     """
+    overall_resiliency_report: ResiliencyReport
+    """
+    Resiliency score and report
+    """
 
     def set_cluster_events(self, events: list[ClusterEvent]):
         """
@@ -134,6 +138,17 @@ class ScenarioTelemetry:
             else:
                 self.cluster_events = []
 
+            if json_object.get("overall_resiliency_report"):
+                report_data = json_object.get("overall_resiliency_report")
+                self.overall_resiliency_report = ResiliencyReport(
+                    json_object=report_data,
+                    resiliency_score=report_data.get("resiliency_score", 0),
+                    passed_slos=report_data.get("passed_slos", 0),
+                    total_slos=report_data.get("total_slos", 0)
+                )
+            else:
+                self.overall_resiliency_report = ResiliencyReport()
+
             if (
                 self.parameters_base64 is not None
                 and self.parameters_base64 != ""
@@ -165,6 +180,7 @@ class ScenarioTelemetry:
             self.affected_pods = PodsStatus()
             self.affected_nodes = []
             self.cluster_events = []
+            self.overall_resiliency_report = ResiliencyReport()
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
