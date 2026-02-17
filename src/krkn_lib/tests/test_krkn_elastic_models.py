@@ -274,6 +274,25 @@ class TestKrknElasticModels(BaseTest):
             "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",
         )
 
+        # error_logs validation
+        self.assertEqual(len(elastic_telemetry.error_logs), 2)
+        self.assertEqual(
+            elastic_telemetry.error_logs[0].timestamp,
+            "2023-05-22T14:55:05Z"
+        )
+        self.assertEqual(
+            elastic_telemetry.error_logs[0].message,
+            "Pod pod1 failed to start: ImagePullBackOff"
+        )
+        self.assertEqual(
+            elastic_telemetry.error_logs[1].timestamp,
+            "2023-05-22T14:55:10Z"
+        )
+        self.assertEqual(
+            elastic_telemetry.error_logs[1].message,
+            "Node kind-control-plane became NotReady"
+        )
+
     def test_ElasticChaosRunTelemetry(self):
         run_uuid = str(uuid.uuid4())
         example_data = self.get_ChaosRunTelemetry_json(run_uuid)
@@ -291,3 +310,29 @@ class TestKrknElasticModels(BaseTest):
         self.check_test_ElasticChaosRunTelemetry(
             elastic_telemetry_dic, run_uuid
         )
+
+    def test_elastic_error_logs_conversion_from_none(self):
+        """Test that conversion handles None error_logs gracefully"""
+        run_uuid = str(uuid.uuid4())
+        example_data = self.get_ChaosRunTelemetry_json(run_uuid)
+        # Set error_logs to None
+        example_data["error_logs"] = None
+
+        telemetry = ChaosRunTelemetry(json_dict=example_data)
+        elastic_telemetry = ElasticChaosRunTelemetry(
+            chaos_run_telemetry=telemetry
+        )
+
+        self.assertIsNone(elastic_telemetry.error_logs)
+
+    def test_elastic_error_logs_conversion_from_empty_list(self):
+        """Test empty list handling in conversion"""
+        run_uuid = str(uuid.uuid4())
+        example_data = self.get_ChaosRunTelemetry_json(run_uuid)
+        example_data["error_logs"] = []
+
+        telemetry = ChaosRunTelemetry(json_dict=example_data)
+        elastic_telemetry = ElasticChaosRunTelemetry(
+            chaos_run_telemetry=telemetry
+        )
+        self.assertIsNone(elastic_telemetry.error_logs)
