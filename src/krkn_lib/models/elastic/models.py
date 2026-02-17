@@ -102,6 +102,13 @@ class ElasticScenarioParameters(InnerDoc):
     pass
 
 
+class ElasticResiliencyReport(InnerDoc):
+    scenarios = Nested(InnerDoc)
+    resiliency_score = Integer()
+    passed_slos = Integer()
+    total_slos = Integer()
+
+
 class ElasticScenarioTelemetry(InnerDoc):
     start_timestamp = Float()
     end_timestamp = Float()
@@ -112,6 +119,7 @@ class ElasticScenarioTelemetry(InnerDoc):
     parameters = Nested(ElasticScenarioParameters)
     affected_pods = Nested(ElasticPodsStatus)
     affected_nodes = Nested(ElasticAffectedNodes, multi=True)
+    overall_resiliency_report = Nested(ElasticResiliencyReport)
 
 
 class ElasticNodeInfo(InnerDoc):
@@ -230,6 +238,20 @@ class ElasticChaosRunTelemetry(Document):
                     )
                     for node in sc.affected_nodes
                 ],
+                overall_resiliency_report=(
+                    ElasticResiliencyReport(
+                        scenarios=(
+                            sc.overall_resiliency_report.scenarios
+                        ),
+                        resiliency_score=(
+                            sc.overall_resiliency_report.resiliency_score
+                        ),
+                        passed_slos=sc.overall_resiliency_report.passed_slos,
+                        total_slos=sc.overall_resiliency_report.total_slos,
+                    )
+                    if sc.overall_resiliency_report
+                    else None
+                ),
             )
             for sc in chaos_run_telemetry.scenarios
         ]
