@@ -67,7 +67,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/infrastructures/cluster"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -113,7 +113,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/infrastructures/cluster"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -149,7 +149,7 @@ class KrknOpenshift(KrknKubernetes):
                 )
 
                 path = "/apis/config.openshift.io/v1/networks"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
@@ -442,7 +442,7 @@ class KrknOpenshift(KrknKubernetes):
                 ["application/json"]
             )
 
-            (data) = self.api_client.call_api(
+            data = self.api_client.call_api(
                 path,
                 "GET",
                 path_params,

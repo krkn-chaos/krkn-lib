@@ -167,10 +167,16 @@ class KrknKubernetes:
                 os.environ["HTTP_PROXY"] = http_proxy
                 self.client_config.proxy = http_proxy
                 proxy_auth = urlparse(http_proxy)
-                auth_string = proxy_auth.username + ":" + proxy_auth.password
-                self.client_config.proxy_headers = urllib3.util.make_headers(
-                    proxy_basic_auth=auth_string
-                )
+                if (
+                    proxy_auth.username is not None
+                    and proxy_auth.password is not None
+                ):
+                    auth_string = (
+                        proxy_auth.username + ":" + proxy_auth.password
+                    )
+                    self.client_config.proxy_headers = (
+                        urllib3.util.make_headers(proxy_basic_auth=auth_string)
+                    )
 
             client.Configuration.set_default(self.client_config)
             self.watch_resource = watch.Watch()
@@ -193,7 +199,7 @@ class KrknKubernetes:
         on other distributions
 
         *** IT MUST BE CONSIDERED A PRIVATE METHOD (CANNOT USE
-        *** DOUBLE UNDERSCORE TO MANTAIN IT VISIBLE ON SUB-CLASSES)
+        *** DOUBLE UNDERSCORE TO MAINTAIN IT VISIBLE ON SUB-CLASSES)
         *** USED IN KrknKubernetes and KrknOpenshift TO AUTODETECT
         *** THE CLUSTER TYPE
 
@@ -245,7 +251,10 @@ class KrknKubernetes:
             minor_version = api_response.minor
             return major_version + "." + minor_version
         except ApiException as e:
-            print("Exception when calling VersionApi->get_code: %s\n" % e)
+            logging.error(
+                "Exception when calling VersionApi->get_code: %s", str(e)
+            )
+            raise e
 
     def get_host(self) -> str:
         """
@@ -765,13 +774,13 @@ class KrknKubernetes:
         self, label_selector: str = None, field_selector: str = None
     ) -> list[[str, str]]:
         """
-        Return a list of tuples containing pod name [0] and namespace [1]
+        Return a list of lists containing pod name [0] and namespace [1]
 
         :param label_selector: filter by label_selector
             (optional default `None`)
         :param field_selector: filter results by config details
             select only running pods by setting "status.phase=Running"
-        :return: list of tuples pod,namespace
+        :return: list of lists [pod, namespace]
         """
         pods = []
         if label_selector:
@@ -882,7 +891,7 @@ class KrknKubernetes:
             services.append(serv.metadata.name)
         return services
 
-    # Outputs a json blob with informataion about all pods in a given namespace
+    # Outputs a json blob with information about all pods in a given namespace
     def get_all_pod_info(
         self,
         namespace: str = "default",
@@ -986,7 +995,7 @@ class KrknKubernetes:
         :param command: command parameters list or full command string
             if the command must be piped to `bash -c`
             (in that case `base_command` parameter
-            must is omitted`)
+            must be omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command
@@ -1046,7 +1055,7 @@ class KrknKubernetes:
         :param command: command parameters list or full command string
             if the command must be piped to `bash -c`
             (in that case `base_command` parameter
-            must is omitted`)
+            must be omitted`)
         :param pod_name: pod where the command must be executed
         :param namespace: namespace of the pod
         :param container: container where the command
@@ -1101,7 +1110,7 @@ class KrknKubernetes:
                 )
         except Exception as e:
             raise e
-        # apparently stream API doesn't rise an Exception
+        # apparently stream API doesn't raise an Exception
         # if the command fails to be executed
 
         if "OCI runtime exec failed" in ret:
@@ -1511,7 +1520,6 @@ class KrknKubernetes:
                 version="v1",
                 namespace=namespace,
                 plural="virtualmachineinstances",
-                name=name,
                 body=vmi_body,
             )
             return vmi
@@ -1643,25 +1651,25 @@ class KrknKubernetes:
         :return: The Snapshot object if found, None otherwise
         """
         try:
-            vmi = self.custom_object_client.get_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
+            snapshot = self.custom_object_client.get_namespaced_custom_object(
+                group="snapshot.kubevirt.io",
+                version="v1beta1",
                 namespace=namespace,
-                plural="VirtualMachineSnapshot",
+                plural="virtualmachinesnapshots",
                 name=name,
             )
-            return vmi
+            return snapshot
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VMI {name} not found in namespace {namespace}"
+                    f"SnapShot {name} not found in namespace {namespace}"
                 )
                 return None
             else:
-                logging.error(f"Error getting VMI {name}: {e}")
+                logging.error(f"Error getting snapshot {name}: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VMI {name}: {e}")
+            logging.error(f"Unexpected error getting snapshot {name}: {e}")
             raise
 
     def create_snapshot(
@@ -1684,24 +1692,20 @@ class KrknKubernetes:
                     name=name, namespace=namespace, vm_name=vm_name
                 )
             )
-            vmi = self.custom_object_client.create_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
-                namespace=namespace,
-                plural="VirtualMachineSnapshot",
-                name=name,
-                body=ss_body,
-            )
-            return vmi
-        except ApiException as e:
-            if e.status == 404:
-                logging.warning(
-                    f"Snapshot {name} not found in namespace {namespace}"
+            snapshot = (
+                self.custom_object_client.create_namespaced_custom_object(
+                    group="snapshot.kubevirt.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="virtualmachinesnapshots",
+                    body=ss_body,
                 )
-                return None
-            else:
-                logging.error(f"Error creating Snapshot {name}: {e}")
-                raise
+            )
+            return snapshot
+        except ApiException as e:
+
+            logging.error(f"Error creating Snapshot {name}: {e}")
+            raise
         except Exception as e:
             logging.error(f"Unexpected error creating Snapshot {name}: {e}")
             raise
@@ -1786,20 +1790,18 @@ class KrknKubernetes:
 
     def delete_snapshot(self, snapshot_name: str, namespace: str):
         """Helper method to delete any snapshot created by the scenario."""
-        self.logger.info(f"Deleting snapshot '{self.snapshot_name}'...")
+        logging.info(f"Deleting snapshot '{snapshot_name}'...")
         try:
             self.custom_object_client.delete_namespaced_custom_object(
-                group="kubevirt.io",
-                version="v1",
+                group="snapshot.kubevirt.io",
+                version="v1beta1",
                 namespace=namespace,
-                plural="VirtualMachineSnapshot",
+                plural="virtualmachinesnapshots",
                 name=snapshot_name,
             )
-            self.logger.info(
-                f"Snapshot '{self.snapshot_name}' deleted successfully."
-            )
+            logging.info(f"Snapshot '{snapshot_name}' deleted successfully.")
         except Exception as e:
-            self.logger.warning(
+            logging.warning(
                 "Failed to delete snapshot, "
                 f"might have been already deleted: {e}"
             )
@@ -1826,6 +1828,7 @@ class KrknKubernetes:
                     str(e),
                 )
                 raise e
+            node_ready_status = "False"
             for condition in node_info.status.conditions:
                 if condition.type == "KernelDeadlock":
                     node_kerneldeadlock_status = condition.status
@@ -1960,13 +1963,14 @@ class KrknKubernetes:
                         )
                     )
 
-                for i, container in enumerate(
-                    response.status.container_statuses
-                ):
-                    container_list[i].ready = container.ready
-                    container_list[i].containerId = (
-                        response.status.container_statuses[i].container_id
-                    )
+                if response.status.container_statuses:
+                    for i, container in enumerate(
+                        response.status.container_statuses
+                    ):
+                        container_list[i].ready = container.ready
+                        container_list[i].containerId = (
+                            response.status.container_statuses[i].container_id
+                        )
 
                 # Create a list of volumes associated with the pod
                 volume_list = []
@@ -2399,7 +2403,7 @@ class KrknKubernetes:
                         )
 
                         path = f"/api/{api_version}/{resource.name}"
-                        (data) = self.api_client.call_api(
+                        data = self.api_client.call_api(
                             path,
                             "GET",
                             path_params,
@@ -2563,7 +2567,6 @@ class KrknKubernetes:
                     node_info.nodes_type = "unknown"
 
                 node_info.architecture = node.status.node_info.architecture
-                node_info.architecture = node.status.node_info.architecture
                 node_info.kernel_version = node.status.node_info.kernel_version
                 node_info.kubelet_version = (
                     node.status.node_info.kubelet_version
@@ -2649,7 +2652,7 @@ class KrknKubernetes:
             sequential number of the archive assigned to the worker
             and the extension tar.b64
         :param queue: the queue from which the sequential
-            number wil be popped
+            number will be popped
         :param queue_size: total size of the queue
         :param downloaded_file_list: the list of
             archive number and local filename  downloaded
@@ -2771,7 +2774,7 @@ class KrknKubernetes:
             where the temporary archive
             will be stored (will be deleted once the download
             terminates, must be writable
-            and must have enough space to temporarly store the archive)
+            and must have enough space to temporarily store the archive)
         :param target_path: the path that will be archived
             and downloaded from the container
         :param archive_files_prefix: prefix string that will be added
@@ -3034,7 +3037,7 @@ class KrknKubernetes:
             ["application/json"]
         )
         try:
-            (data) = self.api_client.call_api(
+            data = self.api_client.call_api(
                 path,
                 "POST",
                 path_params,
@@ -3275,7 +3278,7 @@ class KrknKubernetes:
             default 5000
         :param port_name: the port name if the Service is pointing to
             a string name instead of a port number
-        :param stats_route: overrides the defautl route where the stats
+        :param stats_route: overrides the default route where the stats
             action will be mapped, change it only if you have a /stats
             route in your test_plan
         :return: a structure containing all the infos of the
@@ -3340,7 +3343,7 @@ class KrknKubernetes:
 
     def service_exists(self, service_name: str, namespace: str) -> bool:
         """
-        Checks wheter a kubernetes Service exist or not
+        Checks whether a kubernetes Service exist or not
         :param service_name: the name of the service to check
         :param namespace: the namespace where the service should exist
         :return: True if the service exists, False if not
@@ -3453,7 +3456,7 @@ class KrknKubernetes:
             ["application/json"]
         )
         path = f"/api/v1/nodes/{node_name}/proxy/stats/summary"
-        (data) = self.api_client.call_api(
+        data = self.api_client.call_api(
             path,
             "GET",
             path_params,

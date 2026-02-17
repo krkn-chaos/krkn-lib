@@ -269,6 +269,129 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         except Exception:
             self.fail("constructor raised Exception unexpectedly!")
 
+    def test_chaos_run_telemetry_with_error_logs(self):
+        """Test error_logs field is properly parsed from JSON and serialized"""
+        test_json_with_error_logs = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            }],
+            "node_summary_infos": [],
+            "node_taints": [],
+            "error_logs": [
+                {
+                    "timestamp": "2023-05-22T14:55:05Z",
+                    "message": "Pod pod1 failed to start: ImagePullBackOff"
+                },
+                {
+                    "timestamp": "2023-05-22T14:55:10Z",
+                    "message": "Node kind-control-plane became NotReady"
+                }
+            ]
+        }
+        """  # NOQA
+        json_obj = json.loads(test_json_with_error_logs)
+        telemetry = ChaosRunTelemetry(json_obj)
+
+        # Verify error_logs are properly parsed
+        self.assertIsNotNone(telemetry.error_logs)
+        self.assertEqual(len(telemetry.error_logs), 2)
+        self.assertEqual(
+            telemetry.error_logs[0]["timestamp"], "2023-05-22T14:55:05Z"
+        )
+        self.assertEqual(
+            telemetry.error_logs[0]["message"],
+            "Pod pod1 failed to start: ImagePullBackOff",
+        )
+        self.assertEqual(
+            telemetry.error_logs[1]["timestamp"], "2023-05-22T14:55:10Z"
+        )
+        self.assertEqual(
+            telemetry.error_logs[1]["message"],
+            "Node kind-control-plane became NotReady",
+        )
+
+        # Verify to_json() includes error_logs
+        json_str = telemetry.to_json()
+        self.assertIsNotNone(json_str)
+        self.assertIn("error_logs", json_str)
+        self.assertIn("ImagePullBackOff", json_str)
+
+    def test_chaos_run_telemetry_error_logs_edge_cases(self):
+        """Test error_logs field handles edge cases properly"""
+        # Test with empty error_logs list
+        test_json_empty_error_logs = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            }],
+            "node_summary_infos": [],
+            "node_taints": [],
+            "error_logs": []
+        }
+        """  # NOQA
+        json_obj = json.loads(test_json_empty_error_logs)
+        telemetry = ChaosRunTelemetry(json_obj)
+        self.assertIsNotNone(telemetry.error_logs)
+        self.assertEqual(len(telemetry.error_logs), 0)
+
+        # Test with error_logs field missing from JSON
+        test_json_missing_error_logs = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            }],
+            "node_summary_infos": [],
+            "node_taints": []
+        }
+        """  # NOQA
+        json_obj = json.loads(test_json_missing_error_logs)
+        telemetry = ChaosRunTelemetry(json_obj)
+        # When missing, error_logs should be None (from json_dict.get())
+        self.assertIsNone(telemetry.error_logs)
+
+        # Test with error_logs explicitly set to None in JSON
+        test_json_null_error_logs = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": "cHJvcGVydHk6CiAgICB1bml0OiB1bml0CiAgICB0ZXN0OiB0ZXN0"
+            }],
+            "node_summary_infos": [],
+            "node_taints": [],
+            "error_logs": null
+        }
+        """  # NOQA
+        json_obj = json.loads(test_json_null_error_logs)
+        telemetry = ChaosRunTelemetry(json_obj)
+        self.assertIsNone(telemetry.error_logs)
+
+    def test_chaos_run_telemetry_empty_constructor_has_error_logs(self):
+        """Test error_logs is initialized when using empty constructor"""
+        telemetry = ChaosRunTelemetry()
+        self.assertTrue(hasattr(telemetry, "error_logs"))
+        self.assertIsNotNone(telemetry.error_logs)
+        self.assertEqual(telemetry.error_logs, [])
+
     def test_cluster_event(self):
 
         k8s_json = r"""

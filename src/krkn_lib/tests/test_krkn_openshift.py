@@ -24,7 +24,6 @@ from krkn_lib.ocp.krkn_openshift import KrknOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
 
-
 # ==============================================================================
 # UNIT TESTS (Mocked - No external dependencies)
 # ==============================================================================

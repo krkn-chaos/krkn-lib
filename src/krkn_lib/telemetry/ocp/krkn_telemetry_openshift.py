@@ -244,7 +244,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 )
 
                 path = "/apis/kubevirt.io/v1/virtualmachineinstances"
-                (data) = api_client.call_api(
+                data = api_client.call_api(
                     path,
                     "GET",
                     path_params,
