@@ -17,6 +17,7 @@ import os
 import tempfile
 import unittest
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import Mock, PropertyMock, patch
 
 from krkn_lib.ocp.krkn_openshift import KrknOpenshift
@@ -48,6 +49,18 @@ class TestKrknOpenshiftInit(unittest.TestCase):
         finally:
             if os.path.exists(temp_kubeconfig):
                 os.unlink(temp_kubeconfig)
+
+    def test_init_with_kubeconfig_string(self):
+        """Test initialization with kubeconfig"""
+        kubeconfig = os.environ.get(
+            "KUBECONFIG", str(Path.home() / ".kube" / "config")
+        )
+        path = Path(kubeconfig)
+        kubeconfig_content = path.read_text(encoding="utf-8")
+
+        ocp = KrknOpenshift(kubeconfig_string=kubeconfig_content)
+        nodes = ocp.list_nodes()
+        self.assertTrue(len(nodes) > 0)
 
     @patch("krkn_lib.k8s.krkn_kubernetes.config")
     def test_init_without_kubeconfig(self, mock_config):
