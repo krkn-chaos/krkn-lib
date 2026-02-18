@@ -228,7 +228,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         increase_baseline = 70
         nodes = self.lib_k8s.list_nodes()
         node_cpus = self.lib_k8s.get_node_cpu_count(nodes[0])
-        node_resources_start = self.lib_k8s.get_node_resources_info(nodes[0])
+        resources_start = self.lib_k8s.get_node_resources_info(nodes[0])
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
         namespace = f"test-hog-pod-{self.get_random_string(5)}"
         self.deploy_namespace(namespace, labels=[])
@@ -253,8 +253,8 @@ class KrknKubernetesTestsMisc(BaseTest):
             continue
 
         time.sleep(19)
-        node_resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
-        cpu_delta = node_resources_after.cpu / node_resources_start.cpu * 100
+        resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
+        cpu_delta = resources_after.cpu / resources_start.cpu * 100
         print(f"DETECTED CPU PERCENTAGE INCREASE: {cpu_delta/node_cpus}%")
         self.assertGreaterEqual(cpu_delta, increase_baseline * node_cpus)
 
@@ -272,8 +272,9 @@ class KrknKubernetesTestsMisc(BaseTest):
             continue
         # grabbing the peak during the 20s chaos run
         time.sleep(19)
-        node_resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
-        memory_delta = node_resources_after.memory / node_resources_start.memory * 100
+        resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
+        divide_start = resources_after.memory / resources_start.memory
+        memory_delta = divide_start * 100
         print(f"DETECTED MEMORY PERCENTAGE INCREASE: {memory_delta}%")
         self.assertGreaterEqual(memory_delta, increase_baseline)
 
@@ -291,8 +292,8 @@ class KrknKubernetesTestsMisc(BaseTest):
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
         time.sleep(29)
-        node_resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
-        disk_delta = node_resources_start.disk_space - node_resources_after.disk_space
+        resources_after = self.lib_k8s.get_node_resources_info(nodes[0])
+        disk_delta = resources_start.disk_space - resources_after.disk_space
         print(f"DISK SPACE ALLOCATED (MB): {disk_delta/1024/1024}")
 
         # testing that at least 300MB on 512 are written

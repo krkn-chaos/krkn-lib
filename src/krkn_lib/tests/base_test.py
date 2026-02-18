@@ -546,14 +546,6 @@ class BaseTest(unittest.TestCase):
                             "terminating_time": 0,
                         }
                     ],
-                    "overall_resiliency_report": {
-                        "scenarios": {
-                            "example_scenario.yaml": 95
-                        },
-                        "resiliency_score": 90,
-                        "passed_slos": 4,
-                        "total_slos": 5,
-                    },
                 }
             ],
             "node_summary_infos": [
@@ -646,12 +638,18 @@ class BaseTest(unittest.TestCase):
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",
-                    "message": "Pod pod1 failed to start: ImagePullBackOff"
+                    "message": "Pod pod1 failed to start: ImagePullBackOff",
                 },
                 {
                     "timestamp": "2023-05-22T14:55:10Z",
-                    "message": "Node kind-control-plane became NotReady"
-                }
+                    "message": "Node kind-control-plane became NotReady",
+                },
             ],
+            "overall_resiliency_report": {
+                "scenarios": {"example_scenario.yaml": 95},
+                "resiliency_score": 90,
+                "passed_slos": 4,
+                "total_slos": 5,
+            },
         }
         return example_data
