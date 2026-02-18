@@ -3424,7 +3424,8 @@ class KrknKubernetes:
         :param name: Pod name
         :param namespace: Namespace to deploy pod
         :param image: Container image
-        :param targets_json_base64: Base64-encoded newline-delimited Vegeta JSON targets
+        :param targets_json_base64: Base64-encoded newline-delimited
+            Vegeta JSON targets
         :param duration: Attack duration (e.g., "30s", "5m")
         :param rate: Request rate (e.g., "50/1s", "1000/1m")
         :param workers: Initial number of concurrent workers
