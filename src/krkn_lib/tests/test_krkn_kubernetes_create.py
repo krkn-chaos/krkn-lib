@@ -96,9 +96,9 @@ class KrknKubernetesTestsCreate(BaseTest):
             )
 
             time.sleep(2)
-
+            cli = self.lib_k8s.cli
             # Verify ConfigMap exists
-            cm = self.lib_k8s.cli.read_namespaced_config_map(cm_name, namespace)
+            cm = cli.read_namespaced_config_map(cm_name, namespace)
             self.assertIsNotNone(cm)
             self.assertEqual(cm.metadata.name, cm_name)
         except Exception as e:

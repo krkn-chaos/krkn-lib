@@ -139,36 +139,6 @@ class TestKrknElasticModels(BaseTest):
             0,
         )
 
-        # overall_resiliency_report
-        self.assertIsNotNone(
-            elastic_telemetry.scenarios[0].overall_resiliency_report
-        )
-        self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .overall_resiliency_report.resiliency_score,
-            90,
-        )
-        self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .overall_resiliency_report.passed_slos,
-            4,
-        )
-        self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .overall_resiliency_report.total_slos,
-            5,
-        )
-        self.assertIsNotNone(
-            elastic_telemetry.scenarios[0]
-            .overall_resiliency_report.scenarios
-        )
-        self.assertEqual(
-            elastic_telemetry.scenarios[0]
-            .overall_resiliency_report.scenarios.to_dict()
-            .get("example_scenario.yaml"),
-            95,
-        )
-
         # node_summary_infos
         self.assertEqual(len(elastic_telemetry.node_summary_infos), 1)
 
@@ -307,20 +277,40 @@ class TestKrknElasticModels(BaseTest):
         # error_logs validation
         self.assertEqual(len(elastic_telemetry.error_logs), 2)
         self.assertEqual(
-            elastic_telemetry.error_logs[0].timestamp,
-            "2023-05-22T14:55:05Z"
+            elastic_telemetry.error_logs[0].timestamp, "2023-05-22T14:55:05Z"
         )
         self.assertEqual(
             elastic_telemetry.error_logs[0].message,
-            "Pod pod1 failed to start: ImagePullBackOff"
+            "Pod pod1 failed to start: ImagePullBackOff",
         )
         self.assertEqual(
-            elastic_telemetry.error_logs[1].timestamp,
-            "2023-05-22T14:55:10Z"
+            elastic_telemetry.error_logs[1].timestamp, "2023-05-22T14:55:10Z"
         )
         self.assertEqual(
             elastic_telemetry.error_logs[1].message,
-            "Node kind-control-plane became NotReady"
+            "Node kind-control-plane became NotReady",
+        )
+
+        # overall_resiliency_report validation
+        overall_report = elastic_telemetry.overall_resiliency_report
+        self.assertIsNotNone(overall_report)
+        self.assertEqual(
+            overall_report.resiliency_score, 90
+        )
+        self.assertEqual(
+            overall_report.passed_slos, 4
+        )
+        self.assertEqual(
+            overall_report.total_slos, 5
+        )
+        self.assertIsNotNone(
+            overall_report.scenarios
+        )
+        self.assertEqual(
+            overall_report.scenarios.to_dict().get(
+                "example_scenario.yaml"
+            ),
+            95,
         )
 
     def test_ElasticChaosRunTelemetry(self):

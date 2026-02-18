@@ -381,6 +381,7 @@ class NodeResources:
         self.cpu = 0
         self.disk_space = 0
 
+
 class ResiliencyReport:
     """
     Resiliency report containing scenario scores and SLO metrics
@@ -416,4 +417,3 @@ class ResiliencyReport:
         self.total_slos = total_slos
         if json_object and "scenarios" in json_object:
             self.scenarios = json_object["scenarios"]
-
