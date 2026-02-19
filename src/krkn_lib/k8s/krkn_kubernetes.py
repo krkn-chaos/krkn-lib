@@ -217,11 +217,8 @@ class KrknKubernetes:
                     if condition["type"] == "Available":
                         return condition["message"].split(" ")[-1]
             return ""
-        except client.exceptions.ApiException as e:
-            if e.status == 404:
-                return ""
-            else:
-                raise e
+        except Exception:
+            return ""
 
     def is_kubernetes(self) -> bool:
         """
