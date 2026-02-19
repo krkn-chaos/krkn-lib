@@ -18,8 +18,9 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock, MagicMock, PropertyMock, patch
 
+from kubernetes.client import ApiException
 from krkn_lib.ocp.krkn_openshift import KrknOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
@@ -137,6 +138,25 @@ class TestIsOpenshift(unittest.TestCase):
 
         self.assertFalse(result)
 
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_returns_empty_on_404(self, mock_client_prop):
+        mock_client = MagicMock()
+        mock_client.list_cluster_custom_object.side_effect = ApiException(status=404)
+        mock_client_prop.return_value = mock_client
+
+        result = self.ocp._get_clusterversion_string()
+        self.assertEqual(result, "")
+
+    # Related Issue: https://github.com/krkn-chaos/krkn-lib/issues/254
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_returns_empty_on_connection_error(self, mock_client_prop):
+        mock_client = MagicMock()
+        mock_client.list_cluster_custom_object.side_effect = Exception("connection error")
+        mock_client_prop.return_value = mock_client
+
+        result = self.ocp._get_clusterversion_string()
+        self.assertEqual(result, "")
+        self.assertFalse(self.ocp.is_openshift())
 
 class TestGetClusterType(unittest.TestCase):
     """Test get_cluster_type method with PropertyMock."""
