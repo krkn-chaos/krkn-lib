@@ -5,11 +5,13 @@ import shutil
 import subprocess
 import tarfile
 import threading
+import yaml
 from collections import namedtuple
 from pathlib import Path
 from queue import Queue
 from typing import Optional
 
+from kubernetes.client import ApiException
 from tzlocal import get_localzone
 
 from krkn_lib.k8s import KrknKubernetes
@@ -168,6 +170,99 @@ class KrknOpenshift(KrknKubernetes):
                 )
                 network_plugins.append("Unknown")
         return network_plugins
+
+    def is_fips_enabled(self) -> bool:
+        """
+        Check if FIPS (Federal Information Processing Standards)
+        is enabled in the cluster.
+
+        FIPS is detected by checking the cluster-config-v1 ConfigMap
+        in the kube-system namespace, which contains the install-config
+        with the fips setting.
+
+        :return: True if FIPS is enabled, False otherwise
+        """
+        try:
+            # Read the cluster-config-v1 ConfigMap from kube-system
+            configmap = self.cli.read_namespaced_config_map(
+                name="cluster-config-v1",
+                namespace="kube-system"
+            )
+
+            # Get the install-config data field
+            install_config_yaml = configmap.data.get("install-config", "")
+            if not install_config_yaml:
+                return False
+
+            # Parse the YAML to get the fips setting
+            install_config = yaml.safe_load(install_config_yaml)
+            fips_enabled = install_config.get("fips", False)
+
+            return fips_enabled is True
+        except ApiException as e:
+            logging.warning("Failed to check FIPS status -> %s", str(e))
+            return False
+
+    def is_etcd_encryption_enabled(self) -> bool:
+        """
+        Check if etcd encryption is enabled in the cluster.
+
+        This is determined by checking the APIServer configuration
+        for encryption settings.
+
+        :return: True if etcd encryption is enabled, False otherwise
+        """
+        try:
+            # Get APIServer custom resource using typed API
+            api_server = self.custom_object_client.get_cluster_custom_object(
+                group="config.openshift.io",
+                version="v1",
+                plural="apiservers",
+                name="cluster",
+            )
+
+            # Check if encryption type is set
+            # (aescbc or aesgcm indicates encryption is enabled)
+            encryption_spec = api_server.get("spec", {}).get(
+                "encryption", {}
+            )
+            encryption_type = encryption_spec.get("type", "")
+            return encryption_type.lower() in ["aescbc", "aesgcm"]
+        except ApiException as e:
+            logging.warning(
+                "Failed to check etcd encryption status -> %s", str(e)
+            )
+            return False
+
+    def is_ipsec_enabled(self) -> bool:
+        """
+        Check if IPsec is enabled in the cluster.
+
+        This is determined by checking if the ovn-ipsec daemonset
+        exists and is running in the openshift-ovn-kubernetes
+        namespace.
+
+        :return: True if IPsec is enabled, False otherwise
+        """
+        try:
+            # Check for ovn-ipsec daemonset using typed API
+            daemonset = self.apps_api.read_namespaced_daemon_set(
+                name="ovn-ipsec",
+                namespace="openshift-ovn-kubernetes",
+            )
+
+            # Verify the daemonset has desired pods
+            if daemonset.status and daemonset.status.desired_number_scheduled:
+                return daemonset.status.desired_number_scheduled > 0
+
+            return False
+        except ApiException as e:
+            # DaemonSet not found or other API error
+            logging.debug(
+                "IPsec daemonset not found or error occurred -> %s",
+                str(e),
+            )
+            return False
 
     def filter_must_gather_ocp_log_folder(
         self,

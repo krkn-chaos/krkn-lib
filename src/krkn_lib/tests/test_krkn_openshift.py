@@ -9,6 +9,7 @@ actual OpenShift clusters or external services.
 
 Integration tests use BaseTest and require actual testdata files
 or cluster connections.
+python -m pytest src/krkn_lib/tests/test_krkn_openshift.py
 
 Assisted By: Claude Code
 """
@@ -20,13 +21,15 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, PropertyMock, patch
 
+from kubernetes.client import ApiException
+
 from krkn_lib.ocp.krkn_openshift import KrknOpenshift
 from krkn_lib.tests import BaseTest
 from krkn_lib.utils import SafeLogger
 
-# ==============================================================================
+# ===========================================================================
 # UNIT TESTS (Mocked - No external dependencies)
-# ==============================================================================
+# ===========================================================================
 
 
 class TestKrknOpenshiftInit(unittest.TestCase):
@@ -335,6 +338,277 @@ class TestGetClusterNetworkPlugins(unittest.TestCase):
         self.assertEqual(result, [])
 
 
+class TestIsFipsEnabled(unittest.TestCase):
+    """Test is_fips_enabled method."""
+
+    def setUp(self):
+        with patch("krkn_lib.k8s.krkn_kubernetes.config"):
+            self.ocp = KrknOpenshift()
+
+    @patch.object(KrknOpenshift, "cli", new_callable=PropertyMock)
+    def test_is_fips_enabled_true(self, mock_cli_prop):
+        """Test FIPS enabled detection."""
+        mock_cli = Mock()
+
+        # Mock ConfigMap with install-config containing fips: true
+        mock_configmap = Mock()
+        mock_configmap.data = {"install-config": "fips: true\nother: value\n"}
+
+        mock_cli.read_namespaced_config_map.return_value = mock_configmap
+        mock_cli_prop.return_value = mock_cli
+
+        result = self.ocp.is_fips_enabled()
+
+        self.assertTrue(result)
+        mock_cli.read_namespaced_config_map.assert_called_once_with(
+            name="cluster-config-v1", namespace="kube-system"
+        )
+
+    @patch.object(KrknOpenshift, "cli", new_callable=PropertyMock)
+    def test_is_fips_enabled_false(self, mock_cli_prop):
+        """Test FIPS not enabled."""
+        mock_cli = Mock()
+
+        # Mock ConfigMap with install-config containing fips: false
+        mock_configmap = Mock()
+        mock_configmap.data = {"install-config": "fips: false\nother: value\n"}
+
+        mock_cli.read_namespaced_config_map.return_value = mock_configmap
+        mock_cli_prop.return_value = mock_cli
+
+        result = self.ocp.is_fips_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(KrknOpenshift, "cli", new_callable=PropertyMock)
+    def test_is_fips_enabled_exception(self, mock_cli_prop):
+        """Test exception handling returns False."""
+        mock_cli = Mock()
+        mock_cli.read_namespaced_config_map.side_effect = ApiException(
+            "ConfigMap not found"
+        )
+        mock_cli_prop.return_value = mock_cli
+
+        result = self.ocp.is_fips_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(KrknOpenshift, "cli", new_callable=PropertyMock)
+    def test_is_fips_enabled_no_install_config(self, mock_cli_prop):
+        """Test when ConfigMap has no install-config field."""
+        mock_cli = Mock()
+
+        # Mock ConfigMap with empty data
+        mock_configmap = Mock()
+        mock_configmap.data = {}
+
+        mock_cli.read_namespaced_config_map.return_value = mock_configmap
+        mock_cli_prop.return_value = mock_cli
+
+        result = self.ocp.is_fips_enabled()
+
+        self.assertFalse(result)
+
+
+class TestIsEtcdEncryptionEnabled(unittest.TestCase):
+    """Test is_etcd_encryption_enabled method."""
+
+    def setUp(self):
+        with patch("krkn_lib.k8s.krkn_kubernetes.config"):
+            self.ocp = KrknOpenshift()
+
+    @patch.object(
+        KrknOpenshift, "custom_object_client", new_callable=PropertyMock
+    )
+    def test_is_etcd_encryption_enabled_aescbc(
+        self, mock_custom_object_client_prop
+    ):
+        """Test etcd encryption enabled with aescbc."""
+        mock_custom_object_client = Mock()
+
+        mock_response = {"spec": {"encryption": {"type": "aescbc"}}}
+
+        mock_custom_object_client.get_cluster_custom_object.return_value = (
+            mock_response
+        )
+        mock_custom_object_client_prop.return_value = mock_custom_object_client
+
+        result = self.ocp.is_etcd_encryption_enabled()
+
+        self.assertTrue(result)
+        mock_custom = mock_custom_object_client.get_cluster_custom_object
+        mock_custom.assert_called_once_with(
+            group="config.openshift.io",
+            version="v1",
+            plural="apiservers",
+            name="cluster",
+        )
+
+    @patch.object(
+        KrknOpenshift, "custom_object_client", new_callable=PropertyMock
+    )
+    def test_is_etcd_encryption_enabled_aesgcm(
+        self, mock_custom_object_client_prop
+    ):
+        """Test etcd encryption enabled with aesgcm."""
+        mock_custom_object_client = Mock()
+
+        mock_response = {"spec": {"encryption": {"type": "aesgcm"}}}
+
+        mock_custom_object_client.get_cluster_custom_object.return_value = (
+            mock_response
+        )
+        mock_custom_object_client_prop.return_value = mock_custom_object_client
+
+        result = self.ocp.is_etcd_encryption_enabled()
+
+        self.assertTrue(result)
+
+    @patch.object(
+        KrknOpenshift, "custom_object_client", new_callable=PropertyMock
+    )
+    def test_is_etcd_encryption_enabled_false(
+        self, mock_custom_object_client_prop
+    ):
+        """Test etcd encryption not enabled."""
+        mock_custom_object_client = Mock()
+
+        mock_response = {"spec": {"encryption": {"type": ""}}}
+
+        mock_custom_object_client.get_cluster_custom_object.return_value = (
+            mock_response
+        )
+        mock_custom_object_client_prop.return_value = mock_custom_object_client
+
+        result = self.ocp.is_etcd_encryption_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(
+        KrknOpenshift, "custom_object_client", new_callable=PropertyMock
+    )
+    def test_is_etcd_encryption_enabled_exception(
+        self, mock_custom_object_client_prop
+    ):
+        """Test exception handling returns False."""
+        mock_custom_object_client = Mock()
+        mock_custom_object_client.get_cluster_custom_object.side_effect = (
+            ApiException("API error")
+        )
+        mock_custom_object_client_prop.return_value = mock_custom_object_client
+
+        result = self.ocp.is_etcd_encryption_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(
+        KrknOpenshift, "custom_object_client", new_callable=PropertyMock
+    )
+    def test_is_etcd_encryption_enabled_no_spec(
+        self, mock_custom_object_client_prop
+    ):
+        """Test when APIServer has no spec."""
+        mock_custom_object_client = Mock()
+
+        mock_response = {}
+
+        mock_custom_object_client.get_cluster_custom_object.return_value = (
+            mock_response
+        )
+        mock_custom_object_client_prop.return_value = mock_custom_object_client
+
+        result = self.ocp.is_etcd_encryption_enabled()
+
+        self.assertFalse(result)
+
+
+class TestIsIpsecEnabled(unittest.TestCase):
+    """Test is_ipsec_enabled method."""
+
+    def setUp(self):
+        with patch("krkn_lib.k8s.krkn_kubernetes.config"):
+            self.ocp = KrknOpenshift()
+
+    @patch.object(KrknOpenshift, "apps_api", new_callable=PropertyMock)
+    def test_is_ipsec_enabled_true(self, mock_apps_api_prop):
+        """Test IPsec enabled detection."""
+        mock_apps_api = Mock()
+
+        # Mock DaemonSet with pods scheduled
+        mock_daemonset = Mock()
+        mock_daemonset.status = Mock()
+        mock_daemonset.status.desired_number_scheduled = 3
+
+        mock_apps_api.read_namespaced_daemon_set.return_value = mock_daemonset
+        mock_apps_api_prop.return_value = mock_apps_api
+
+        result = self.ocp.is_ipsec_enabled()
+
+        self.assertTrue(result)
+        mock_apps_api.read_namespaced_daemon_set.assert_called_once_with(
+            name="ovn-ipsec", namespace="openshift-ovn-kubernetes"
+        )
+
+    @patch.object(KrknOpenshift, "apps_api", new_callable=PropertyMock)
+    def test_is_ipsec_enabled_false_not_found(self, mock_apps_api_prop):
+        """Test IPsec not enabled (daemonset not found)."""
+        mock_apps_api = Mock()
+        mock_apps_api.read_namespaced_daemon_set.side_effect = ApiException(
+            "DaemonSet not found"
+        )
+        mock_apps_api_prop.return_value = mock_apps_api
+
+        result = self.ocp.is_ipsec_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(KrknOpenshift, "apps_api", new_callable=PropertyMock)
+    def test_is_ipsec_enabled_false_no_pods(self, mock_apps_api_prop):
+        """Test IPsec daemonset exists but has no pods."""
+        mock_apps_api = Mock()
+
+        # Mock DaemonSet with no pods scheduled
+        mock_daemonset = Mock()
+        mock_daemonset.status = Mock()
+        mock_daemonset.status.desired_number_scheduled = 0
+
+        mock_apps_api.read_namespaced_daemon_set.return_value = mock_daemonset
+        mock_apps_api_prop.return_value = mock_apps_api
+
+        result = self.ocp.is_ipsec_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(KrknOpenshift, "apps_api", new_callable=PropertyMock)
+    def test_is_ipsec_enabled_exception(self, mock_apps_api_prop):
+        """Test exception handling returns False."""
+        mock_apps_api = Mock()
+        mock_apps_api.read_namespaced_daemon_set.side_effect = ApiException(
+            "API error"
+        )
+        mock_apps_api_prop.return_value = mock_apps_api
+
+        result = self.ocp.is_ipsec_enabled()
+
+        self.assertFalse(result)
+
+    @patch.object(KrknOpenshift, "apps_api", new_callable=PropertyMock)
+    def test_is_ipsec_enabled_no_status(self, mock_apps_api_prop):
+        """Test when DaemonSet has no status."""
+        mock_apps_api = Mock()
+
+        # Mock DaemonSet with None status
+        mock_daemonset = Mock()
+        mock_daemonset.status = None
+
+        mock_apps_api.read_namespaced_daemon_set.return_value = mock_daemonset
+        mock_apps_api_prop.return_value = mock_apps_api
+
+        result = self.ocp.is_ipsec_enabled()
+
+        self.assertFalse(result)
+
+
 class TestGetPrometheusApiConnectionData(unittest.TestCase):
     """Test get_prometheus_api_connection_data method."""
 
@@ -520,9 +794,9 @@ class TestFilterMustGatherOcpLogFolder(unittest.TestCase):
         )
 
 
-# ==============================================================================
+# ===========================================================================
 # INTEGRATION TESTS (Require actual testdata or kind cluster connections)
-# ==============================================================================
+# ===========================================================================
 
 
 class KrknOpenshiftIntegrationTest(BaseTest):
@@ -554,6 +828,24 @@ class KrknOpenshiftIntegrationTest(BaseTest):
     def test_is_openshift(self):
         """Test OpenShift detection on real cluster."""
         self.assertFalse(self.lib_ocp.is_openshift())
+
+    def test_is_fips_enabled(self):
+        """Test FIPS detection on real cluster."""
+        result = self.lib_ocp.is_fips_enabled()
+        # Should return a boolean
+        self.assertIsInstance(result, bool)
+
+    def test_is_etcd_encryption_enabled(self):
+        """Test etcd encryption detection on real cluster."""
+        result = self.lib_ocp.is_etcd_encryption_enabled()
+        # Should return a boolean
+        self.assertIsInstance(result, bool)
+
+    def test_is_ipsec_enabled(self):
+        """Test IPsec detection on real cluster."""
+        result = self.lib_ocp.is_ipsec_enabled()
+        # Should return a boolean
+        self.assertIsInstance(result, bool)
 
     def test_filter_must_gather_ocp_log_folder(self):
         """Test log filtering with actual testdata files."""

@@ -558,6 +558,23 @@ class ChaosRunTelemetry:
     """
     Build url if run in CI
     """
+    tag: str = ""
+    """
+    Tag to compare similar job
+    """
+    fips_enabled: bool = False
+    """
+    Whether FIPS (Federal Information Processing Standards) is enabled
+    in the cluster
+    """
+    etcd_encryption_enabled: bool = False
+    """
+    Whether etcd encryption is enabled in the cluster
+    """
+    ipsec_enabled: bool = False
+    """
+    Whether IPsec is enabled in the cluster
+    """
     error_logs: list[dict] = None
     """
     Error logs collected during chaos run
@@ -619,6 +636,12 @@ class ChaosRunTelemetry:
             )
             self.job_status = json_dict.get("job_status")
             self.build_url = json_dict.get("build_url")
+            self.tag = json_dict.get("tag")
+            self.fips_enabled = json_dict.get("fips_enabled", False)
+            self.etcd_encryption_enabled = json_dict.get(
+                "etcd_encryption_enabled", False
+            )
+            self.ipsec_enabled = json_dict.get("ipsec_enabled", False)
             self.error_logs = json_dict.get("error_logs")
 
             if json_dict.get("overall_resiliency_report"):

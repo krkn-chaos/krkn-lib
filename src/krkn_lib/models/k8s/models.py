@@ -409,7 +409,7 @@ class ResiliencyReport:
         json_object: dict = None,
         resiliency_score: int = 0,
         passed_slos: int = 0,
-        total_slos: int = 0
+        total_slos: int = 0,
     ):
         self.scenarios = {}
         self.resiliency_score = resiliency_score

@@ -1,6 +1,7 @@
 import datetime
 import logging
 from unittest.mock import Mock, patch
+
 from krkn_lib.prometheus.krkn_prometheus import KrknPrometheus
 from krkn_lib.tests import BaseTest
 
@@ -9,20 +10,21 @@ class TestKrknPrometheus(BaseTest):
     """
     Integration tests for KrknPrometheus class.
     """
+
     url = "http://localhost:9090"
 
     def setUp(self):
         logging.disable(logging.NOTSET)
         logging.basicConfig(
             level=logging.DEBUG,
-            format='%(levelname)s: %(message)s',
-            force=True
+            format="%(levelname)s: %(message)s",
+            force=True,
         )
 
     def test_constructor_success(self):
         """Test successful initialization of KrknPrometheus."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_instance = Mock()
             mock_prom.return_value = mock_instance
@@ -35,7 +37,7 @@ class TestKrknPrometheus(BaseTest):
     def test_constructor_with_bearer_token(self):
         """Test initialization with bearer token."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             bearer_token = "test_token_12345"
             mock_instance = Mock()
@@ -45,16 +47,16 @@ class TestKrknPrometheus(BaseTest):
 
             # Verify the headers were set correctly
             call_args = mock_prom.call_args
-            self.assertIn('headers', call_args.kwargs)
+            self.assertIn("headers", call_args.kwargs)
             self.assertEqual(
-                call_args.kwargs['headers']['Authorization'],
-                f"Bearer {bearer_token}"
+                call_args.kwargs["headers"]["Authorization"],
+                f"Bearer {bearer_token}",
             )
 
     def test_constructor_exception_handling(self):
         """Test that constructor exits on initialization failure."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.side_effect = Exception("Connection failed")
 
@@ -66,7 +68,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_prom_query_in_range_success(self):
         """Test successful range query execution."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -75,7 +77,7 @@ class TestKrknPrometheus(BaseTest):
             expected_result = [
                 {
                     "metric": {"instance": "node1", "pod": "test_pod"},
-                    "values": [[1699357840, "0.1"], [1699357850, "0.2"]]
+                    "values": [[1699357840, "0.1"], [1699357850, "0.2"]],
                 }
             ]
             mock_client.custom_query_range.return_value = expected_result
@@ -99,7 +101,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_prom_query_in_range_default_times(self):
         """Test range query with default start/end times."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -117,7 +119,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_prom_query_in_range_custom_granularity(self):
         """Test range query with custom granularity."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -134,12 +136,12 @@ class TestKrknPrometheus(BaseTest):
             )
 
             call_args = mock_client.custom_query_range.call_args
-            self.assertEqual(call_args.kwargs['step'], "30s")
+            self.assertEqual(call_args.kwargs["step"], "30s")
 
     def test_process_prom_query_in_range_exception(self):
         """Test exception handling in range query."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -158,16 +160,13 @@ class TestKrknPrometheus(BaseTest):
     def test_process_query_success(self):
         """Test successful instant query execution."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             expected_result = [
-                {
-                    "metric": {"instance": "node1"},
-                    "value": [1699357840, "0.5"]
-                }
+                {"metric": {"instance": "node1"}, "value": [1699357840, "0.5"]}
             ]
             mock_client.custom_query.return_value = expected_result
 
@@ -184,7 +183,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_query_exception(self):
         """Test exception handling in instant query."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -203,7 +202,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_info_severity(self):
         """Test process_alert with info severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -212,9 +211,9 @@ class TestKrknPrometheus(BaseTest):
                 {
                     "metric": {
                         "container": "test-container",
-                        "endpoint": "test-endpoint"
+                        "endpoint": "test-endpoint",
                     },
-                    "values": [[1699357840, "0.1"]]
+                    "values": [[1699357840, "0.1"]],
                 }
             ]
             mock_client.custom_query_range.return_value = mock_result
@@ -228,7 +227,7 @@ class TestKrknPrometheus(BaseTest):
                     "endpoint: {{$labels.endpoint}}, "
                     "value: {{$value}}"
                 ),
-                "severity": "info"
+                "severity": "info",
             }
             start_time = datetime.datetime.now() - datetime.timedelta(days=1)
             end_time = datetime.datetime.now()
@@ -246,7 +245,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_debug_severity(self):
         """Test process_alert with debug severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -254,7 +253,7 @@ class TestKrknPrometheus(BaseTest):
             mock_result = [
                 {
                     "metric": {"pod": "test-pod"},
-                    "values": [[1699357840, "1.5"]]
+                    "values": [[1699357840, "1.5"]],
                 }
             ]
             mock_client.custom_query_range.return_value = mock_result
@@ -264,13 +263,13 @@ class TestKrknPrometheus(BaseTest):
             alert = {
                 "expr": "test_query",
                 "description": "pod: {{$labels.pod}}, value: {{$value}}",
-                "severity": "debug"
+                "severity": "debug",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             self.assertIsNotNone(timestamp)
@@ -281,7 +280,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_warning_severity(self):
         """Test process_alert with warning severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -289,7 +288,7 @@ class TestKrknPrometheus(BaseTest):
             mock_result = [
                 {
                     "metric": {"instance": "node1"},
-                    "values": [[1699357840, "90"]]
+                    "values": [[1699357840, "90"]],
                 }
             ]
             mock_client.custom_query_range.return_value = mock_result
@@ -301,13 +300,13 @@ class TestKrknPrometheus(BaseTest):
                 "description": (
                     "High CPU on {{$labels.instance}}: {{$value}}%"
                 ),
-                "severity": "warning"
+                "severity": "warning",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             self.assertIsNotNone(timestamp)
@@ -318,16 +317,13 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_error_severity(self):
         """Test process_alert with error severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             mock_result = [
-                {
-                    "metric": {"service": "api"},
-                    "values": [[1699357840, "500"]]
-                }
+                {"metric": {"service": "api"}, "values": [[1699357840, "500"]]}
             ]
             mock_client.custom_query_range.return_value = mock_result
 
@@ -338,13 +334,13 @@ class TestKrknPrometheus(BaseTest):
                 "description": (
                     "Error on {{$labels.service}}: code {{$value}}"
                 ),
-                "severity": "error"
+                "severity": "error",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             self.assertIsNotNone(timestamp)
@@ -355,16 +351,13 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_critical_severity(self):
         """Test process_alert with critical severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             mock_result = [
-                {
-                    "metric": {"cluster": "prod"},
-                    "values": [[1699357840, "0"]]
-                }
+                {"metric": {"cluster": "prod"}, "values": [[1699357840, "0"]]}
             ]
             mock_client.custom_query_range.return_value = mock_result
 
@@ -373,13 +366,13 @@ class TestKrknPrometheus(BaseTest):
             alert = {
                 "expr": "cluster_down",
                 "description": "Cluster {{$labels.cluster}} is down!",
-                "severity": "critical"
+                "severity": "critical",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             self.assertIsNotNone(timestamp)
@@ -390,7 +383,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_invalid_severity(self):
         """Test process_alert with invalid severity level."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -400,13 +393,13 @@ class TestKrknPrometheus(BaseTest):
             alert = {
                 "expr": "test_query",
                 "description": "Test description",
-                "severity": "not_exists"
+                "severity": "not_exists",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             # Should return timestamp and log_output with error message
@@ -417,22 +410,19 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_missing_expr(self):
         """Test process_alert with missing expr field."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             prom_cli = KrknPrometheus(self.url)
 
-            alert = {
-                "description": "Test description",
-                "severity": "info"
-            }
+            alert = {"description": "Test description", "severity": "info"}
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             # Should return timestamp and log_output with error message
@@ -444,22 +434,19 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_missing_description(self):
         """Test process_alert with missing description field."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             prom_cli = KrknPrometheus(self.url)
 
-            alert = {
-                "expr": "test_query",
-                "severity": "info"
-            }
+            alert = {"expr": "test_query", "severity": "info"}
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             # Should return timestamp and log_output with error message
@@ -471,22 +458,19 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_missing_severity(self):
         """Test process_alert with missing severity field."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
 
             prom_cli = KrknPrometheus(self.url)
 
-            alert = {
-                "expr": "test_query",
-                "description": "Test description"
-            }
+            alert = {"expr": "test_query", "description": "Test description"}
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             # Should return timestamp and log_output with error message
@@ -498,7 +482,7 @@ class TestKrknPrometheus(BaseTest):
     def test_process_alert_no_records(self):
         """Test process_alert when query returns no records."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_client = Mock()
             mock_prom.return_value = mock_client
@@ -511,13 +495,13 @@ class TestKrknPrometheus(BaseTest):
             alert = {
                 "expr": "non_existent_metric",
                 "description": "Test",
-                "severity": "info"
+                "severity": "info",
             }
 
             timestamp, log_output = prom_cli.process_alert(
                 alert,
                 datetime.datetime.now() - datetime.timedelta(hours=1),
-                datetime.datetime.now()
+                datetime.datetime.now(),
             )
 
             self.assertIsNone(timestamp)
@@ -526,7 +510,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_standard_replacement(self):
         """Test parse_metric with standard label and value replacement."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -558,7 +542,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_no_value(self):
         """Test parse_metric with empty values array."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -590,7 +574,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_underscore_label(self):
         """Test parse_metric with labels containing underscores."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -624,7 +608,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_multiple_values(self):
         """Test parse_metric with multiple values in the series."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -634,7 +618,7 @@ class TestKrknPrometheus(BaseTest):
                 "values": [
                     [1699357840, "0.1"],
                     [1699357850, "0.2"],
-                    [1699357860, "0.3"]
+                    [1699357860, "0.3"],
                 ],
             }
 
@@ -649,7 +633,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_missing_label(self):
         """Test parse_metric when a label doesn't exist in the metric."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -670,7 +654,7 @@ class TestKrknPrometheus(BaseTest):
     def test_parse_metric_no_placeholders(self):
         """Test parse_metric with description containing no placeholders."""
         with patch(
-            'krkn_lib.prometheus.krkn_prometheus.PrometheusConnect'
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
         ) as mock_prom:
             mock_prom.return_value = Mock()
             prom_cli = KrknPrometheus(self.url)
@@ -680,9 +664,7 @@ class TestKrknPrometheus(BaseTest):
                 "values": [[1699357840, "0.1"]],
             }
 
-            description = (
-                "This is a plain description with no placeholders"
-            )
+            description = "This is a plain description with no placeholders"
 
             result = prom_cli.parse_metric(description, metric)
             self.assertEqual(description, result)
