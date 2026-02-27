@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ name }}
+  namespace: {{ namespace }}
+  labels:
+    app: krkn-http-load
+spec:
+{% if has_node_selectors %}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+{% for key, values in node_selectors.items() %}
+        - matchExpressions:
+          - key: {{ key }}
+{% if values and values|length > 0 %}
+            operator: In
+            values:
+{% for value in values %}
+            - "{{ value }}"
+{% endfor %}
+{% else %}
+            operator: Exists
+{% endif %}
+{% endfor %}
+{% endif %}
+  restartPolicy: Never
+  containers:
+  - name: vegeta-load
+    image: {{ image }}
+    imagePullPolicy: Always
+    env:
+    - name: TARGETS_JSON_BASE64
+      value: "{{ targets_json_base64 }}"
+    - name: DURATION
+      value: "{{ duration }}"
+    - name: RATE
+      value: "{{ rate }}"
+    - name: WORKERS
+      value: "{{ workers }}"
+    - name: MAX_WORKERS
+      value: "{{ max_workers }}"
+    - name: CONNECTIONS
+      value: "{{ connections }}"
+    - name: TIMEOUT
+      value: "{{ timeout }}"
+    - name: KEEPALIVE
+      value: "{{ keepalive }}"
+    - name: HTTP2
+      value: "{{ http2 }}"
+    - name: INSECURE
+      value: "{{ insecure }}"

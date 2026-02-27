@@ -1,4 +1,6 @@
+import base64
 import datetime
+import json
 import logging
 import random
 import time
@@ -220,6 +222,80 @@ class KrknKubernetesTestsMisc(BaseTest):
             second=test_duration,
             places=None,
             delta=2,
+        )
+        self.lib_k8s.delete_namespace(namespace)
+
+    def test_deploy_http_load(self):
+        namespace = "test-" + self.get_random_string(10)
+        http_load_pod_name = (
+            "krkn-http-load-" + self.get_random_string(10)
+        )
+        nginx_pod_name = (
+            "nginx-test-pod-" + self.get_random_string(10)
+        )
+        service_name = (
+            "nginx-test-service" + self.get_random_string(10)
+        )
+        self.deploy_namespace(namespace, labels=[])
+        self.deploy_nginx(
+            namespace=namespace,
+            pod_name=nginx_pod_name,
+            service_name=service_name,
+        )
+        count = 0
+        while not self.lib_k8s.is_pod_running(
+            nginx_pod_name, namespace
+        ):
+            time.sleep(3)
+            if count > 20:
+                self.assertTrue(
+                    False,
+                    "container is not running after 20 retries",
+                )
+            count += 1
+            continue
+
+        target_url = (
+            f"http://{service_name}.{namespace}.svc.cluster"
+            f".local:80"
+        )
+        targets_line = json.dumps(
+            {"method": "GET", "url": target_url}
+        )
+        targets_json_base64 = base64.b64encode(
+            targets_line.encode()
+        ).decode()
+
+        test_duration = 10
+        self.lib_k8s.deploy_http_load(
+            name=http_load_pod_name,
+            namespace=namespace,
+            image="quay.io/krkn-chaos/krkn-http-load",
+            targets_json_base64=targets_json_base64,
+            duration=f"{test_duration}s",
+            rate="10/1s",
+            workers=2,
+            max_workers=4,
+            connections=10,
+            timeout="5s",
+            keepalive=True,
+            http2=False,
+            insecure=False,
+            node_selectors={},
+        )
+
+        start = time.time()
+        end = 0
+        while self.lib_k8s.is_pod_running(
+            http_load_pod_name, namespace
+        ):
+            end = time.time()
+            continue
+        self.assertAlmostEqual(
+            first=end - start,
+            second=test_duration,
+            places=None,
+            delta=5,
         )
         self.lib_k8s.delete_namespace(namespace)
 

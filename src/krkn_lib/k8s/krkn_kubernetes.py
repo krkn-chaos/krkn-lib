@@ -3491,6 +3491,79 @@ class KrknKubernetes:
 
         self.create_pod(namespace=namespace, body=pod_body)
 
+    def deploy_http_load(
+        self,
+        name: str,
+        namespace: str,
+        image: str,
+        targets_json_base64: str,
+        duration: str,
+        rate: str = "50/1s",
+        workers: int = 10,
+        max_workers: int = 100,
+        connections: int = 100,
+        timeout: str = "10s",
+        keepalive: bool = True,
+        http2: bool = True,
+        insecure: bool = False,
+        node_selectors: dict = None,
+        timeout_sec: int = 500
+    ):
+        """
+        Deploy an HTTP load testing pod using Vegeta.
+
+        :param name: Pod name
+        :param namespace: Namespace to deploy pod
+        :param image: Container image
+        :param targets_json_base64: Base64-encoded newline-delimited
+            Vegeta JSON targets
+        :param duration: Attack duration (e.g., "30s", "5m")
+        :param rate: Request rate (e.g., "50/1s", "1000/1m")
+        :param workers: Initial number of concurrent workers
+        :param max_workers: Maximum workers (Vegeta scales horizontally)
+        :param connections: Max idle connections per host
+        :param timeout: Request timeout (e.g., "10s")
+        :param keepalive: Use persistent connections
+        :param http2: Enable HTTP/2
+        :param insecure: Skip TLS certificate verification
+        :param node_selectors: Node affinity labels
+        :param timeout_sec: Pod creation timeout in seconds
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=False)
+        pod_template = env.get_template("http_load_pod.j2")
+
+        has_node_selectors = node_selectors is not None and len(node_selectors) > 0
+
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=name,
+                namespace=namespace,
+                image=image,
+                targets_json_base64=targets_json_base64,
+                duration=duration,
+                rate=rate,
+                workers=str(workers),
+                max_workers=str(max_workers),
+                connections=str(connections),
+                timeout=timeout,
+                keepalive="true" if keepalive else "false",
+                http2="true" if http2 else "false",
+                insecure="true" if insecure else "false",
+                has_node_selectors=has_node_selectors,
+                node_selectors=node_selectors if has_node_selectors else {}
+            )
+        )
+
+        logging.info(f"Deploying HTTP load pod {name} for {duration} at {rate}")
+
+        try:
+            self.create_pod(pod_body, namespace, timeout_sec)
+            logging.info(f"HTTP load pod {name} created successfully")
+        except Exception as e:
+            logging.error(f"Failed to create HTTP load pod {name}: {e}")
+            raise e
+
     def deploy_hog(self, pod_name: str, hog_config: HogConfig):
         """
         Deploys a Pod to run the Syn Flood scenario
