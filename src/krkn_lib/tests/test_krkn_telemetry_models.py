@@ -577,6 +577,70 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(event.involved_object_namespace, "default")
         self.assertEqual(event.type, "Normal")
 
+    def test_chaos_run_telemetry_with_security_fields(self):
+        """
+        Test security fields (FIPS, etcd encryption, IPsec) are
+        properly parsed from JSON and serialized
+        """
+        test_json_with_security = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": ""
+            }],
+            "node_summary_infos": [],
+            "node_taints": [],
+            "fips_enabled": true,
+            "etcd_encryption_enabled": true,
+            "ipsec_enabled": false
+        }
+        """
+        json_obj = json.loads(test_json_with_security)
+        telemetry = ChaosRunTelemetry(json_obj)
+
+        # Verify security fields are properly parsed
+        self.assertTrue(telemetry.fips_enabled)
+        self.assertTrue(telemetry.etcd_encryption_enabled)
+        self.assertFalse(telemetry.ipsec_enabled)
+
+        # Verify serialization includes security fields
+        telemetry_json = telemetry.to_json()
+        parsed_json = json.loads(telemetry_json)
+        self.assertTrue(parsed_json["fips_enabled"])
+        self.assertTrue(parsed_json["etcd_encryption_enabled"])
+        self.assertFalse(parsed_json["ipsec_enabled"])
+
+    def test_chaos_run_telemetry_security_fields_defaults(self):
+        """
+        Test security fields default to False when not provided
+        in JSON
+        """
+        test_json_without_security = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": ""
+            }],
+            "node_summary_infos": [],
+            "node_taints": []
+        }
+        """
+        json_obj = json.loads(test_json_without_security)
+        telemetry = ChaosRunTelemetry(json_obj)
+
+        # Verify security fields default to False
+        self.assertFalse(telemetry.fips_enabled)
+        self.assertFalse(telemetry.etcd_encryption_enabled)
+        self.assertFalse(telemetry.ipsec_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

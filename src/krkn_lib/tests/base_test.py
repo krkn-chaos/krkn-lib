@@ -635,6 +635,10 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "tag": "github-action",
+            "fips_enabled": True,
+            "etcd_encryption_enabled": True,
+            "ipsec_enabled": False,
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",

@@ -269,6 +269,10 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")
         self.assertEqual(elastic_telemetry.run_uuid, run_uuid)
+        self.assertEqual(elastic_telemetry.tag, "github-action")
+        self.assertTrue(elastic_telemetry.fips_enabled)
+        self.assertTrue(elastic_telemetry.etcd_encryption_enabled)
+        self.assertFalse(elastic_telemetry.ipsec_enabled)
         self.assertEqual(
             elastic_telemetry.build_url,
             "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",
@@ -294,22 +298,12 @@ class TestKrknElasticModels(BaseTest):
         # overall_resiliency_report validation
         overall_report = elastic_telemetry.overall_resiliency_report
         self.assertIsNotNone(overall_report)
+        self.assertEqual(overall_report.resiliency_score, 90)
+        self.assertEqual(overall_report.passed_slos, 4)
+        self.assertEqual(overall_report.total_slos, 5)
+        self.assertIsNotNone(overall_report.scenarios)
         self.assertEqual(
-            overall_report.resiliency_score, 90
-        )
-        self.assertEqual(
-            overall_report.passed_slos, 4
-        )
-        self.assertEqual(
-            overall_report.total_slos, 5
-        )
-        self.assertIsNotNone(
-            overall_report.scenarios
-        )
-        self.assertEqual(
-            overall_report.scenarios.to_dict().get(
-                "example_scenario.yaml"
-            ),
+            overall_report.scenarios.to_dict().get("example_scenario.yaml"),
             95,
         )
 
