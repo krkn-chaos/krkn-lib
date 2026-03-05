@@ -88,6 +88,20 @@ class ElasticPodsStatus(InnerDoc):
     error = Text()
 
 
+class ElasticAffectedVMI(InnerDoc):
+    vmi_name = Text(fields={"keyword": Keyword()})
+    namespace = Text()
+    total_recovery_time = Float()
+    vmi_readiness_time = Float()
+    vmi_rescheduling_time = Float()
+
+
+class ElasticVmisStatus(InnerDoc):
+    recovered = Nested(ElasticAffectedVMI, multi=True)
+    unrecovered = Nested(ElasticAffectedVMI, multi=True)
+    error = Text()
+
+
 class ElasticAffectedNodes(InnerDoc):
     node_name = Text(fields={"keyword": Keyword()})
     node_id = Text()
@@ -118,6 +132,7 @@ class ElasticScenarioTelemetry(InnerDoc):
     parameters_base64 = Text()
     parameters = Nested(ElasticScenarioParameters)
     affected_pods = Nested(ElasticPodsStatus)
+    affected_vmis = Nested(ElasticVmisStatus)
     affected_nodes = Nested(ElasticAffectedNodes, multi=True)
 
 
@@ -225,6 +240,25 @@ class ElasticChaosRunTelemetry(Document):
                         for pod in sc.affected_pods.unrecovered
                     ],
                     error=sc.affected_pods.error,
+                ),
+                affected_vmis=ElasticVmisStatus(
+                    recovered=[
+                        ElasticAffectedVMI(
+                            vmi_name=vmi.vmi_name,
+                            namespace=vmi.namespace,
+                            total_recovery_time=vmi.total_recovery_time,
+                            vmi_readiness_time=vmi.vmi_readiness_time,
+                            vmi_rescheduling_time=vmi.vmi_rescheduling_time,
+                        )
+                        for vmi in sc.affected_vmis.recovered
+                    ],
+                    unrecovered=[
+                        ElasticAffectedVMI(
+                            vmi_name=vmi.vmi_name, namespace=vmi.namespace
+                        )
+                        for vmi in sc.affected_vmis.unrecovered
+                    ],
+                    error=sc.affected_vmis.error,
                 ),
                 affected_nodes=[
                     ElasticAffectedNodes(
