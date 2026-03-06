@@ -415,5 +415,10 @@ class ResiliencyReport:
         self.resiliency_score = resiliency_score
         self.passed_slos = passed_slos
         self.total_slos = total_slos
-        if json_object and "scenarios" in json_object:
-            self.scenarios = json_object["scenarios"]
+        if json_object:
+            self.scenarios = json_object.get("scenarios", {})
+            self.resiliency_score = json_object.get(
+                "resiliency_score", resiliency_score
+            )
+            self.passed_slos = json_object.get("passed_slos", passed_slos)
+            self.total_slos = json_object.get("total_slos", total_slos)
