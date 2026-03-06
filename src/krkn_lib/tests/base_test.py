@@ -535,6 +535,21 @@ class BaseTest(unittest.TestCase):
                         ],
                         "error": "some error",
                     },
+                    "affected_vmis": {
+                        "recovered": [
+                            {
+                                "vmi_name": "vmi1",
+                                "namespace": "default",
+                                "total_recovery_time": 15.0,
+                                "vmi_readiness_time": 8.0,
+                                "vmi_rescheduling_time": 3.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"vmi_name": "vmi2", "namespace": "default"}
+                        ],
+                        "error": "some vmi error",
+                    },
                     "affected_nodes": [
                         {
                             "node_name": "kind-control-plane",

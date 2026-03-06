@@ -97,6 +97,61 @@ class TestKrknElasticModels(BaseTest):
             .namespace,
             "default",
         )
+        # scenarios -> affected_vmis
+        self.assertEqual(
+            len(elastic_telemetry.scenarios[0].affected_vmis.recovered), 1
+        )
+        self.assertEqual(
+            len(elastic_telemetry.scenarios[0].affected_vmis.unrecovered), 1
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0].affected_vmis.error, "some vmi error"
+        )
+
+        # scenarios -> affected_vmis -> recovered
+        self.assertEqual(
+            elastic_telemetry.scenarios[0].affected_vmis.recovered[0].vmi_name,
+            "vmi1",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .namespace,
+            "default",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .total_recovery_time,
+            15.0,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .vmi_readiness_time,
+            8.0,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .vmi_rescheduling_time,
+            3.0,
+        )
+
+        # scenarios -> affected_vmis -> unrecovered
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.unrecovered[0]
+            .vmi_name,
+            "vmi2",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.unrecovered[0]
+            .namespace,
+            "default",
+        )
+
         print(
             "elastic affected nodes"
             + str(
