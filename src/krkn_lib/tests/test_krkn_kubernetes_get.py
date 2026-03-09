@@ -347,6 +347,23 @@ class KrknKubernetesTestsGet(BaseTest):
                 container_id[0],
             )
 
+    def test_is_fips_enabled(self):
+        """Test FIPS detection returns a boolean."""
+        result = self.lib_k8s.is_fips_enabled()
+        self.assertIsInstance(result, bool)
+
+    def test_is_etcd_encryption_enabled(self):
+        """Test etcd encryption detection returns a boolean."""
+        result = self.lib_k8s.is_etcd_encryption_enabled()
+        # For vanilla Kubernetes, should return False
+        self.assertIsInstance(result, bool)
+        self.assertFalse(result)
+
+    def test_is_ipsec_enabled(self):
+        """Test IPsec detection returns a boolean."""
+        result = self.lib_k8s.is_ipsec_enabled()
+        self.assertIsInstance(result, bool)
+
 
 if __name__ == "__main__":
     unittest.main()

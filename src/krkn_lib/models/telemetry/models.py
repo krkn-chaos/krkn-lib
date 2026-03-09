@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import AffectedNode, PodsStatus, ResiliencyReport
+from krkn_lib.models.k8s import AffectedNode, PodsStatus, VmisStatus, ResiliencyReport
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [
@@ -81,6 +81,10 @@ class ScenarioTelemetry:
     """
     Pods affected by the chaos scenario
     """
+    affected_vmis: VmisStatus
+    """
+    VMIs affected by the chaos scenario
+    """
     affected_nodes: list[AffectedNode]
     """
     Nodes affected by the chaos scenario
@@ -88,10 +92,6 @@ class ScenarioTelemetry:
     cluster_events: list[ClusterEvent]
     """
     Cluster events collected during the chaos run
-    """
-    overall_resiliency_report: ResiliencyReport
-    """
-    Resiliency score and report
     """
 
     def set_cluster_events(self, events: list[ClusterEvent]):
@@ -117,6 +117,9 @@ class ScenarioTelemetry:
             self.affected_pods = PodsStatus(
                 json_object=json_object.get("affected_pods")
             )
+            self.affected_vmis = VmisStatus(
+                json_object=json_object.get("affected_vmis")
+            )
 
             if json_object.get("affected_nodes") and isinstance(
                 json_object.get("affected_nodes"), list
@@ -137,17 +140,6 @@ class ScenarioTelemetry:
                 ]
             else:
                 self.cluster_events = []
-
-            if json_object.get("overall_resiliency_report"):
-                report_data = json_object.get("overall_resiliency_report")
-                self.overall_resiliency_report = ResiliencyReport(
-                    json_object=report_data,
-                    resiliency_score=report_data.get("resiliency_score", 0),
-                    passed_slos=report_data.get("passed_slos", 0),
-                    total_slos=report_data.get("total_slos", 0)
-                )
-            else:
-                self.overall_resiliency_report = ResiliencyReport()
 
             if (
                 self.parameters_base64 is not None
@@ -178,9 +170,9 @@ class ScenarioTelemetry:
             self.parameters_base64 = ""
             self.parameters = {}
             self.affected_pods = PodsStatus()
+            self.affected_vmis = VmisStatus()
             self.affected_nodes = []
             self.cluster_events = []
-            self.overall_resiliency_report = ResiliencyReport()
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -353,7 +345,8 @@ class ClusterEvent:
 
         if k8s_obj:
             # This parses CoreV1Event
-            # (https://github.com/kubernetes-client/python/blob/master/kubernetes/docs/CoreV1Event.md)
+            # https://github.com/kubernetes-client/python/blob/master/
+            # kubernetes/docs/CoreV1Event.md
             self.name = k8s_obj.metadata.name
             self.creation = str(k8s_obj.metadata.creation_timestamp)
             self.reason = k8s_obj.reason
@@ -573,9 +566,30 @@ class ChaosRunTelemetry:
     """
     Build url if run in CI
     """
+    tag: str = ""
+    """
+    Tag to compare similar job
+    """
+    fips_enabled: bool = False
+    """
+    Whether FIPS (Federal Information Processing Standards) is enabled
+    in the cluster
+    """
+    etcd_encryption_enabled: bool = False
+    """
+    Whether etcd encryption is enabled in the cluster
+    """
+    ipsec_enabled: bool = False
+    """
+    Whether IPsec is enabled in the cluster
+    """
     error_logs: list[dict] = None
     """
     Error logs collected during chaos run
+    """
+    overall_resiliency_report: ResiliencyReport = None
+    """
+    Overall resiliency report for the chaos run
     """
 
     def __init__(self, json_dict: any = None):
@@ -590,6 +604,7 @@ class ChaosRunTelemetry:
         self.health_checks = list[HealthCheck]()
         self.virt_checks = list[VirtCheck]()
         self.error_logs = []
+        self.overall_resiliency_report = ResiliencyReport()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -629,7 +644,22 @@ class ChaosRunTelemetry:
             )
             self.job_status = json_dict.get("job_status")
             self.build_url = json_dict.get("build_url")
+            self.tag = json_dict.get("tag")
+            self.fips_enabled = json_dict.get("fips_enabled", False)
+            self.etcd_encryption_enabled = json_dict.get(
+                "etcd_encryption_enabled", False
+            )
+            self.ipsec_enabled = json_dict.get("ipsec_enabled", False)
             self.error_logs = json_dict.get("error_logs")
+
+            if json_dict.get("overall_resiliency_report"):
+                report_data = json_dict.get("overall_resiliency_report")
+                self.overall_resiliency_report = ResiliencyReport(
+                    json_object=report_data,
+                    resiliency_score=report_data.get("resiliency_score", 0),
+                    passed_slos=report_data.get("passed_slos", 0),
+                    total_slos=report_data.get("total_slos", 0),
+                )
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

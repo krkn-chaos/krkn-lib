@@ -9,18 +9,20 @@ import urllib3
 from elasticsearch import Elasticsearch, NotFoundError
 
 try:
+    from opensearchpy import NotFoundError as OpenSearchNotFoundError
     from opensearchpy import (
         OpenSearch,
-        NotFoundError as OpenSearchNotFoundError,
     )
+
     OPENSEARCH_AVAILABLE = True
 except ImportError:
     # Try alternative import path
     try:
+        from opensearch_py import NotFoundError as OpenSearchNotFoundError
         from opensearch_py import (
             OpenSearch,
-            NotFoundError as OpenSearchNotFoundError,
         )
+
         OPENSEARCH_AVAILABLE = True
     except ImportError:
         OPENSEARCH_AVAILABLE = False
@@ -188,15 +190,15 @@ class KrknElastic:
         """
         if isinstance(exception, NotFoundError):
             return True
-        if (OPENSEARCH_AVAILABLE and
-            OpenSearchNotFoundError and
-            isinstance(exception, OpenSearchNotFoundError)):
+        if (
+            OPENSEARCH_AVAILABLE
+            and OpenSearchNotFoundError
+            and isinstance(exception, OpenSearchNotFoundError)
+        ):
             return True
         return False
 
-    def upload_data_to_elasticsearch(
-        self, item: dict, index: str = ""
-    ) -> int:
+    def upload_data_to_elasticsearch(self, item: dict, index: str = "") -> int:
         """uploads captured data in item dictionary to Elasticsearch
 
 
@@ -281,6 +283,12 @@ class KrknElastic:
             is pushed
         :return: the time needed to save if succeeded -1 if failed
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_alert"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -302,6 +310,12 @@ class KrknElastic:
             is pushed
         :return: the time needed to save if succeeded -1 if failed
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_metric"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -316,6 +330,12 @@ class KrknElastic:
             return -1
 
     def push_telemetry(self, telemetry: ChaosRunTelemetry, index: str):
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_telemetry"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -338,16 +358,16 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_telemetry"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)
-            query = {
-                "query": {
-                    "match": {
-                        "run_uuid": run_uuid
-                    }
-                }
-            }
+            query = {"query": {"match": {"run_uuid": run_uuid}}}
             result = self.es.search(index=index, body=query)
             documents = [
                 ElasticChaosRunTelemetry(**hit["_source"])
@@ -360,9 +380,7 @@ class KrknElastic:
             raise
         return documents
 
-    def search_alert(
-        self, run_uuid: str, index: str
-    ) -> list[ElasticAlert]:
+    def search_alert(self, run_uuid: str, index: str) -> list[ElasticAlert]:
         """
         Searches ElasticAlerts by run_uuid
         :param run_uuid: the Krkn run id to search
@@ -371,16 +389,16 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_alert"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)
-            query = {
-                "query": {
-                    "match": {
-                        "run_uuid": run_uuid
-                    }
-                }
-            }
+            query = {"query": {"match": {"run_uuid": run_uuid}}}
             result = self.es.search(index=index, body=query)
             documents = [
                 ElasticAlert(**hit["_source"])
@@ -393,9 +411,7 @@ class KrknElastic:
             raise
         return documents
 
-    def search_metric(
-        self, run_uuid: str, index: str
-    ) -> list[ElasticMetric]:
+    def search_metric(self, run_uuid: str, index: str) -> list[ElasticMetric]:
         """
         Searches ElasticMetric by run_uuid
         :param run_uuid: the Krkn run id to search
@@ -404,16 +420,16 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_metric"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)
-            query = {
-                "query": {
-                    "match": {
-                        "run_uuid": run_uuid
-                    }
-                }
-            }
+            query = {"query": {"match": {"run_uuid": run_uuid}}}
             result = self.es.search(index=index, body=query)
             documents = [
                 ElasticMetric(**hit["_source"])

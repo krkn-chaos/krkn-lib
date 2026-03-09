@@ -37,13 +37,19 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.lib_elastic = KrknElastic(
-            SafeLogger(),
-            os.getenv("ELASTIC_URL"),
-            int(os.getenv("ELASTIC_PORT")),
-            username=os.getenv("ELASTIC_USER"),
-            password=os.getenv("ELASTIC_PASSWORD"),
-        )
+        # Initialize Elastic only if environment variables are set
+        elastic_port = os.getenv("ELASTIC_PORT")
+        if elastic_port:
+            cls.lib_elastic = KrknElastic(
+                SafeLogger(),
+                os.getenv("ELASTIC_URL"),
+                int(elastic_port),
+                username=os.getenv("ELASTIC_USER"),
+                password=os.getenv("ELASTIC_PASSWORD"),
+            )
+        else:
+            cls.lib_elastic = None
+
         cls.lib_k8s = KrknKubernetes(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_ocp = KrknOpenshift(config.KUBE_CONFIG_DEFAULT_LOCATION)
         cls.lib_telemetry_k8s = KrknTelemetryKubernetes(
@@ -529,6 +535,21 @@ class BaseTest(unittest.TestCase):
                         ],
                         "error": "some error",
                     },
+                    "affected_vmis": {
+                        "recovered": [
+                            {
+                                "vmi_name": "vmi1",
+                                "namespace": "default",
+                                "total_recovery_time": 15.0,
+                                "vmi_readiness_time": 8.0,
+                                "vmi_rescheduling_time": 3.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"vmi_name": "vmi2", "namespace": "default"}
+                        ],
+                        "error": "some vmi error",
+                    },
                     "affected_nodes": [
                         {
                             "node_name": "kind-control-plane",
@@ -540,14 +561,6 @@ class BaseTest(unittest.TestCase):
                             "terminating_time": 0,
                         }
                     ],
-                    "overall_resiliency_report": {
-                        "scenarios": {
-                            "example_scenario.yaml": 95
-                        },
-                        "resiliency_score": 90,
-                        "passed_slos": 4,
-                        "total_slos": 5,
-                    },
                 }
             ],
             "node_summary_infos": [
@@ -637,15 +650,25 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "tag": "github-action",
+            "fips_enabled": True,
+            "etcd_encryption_enabled": True,
+            "ipsec_enabled": False,
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",
-                    "message": "Pod pod1 failed to start: ImagePullBackOff"
+                    "message": "Pod pod1 failed to start: ImagePullBackOff",
                 },
                 {
                     "timestamp": "2023-05-22T14:55:10Z",
-                    "message": "Node kind-control-plane became NotReady"
-                }
+                    "message": "Node kind-control-plane became NotReady",
+                },
             ],
+            "overall_resiliency_report": {
+                "scenarios": {"example_scenario.yaml": 95},
+                "resiliency_score": 90,
+                "passed_slos": 4,
+                "total_slos": 5,
+            },
         }
         return example_data
