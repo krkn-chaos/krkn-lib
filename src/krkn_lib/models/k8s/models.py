@@ -218,6 +218,91 @@ class PodsStatus:
             self.unrecovered.append(unrecovered)
 
 
+class AffectedVMI:
+    """
+    A VMI affected by a chaos scenario
+    """
+
+    vmi_name: str
+    """
+    Name of the VMI
+    """
+    namespace: str
+    """
+    Namespace of the VMI
+    """
+    vmi_rescheduling_time: float
+    """
+    The time that the cluster took to reschedule
+    the VMI after the chaos scenario
+    """
+    vmi_readiness_time: float
+    """
+    The time the VMI took to become ready after being scheduled
+    """
+    total_recovery_time: float
+    """
+    Total amount of time the VMI took to become ready
+    """
+
+    def __init__(
+        self,
+        vmi_name: str,
+        namespace: str,
+        total_recovery_time: float = None,
+        vmi_readiness_time: float = None,
+        vmi_rescheduling_time: float = None,
+    ):
+        self.vmi_name = vmi_name
+        self.namespace = namespace
+        self.total_recovery_time = total_recovery_time
+        self.vmi_readiness_time = vmi_readiness_time
+        self.vmi_rescheduling_time = vmi_rescheduling_time
+
+
+class VmisStatus:
+    """
+    Return value of wait_for_vmis_to_become_ready containing the list
+    of the VMIs that did recover (vmi_name, namespace,
+    time needed to become ready) and the list of VMIs that did
+    not recover from the chaos
+    """
+
+    recovered: list[AffectedVMI]
+    unrecovered: list[AffectedVMI]
+
+    def __init__(self, json_object: str = None):
+        self.recovered = []
+        self.unrecovered = []
+        self.error = None
+        if json_object:
+            for recovered in json_object["recovered"]:
+                self.recovered.append(
+                    AffectedVMI(
+                        recovered["vmi_name"],
+                        recovered["namespace"],
+                        float(recovered["total_recovery_time"]),
+                        float(recovered["vmi_readiness_time"]),
+                        float(recovered["vmi_rescheduling_time"]),
+                    )
+                )
+            for unrecovered in json_object["unrecovered"]:
+                self.unrecovered.append(
+                    AffectedVMI(
+                        unrecovered["vmi_name"],
+                        unrecovered["namespace"],
+                    )
+                )
+            if "error" in json_object:
+                self.error = json_object["error"]
+
+    def merge(self, vmis_status: "VmisStatus"):
+        for recovered in vmis_status.recovered:
+            self.recovered.append(recovered)
+        for unrecovered in vmis_status.unrecovered:
+            self.unrecovered.append(unrecovered)
+
+
 class AffectedNode:
     """
     A node affected by a chaos scenario
@@ -409,11 +494,16 @@ class ResiliencyReport:
         json_object: dict = None,
         resiliency_score: int = 0,
         passed_slos: int = 0,
-        total_slos: int = 0
+        total_slos: int = 0,
     ):
         self.scenarios = {}
         self.resiliency_score = resiliency_score
         self.passed_slos = passed_slos
         self.total_slos = total_slos
-        if json_object and "scenarios" in json_object:
-            self.scenarios = json_object["scenarios"]
+        if json_object:
+            self.scenarios = json_object.get("scenarios", {})
+            self.resiliency_score = json_object.get(
+                "resiliency_score", resiliency_score
+            )
+            self.passed_slos = json_object.get("passed_slos", passed_slos)
+            self.total_slos = json_object.get("total_slos", total_slos)

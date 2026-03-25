@@ -97,6 +97,61 @@ class TestKrknElasticModels(BaseTest):
             .namespace,
             "default",
         )
+        # scenarios -> affected_vmis
+        self.assertEqual(
+            len(elastic_telemetry.scenarios[0].affected_vmis.recovered), 1
+        )
+        self.assertEqual(
+            len(elastic_telemetry.scenarios[0].affected_vmis.unrecovered), 1
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0].affected_vmis.error, "some vmi error"
+        )
+
+        # scenarios -> affected_vmis -> recovered
+        self.assertEqual(
+            elastic_telemetry.scenarios[0].affected_vmis.recovered[0].vmi_name,
+            "vmi1",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .namespace,
+            "default",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .total_recovery_time,
+            15.0,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .vmi_readiness_time,
+            8.0,
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .vmi_rescheduling_time,
+            3.0,
+        )
+
+        # scenarios -> affected_vmis -> unrecovered
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.unrecovered[0]
+            .vmi_name,
+            "vmi2",
+        )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.unrecovered[0]
+            .namespace,
+            "default",
+        )
+
         print(
             "elastic affected nodes"
             + str(
@@ -269,6 +324,10 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(elastic_telemetry.cloud_type, "EC2")
         self.assertEqual(elastic_telemetry.run_uuid, run_uuid)
+        self.assertEqual(elastic_telemetry.tag, "github-action")
+        self.assertTrue(elastic_telemetry.fips_enabled)
+        self.assertTrue(elastic_telemetry.etcd_encryption_enabled)
+        self.assertFalse(elastic_telemetry.ipsec_enabled)
         self.assertEqual(
             elastic_telemetry.build_url,
             "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",
@@ -294,22 +353,12 @@ class TestKrknElasticModels(BaseTest):
         # overall_resiliency_report validation
         overall_report = elastic_telemetry.overall_resiliency_report
         self.assertIsNotNone(overall_report)
+        self.assertEqual(overall_report.resiliency_score, 90)
+        self.assertEqual(overall_report.passed_slos, 4)
+        self.assertEqual(overall_report.total_slos, 5)
+        self.assertIsNotNone(overall_report.scenarios)
         self.assertEqual(
-            overall_report.resiliency_score, 90
-        )
-        self.assertEqual(
-            overall_report.passed_slos, 4
-        )
-        self.assertEqual(
-            overall_report.total_slos, 5
-        )
-        self.assertIsNotNone(
-            overall_report.scenarios
-        )
-        self.assertEqual(
-            overall_report.scenarios.to_dict().get(
-                "example_scenario.yaml"
-            ),
+            overall_report.scenarios.to_dict().get("example_scenario.yaml"),
             95,
         )
 

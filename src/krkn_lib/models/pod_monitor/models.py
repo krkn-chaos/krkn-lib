@@ -153,8 +153,7 @@ class PodsSnapshot:
                         # pod stayed ready but was restarted
                         # or has a failed container
                         recovery_time = (
-                            ready_status.timestamp
-                            - status_change.timestamp
+                            ready_status.timestamp - status_change.timestamp
                         )
 
                         # Ensure non-negative time (handle clock skew)
@@ -173,9 +172,7 @@ class PodsSnapshot:
                 # if there's a DELETION_SCHEDULED event
                 # looks for the rescheduled pod
                 # and calculates its scheduling and readiness time
-                if status_change.status in (
-                    PodStatus.DELETION_SCHEDULED,
-                ):
+                if status_change.status in (PodStatus.DELETION_SCHEDULED,):
                     rescheduled_pod = self._find_rescheduled_pod(pod_name)
                     if not rescheduled_pod:
                         pods_status.unrecovered.append(

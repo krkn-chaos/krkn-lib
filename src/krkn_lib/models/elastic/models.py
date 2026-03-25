@@ -88,6 +88,20 @@ class ElasticPodsStatus(InnerDoc):
     error = Text()
 
 
+class ElasticAffectedVMI(InnerDoc):
+    vmi_name = Text(fields={"keyword": Keyword()})
+    namespace = Text()
+    total_recovery_time = Float()
+    vmi_readiness_time = Float()
+    vmi_rescheduling_time = Float()
+
+
+class ElasticVmisStatus(InnerDoc):
+    recovered = Nested(ElasticAffectedVMI, multi=True)
+    unrecovered = Nested(ElasticAffectedVMI, multi=True)
+    error = Text()
+
+
 class ElasticAffectedNodes(InnerDoc):
     node_name = Text(fields={"keyword": Keyword()})
     node_id = Text()
@@ -118,6 +132,7 @@ class ElasticScenarioTelemetry(InnerDoc):
     parameters_base64 = Text()
     parameters = Nested(ElasticScenarioParameters)
     affected_pods = Nested(ElasticPodsStatus)
+    affected_vmis = Nested(ElasticVmisStatus)
     affected_nodes = Nested(ElasticAffectedNodes, multi=True)
 
 
@@ -176,6 +191,10 @@ class ElasticChaosRunTelemetry(Document):
     cluster_version = Text()
     major_version = Text()
     build_url = Text()
+    tag = Text()
+    fips_enabled = Boolean()
+    etcd_encryption_enabled = Boolean()
+    ipsec_enabled = Boolean()
     job_status = Boolean()
     run_uuid = Text(fields={"keyword": Keyword()})
     health_checks = Nested(ElasticHealthChecks, multi=True)
@@ -221,6 +240,25 @@ class ElasticChaosRunTelemetry(Document):
                         for pod in sc.affected_pods.unrecovered
                     ],
                     error=sc.affected_pods.error,
+                ),
+                affected_vmis=ElasticVmisStatus(
+                    recovered=[
+                        ElasticAffectedVMI(
+                            vmi_name=vmi.vmi_name,
+                            namespace=vmi.namespace,
+                            total_recovery_time=vmi.total_recovery_time,
+                            vmi_readiness_time=vmi.vmi_readiness_time,
+                            vmi_rescheduling_time=vmi.vmi_rescheduling_time,
+                        )
+                        for vmi in sc.affected_vmis.recovered
+                    ],
+                    unrecovered=[
+                        ElasticAffectedVMI(
+                            vmi_name=vmi.vmi_name, namespace=vmi.namespace
+                        )
+                        for vmi in sc.affected_vmis.unrecovered
+                    ],
+                    error=sc.affected_vmis.error,
                 ),
                 affected_nodes=[
                     ElasticAffectedNodes(
@@ -331,6 +369,12 @@ class ElasticChaosRunTelemetry(Document):
         self.job_status = chaos_run_telemetry.job_status
         self.major_version = chaos_run_telemetry.major_version
         self.build_url = chaos_run_telemetry.build_url
+        self.tag = chaos_run_telemetry.tag
+        self.fips_enabled = chaos_run_telemetry.fips_enabled
+        self.etcd_encryption_enabled = (
+            chaos_run_telemetry.etcd_encryption_enabled
+        )
+        self.ipsec_enabled = chaos_run_telemetry.ipsec_enabled
 
         if chaos_run_telemetry.error_logs:
             self.error_logs = [
@@ -346,18 +390,10 @@ class ElasticChaosRunTelemetry(Document):
         if chaos_run_telemetry.overall_resiliency_report:
             overall_report = chaos_run_telemetry.overall_resiliency_report
             self.overall_resiliency_report = ElasticResiliencyReport(
-                scenarios=(
-                    overall_report.scenarios
-                ),
-                resiliency_score=(
-                    overall_report.resiliency_score
-                ),
-                passed_slos=(
-                    overall_report.passed_slos
-                ),
-                total_slos=(
-                    overall_report.total_slos
-                ),
+                scenarios=(overall_report.scenarios),
+                resiliency_score=(overall_report.resiliency_score),
+                passed_slos=(overall_report.passed_slos),
+                total_slos=(overall_report.total_slos),
             )
         else:
             self.overall_resiliency_report = None

@@ -11,8 +11,9 @@ Assisted By: Claude Code
 
 import logging
 import tempfile
-import unittest
 import time
+import unittest
+
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from kubernetes.client import ApiException
@@ -22,6 +23,7 @@ from krkn_lib.tests import BaseTest
 
 class KrknKubernetesTestsCreate(BaseTest):
     """Test create operations on Kubernetes cluster."""
+
     def test_create_pod(self):
         """Test creating a pod and waiting for it to be running."""
         namespace = "test-cp-" + self.get_random_string(10)

@@ -265,6 +265,97 @@ class KrknKubernetes:
 
         return self.cli.api_client.configuration.get_default_copy().host
 
+    def is_fips_enabled(self) -> bool:
+        """
+        Check if FIPS (Federal Information Processing Standards)
+        is enabled in the cluster.
+
+        For Kubernetes clusters, this checks node labels and
+        annotations for FIPS indicators.
+
+        :return: True if FIPS is enabled, False otherwise
+        """
+        try:
+            nodes = self.cli.list_node()
+            for node in nodes.items:
+                # Check annotations for FIPS
+                annotations = node.metadata.annotations or {}
+                if annotations.get("config.openshift.io/fips") == "true":
+                    return True
+                # Check labels for FIPS
+                labels = node.metadata.labels or {}
+                if labels.get("fips-enabled") == "true":
+                    return True
+            return False
+        except ApiException as e:
+            logging.warning("Failed to check FIPS status: %s", str(e))
+            return False
+
+    def is_etcd_encryption_enabled(self) -> bool:
+        """
+        Check if etcd encryption is enabled in the cluster.
+
+        For vanilla Kubernetes, this is difficult to detect without
+        direct etcd access. This method returns False by default and
+        should be overridden by OpenShift implementation.
+
+        :return: False for vanilla Kubernetes
+        """
+        # For vanilla Kubernetes, etcd encryption status is not
+        # easily accessible. This should be overridden by
+        # OpenShift-specific implementation
+        return False
+
+    def is_ipsec_enabled(self) -> bool:
+        """
+        Check if IPsec is enabled in the cluster.
+
+        This checks for common IPsec daemonsets in kube-system or
+        other namespaces.
+
+        :return: True if IPsec is enabled, False otherwise
+        """
+        try:
+            # Check for common IPsec daemonsets in various namespaces
+            namespaces_to_check = [
+                "kube-system",
+                "openshift-ovn-kubernetes",
+                "calico-system",
+            ]
+
+            for namespace in namespaces_to_check:
+                try:
+                    daemonsets = self.apps_api.list_namespaced_daemon_set(
+                        namespace
+                    )
+                    for ds in daemonsets.items:
+                        if "ipsec" in ds.metadata.name.lower():
+                            # Check if daemonset has desired pods
+                            if (
+                                ds.status.desired_number_scheduled
+                                and ds.status.desired_number_scheduled > 0
+                            ):
+                                return True
+                        # Check for Calico IPsec configuration
+                        if ds.metadata.name == "calico-node":
+                            # Check environment variables for IPsec
+                            containers = ds.spec.template.spec.containers
+                            for container in containers:
+                                for env in container.env or []:
+                                    if (
+                                        env.name == "FELIX_IPSECENABLED"
+                                        and env.value == "true"
+                                    ):
+                                        return True
+                except ApiException:
+                    # Namespace might not exist, continue to next
+                    continue
+
+            return False
+        except ApiException as e:
+            logging.debug("Failed to check IPsec status: %s", str(e))
+            return False
+
     def list_continue_helper(self, func, *args, **keyword_args):
         """
         List continue helper, be able to get all objects past the request limit

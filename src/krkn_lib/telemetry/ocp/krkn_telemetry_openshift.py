@@ -1,5 +1,5 @@
-import ast
 import datetime
+import json
 import logging
 import os
 import threading
@@ -78,6 +78,13 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         chaos_telemetry.network_plugins = (
             self.__ocpcli.get_cluster_network_plugins()
         )
+
+        # Collect security and encryption settings
+        chaos_telemetry.fips_enabled = self.__ocpcli.is_fips_enabled()
+        chaos_telemetry.etcd_encryption_enabled = (
+            self.__ocpcli.is_etcd_encryption_enabled()
+        )
+        chaos_telemetry.ipsec_enabled = self.__ocpcli.is_ipsec_enabled()
 
         vm_number = self.get_vm_number()
         if vm_number > 0:
@@ -256,7 +263,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
                 if data[1] != 200:
                     return 0
 
-                json_obj = ast.literal_eval(data[0])
+                json_obj = json.loads(data[0])
                 return len(json_obj["items"])
             except Exception:
                 logging.info("failed to parse virtualmachines API")

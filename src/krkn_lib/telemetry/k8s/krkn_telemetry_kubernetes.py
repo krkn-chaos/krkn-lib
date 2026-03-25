@@ -110,6 +110,13 @@ class KrknTelemetryKubernetes:
             if scenario.exit_status > 0:
                 chaos_telemetry.job_status = False
 
+        # Collect security and encryption settings
+        chaos_telemetry.fips_enabled = self.__kubecli.is_fips_enabled()
+        chaos_telemetry.etcd_encryption_enabled = (
+            self.__kubecli.is_etcd_encryption_enabled()
+        )
+        chaos_telemetry.ipsec_enabled = self.__kubecli.is_ipsec_enabled()
+
     def send_telemetry(
         self,
         telemetry_config: dict,

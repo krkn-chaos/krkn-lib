@@ -535,6 +535,21 @@ class BaseTest(unittest.TestCase):
                         ],
                         "error": "some error",
                     },
+                    "affected_vmis": {
+                        "recovered": [
+                            {
+                                "vmi_name": "vmi1",
+                                "namespace": "default",
+                                "total_recovery_time": 15.0,
+                                "vmi_readiness_time": 8.0,
+                                "vmi_rescheduling_time": 3.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"vmi_name": "vmi2", "namespace": "default"}
+                        ],
+                        "error": "some vmi error",
+                    },
                     "affected_nodes": [
                         {
                             "node_name": "kind-control-plane",
@@ -635,6 +650,10 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "tag": "github-action",
+            "fips_enabled": True,
+            "etcd_encryption_enabled": True,
+            "ipsec_enabled": False,
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",
