@@ -1212,7 +1212,7 @@ class KrknKubernetes:
     def exec_command_on_node(
         self,
         node_name: str,
-        command: [str],
+        command: list[str],
         exec_pod_name: str,
         exec_pod_namespace: str = "default",
         exec_pod_container: str = None,
