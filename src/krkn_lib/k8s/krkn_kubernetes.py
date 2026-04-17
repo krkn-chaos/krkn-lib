@@ -1556,41 +1556,56 @@ class KrknKubernetes:
             logging.error(f"Unexpected error getting VMI {name}: {e}")
             raise
 
-    def get_vmis(self, regex_name: str, namespace: str) -> Optional[Dict]:
+    def get_vmis(
+        self,
+        regex_name: Optional[str],
+        namespace: str,
+        label_selector: Optional[str] = None,
+    ) -> List[Dict]:
         """
-        Get a Virtual Machine Instance by name and namespace.
+        Get Virtual Machine Instances, optionally filtered by name regex
+        and/or label selector.
 
-        :param name: Name of the VMI to retrieve
-        :param namespace: Namespace of the VMI
-        :return: The VMI object if found, None otherwise
+        :param regex_name: Regex to match VMI names against; None matches all
+        :param namespace: Namespace regex (matched via list_namespaces_by_regex)  # NOQA
+        :param label_selector: Label selector (e.g. "app=myapp,env=prod");
+            None disables label filtering
+        :return: List of matching VMI objects
         """
         try:
             vmis_list = []
             namespaces = self.list_namespaces_by_regex(namespace)
-            for namespace in namespaces:
+            kwargs = {}
+            if label_selector:
+                kwargs["label_selector"] = label_selector
+            for ns in namespaces:
                 vmis = self.custom_object_client.list_namespaced_custom_object(
                     group="kubevirt.io",
                     version="v1",
-                    namespace=namespace,
+                    namespace=ns,
                     plural="virtualmachineinstances",
+                    **kwargs,
                 )
-
-                for vmi in vmis.get("items"):
-                    vmi_name = vmi.get("metadata", {}).get("name")
-                    match = re.match(regex_name, vmi_name)
-                    if match:
+                for vmi in vmis.get("items", []):
+                    if regex_name is None:
                         vmis_list.append(vmi)
+                    else:
+                        vmi_name = vmi.get("metadata", {}).get("name", "")
+                        if re.match(regex_name, vmi_name):
+                            vmis_list.append(vmi)
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VMI {regex_name} not found in namespace {namespace}"
+                    f"No VMIs found (regex={regex_name}, "
+                    f"label_selector={label_selector}) "
+                    f"in namespace {namespace}"
                 )
                 return []
             else:
-                logging.error(f"Error getting VMI {regex_name}: {e}")
+                logging.error(f"Error getting VMIs: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VMI {regex_name}: {e}")
+            logging.error(f"Unexpected error getting VMIs: {e}")
             raise
         return vmis_list
 
@@ -1695,42 +1710,57 @@ class KrknKubernetes:
             logging.error(f"Unexpected error patching VMI {name}: {e}")
             raise
 
-    def get_vms(self, regex_name: str, namespace: str) -> Optional[Dict]:
+    def get_vms(
+        self,
+        regex_name: Optional[str],
+        namespace: str,
+        label_selector: Optional[str] = None,
+    ) -> List[Dict]:
         """
-        Get a Virtual Machine by name and namespace.
+        Get Virtual Machines, optionally filtered by name regex and/or
+        label selector.
 
-        :param name: Name of the VM to retrieve
-        :param namespace: Namespace of the VM
-        :return: The VM object if found, None otherwise
+        :param regex_name: Regex to match VM names against; None matches all
+        :param namespace: Namespace regex (matched via list_namespaces_by_regex)  # NOQA
+        :param label_selector: Label selector (e.g. "app=myapp,env=prod");
+            None disables label filtering
+        :return: List of matching VM objects
         """
         try:
             vms_list = []
             namespaces = self.list_namespaces_by_regex(namespace)
-            for namespace in namespaces:
+            kwargs = {}
+            if label_selector:
+                kwargs["label_selector"] = label_selector
+            for ns in namespaces:
                 vms = self.custom_object_client.list_namespaced_custom_object(
                     group="kubevirt.io",
                     version="v1",
-                    namespace=namespace,
+                    namespace=ns,
                     plural="virtualmachines",
+                    **kwargs,
                 )
-
-                for vm in vms.get("items"):
-                    vm_name = vm.get("metadata", {}).get("name")
-                    match = re.match(regex_name, vm_name)
-                    if match:
+                for vm in vms.get("items", []):
+                    if regex_name is None:
                         vms_list.append(vm)
+                    else:
+                        vm_name = vm.get("metadata", {}).get("name", "")
+                        if re.match(regex_name, vm_name):
+                            vms_list.append(vm)
             return vms_list
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VM {regex_name} not found in namespace {namespace}"
+                    f"No VMs found (regex={regex_name}, "
+                    f"label_selector={label_selector}) "
+                    f"in namespace {namespace}"
                 )
                 return []
             else:
-                logging.error(f"Error getting VM {regex_name}: {e}")
+                logging.error(f"Error getting VMs: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VM {regex_name}: {e}")
+            logging.error(f"Unexpected error getting VMs: {e}")
             raise
 
     def get_snapshot(self, name: str, namespace: str) -> Optional[Dict]:
@@ -3507,7 +3537,7 @@ class KrknKubernetes:
         http2: bool = True,
         insecure: bool = False,
         node_selectors: dict = None,
-        timeout_sec: int = 500
+        timeout_sec: int = 500,
     ):
         """
         Deploy an HTTP load testing pod using Vegeta.
@@ -3533,7 +3563,9 @@ class KrknKubernetes:
         env = Environment(loader=file_loader, autoescape=False)
         pod_template = env.get_template("http_load_pod.j2")
 
-        has_node_selectors = node_selectors is not None and len(node_selectors) > 0
+        has_node_selectors = (
+            node_selectors is not None and len(node_selectors) > 0
+        )
 
         pod_body = yaml.safe_load(
             pod_template.render(
@@ -3551,11 +3583,13 @@ class KrknKubernetes:
                 http2="true" if http2 else "false",
                 insecure="true" if insecure else "false",
                 has_node_selectors=has_node_selectors,
-                node_selectors=node_selectors if has_node_selectors else {}
+                node_selectors=node_selectors if has_node_selectors else {},
             )
         )
 
-        logging.info(f"Deploying HTTP load pod {name} for {duration} at {rate}")
+        logging.info(
+            f"Deploying HTTP load pod {name} for {duration} at {rate}"
+        )
 
         try:
             self.create_pod(pod_body, namespace, timeout_sec)
