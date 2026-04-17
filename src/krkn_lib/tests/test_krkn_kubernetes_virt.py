@@ -180,7 +180,7 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             self.lib_k8s.get_vmi(vmi_name, namespace)
 
     def test_get_vmis_success(self):
-        """Test get_vmis returns matching VMIs"""
+        """Test get_vmis returns matching VMIs by regex"""
         regex_name = "^test-vmi-.*"
         namespace = "test-ns"
         vmi1 = {
@@ -197,24 +197,47 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
         vmis_response = {"items": [vmi1, vmi2, vmi3]}
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=[namespace],
         ):
-            # Configure the mock to return vmis
             mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.return_value = vmis_response
 
-            # get_vmis returns a list
             result = self.lib_k8s.get_vmis(regex_name, namespace)
 
-            # Check that only matching VMIs were returned
             self.assertEqual(len(result), 2)
             self.assertIn(vmi1, result)
             self.assertIn(vmi2, result)
             self.assertNotIn(vmi3, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+            )
+
+    def test_get_vmis_no_regex_returns_all(self):
+        """Test get_vmis with regex_name=None returns all VMIs"""
+        namespace = "test-ns"
+        vmi1 = {"metadata": {"name": "test-vmi-1"}}
+        vmi2 = {"metadata": {"name": "other-vmi"}}
+        vmis_response = {"items": [vmi1, vmi2]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vmis_response
+
+            result = self.lib_k8s.get_vmis(None, namespace)
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vmi1, result)
+            self.assertIn(vmi2, result)
 
     def test_get_vmis_not_found(self):
         """Test get_vmis handles 404 gracefully"""
@@ -222,18 +245,15 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=404)
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=[namespace],
         ):
-            # Configure the mock to raise 404
             mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = api_exception
 
             result = self.lib_k8s.get_vmis(regex_name, namespace)
-            # Returns [] when 404
             self.assertEqual(result, [])
 
     def test_get_vmis_multiple_namespaces(self):
@@ -246,28 +266,157 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         vmis_response_1 = {"items": [vmi1]}
         vmis_response_2 = {"items": [vmi2]}
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=namespaces,
         ):
-            # Configure mock for different responses
             mock_list = self.mock_custom_client.list_namespaced_custom_object
-            mock_list.side_effect = [
-                vmis_response_1,
-                vmis_response_2,
-            ]
+            mock_list.side_effect = [vmis_response_1, vmis_response_2]
 
-            # get_vmis returns a list
             result = self.lib_k8s.get_vmis(regex_name, namespace_pattern)
 
             self.assertEqual(len(result), 2)
             self.assertIn(vmi1, result)
             self.assertIn(vmi2, result)
 
+    def test_get_vmis_by_label_success(self):
+        """Test get_vmis with label_selector passes it to the API"""
+        namespace = "test-ns"
+        label_selector = "app=myapp,env=prod"
+        vmi1 = {
+            "metadata": {
+                "name": "test-vmi-1",
+                "labels": {"app": "myapp", "env": "prod"},
+            }
+        }
+        vmi2 = {
+            "metadata": {
+                "name": "test-vmi-2",
+                "labels": {"app": "myapp", "env": "prod"},
+            }
+        }
+        vmis_response = {"items": [vmi1, vmi2]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vmis_response
+
+            result = self.lib_k8s.get_vmis(
+                None, namespace, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vmi1, result)
+            self.assertIn(vmi2, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                label_selector=label_selector,
+            )
+
+    def test_get_vmis_by_label_not_found(self):
+        """Test get_vmis with label_selector handles 404 gracefully"""
+        namespace = "test-ns"
+        api_exception = ApiException(status=404)
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = api_exception
+
+            result = self.lib_k8s.get_vmis(
+                None, namespace, label_selector="app=missing"
+            )
+            self.assertEqual(result, [])
+
+    def test_get_vmis_by_label_multiple_namespaces(self):
+        """Test get_vmis with label_selector searches across multiple namespaces"""  # NOQA
+        namespace_pattern = "test-ns-.*"
+        namespaces = ["test-ns-1", "test-ns-2"]
+        label_selector = "app=myapp"
+        vmi1 = {"metadata": {"name": "vmi-a"}}
+        vmi2 = {"metadata": {"name": "vmi-b"}}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=namespaces,
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = [{"items": [vmi1]}, {"items": [vmi2]}]
+
+            result = self.lib_k8s.get_vmis(
+                None, namespace_pattern, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vmi1, result)
+            self.assertIn(vmi2, result)
+            self.assertEqual(mock_list.call_count, 2)
+            for call_args in mock_list.call_args_list:
+                self.assertEqual(
+                    call_args.kwargs.get("label_selector"), label_selector
+                )
+
+    def test_get_vmis_combined_regex_and_label(self):
+        """Test get_vmis applies regex name filter on top of server-side label filtering"""  # NOQA
+        namespace = "test-ns"
+        label_selector = "app=myapp"
+        vmi_match = {"metadata": {"name": "test-vmi-1"}}
+        vmi_no_match = {"metadata": {"name": "other-vmi"}}
+        vmis_response = {"items": [vmi_match, vmi_no_match]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vmis_response
+
+            result = self.lib_k8s.get_vmis(
+                "^test-vmi-.*", namespace, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 1)
+            self.assertIn(vmi_match, result)
+            self.assertNotIn(vmi_no_match, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachineinstances",
+                label_selector=label_selector,
+            )
+
+    def test_get_vmis_api_error_raises(self):
+        """Test get_vmis raises on non-404 API errors"""
+        namespace = "test-ns"
+        api_exception = ApiException(status=500)
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = api_exception
+
+            with self.assertRaises(ApiException):
+                self.lib_k8s.get_vmis("^test-.*", namespace)
+
     def test_get_vms_success(self):
-        """Test get_vms returns matching VMs"""
+        """Test get_vms returns matching VMs by regex"""
         regex_name = "^test-vm-.*"
         namespace = "test-ns"
         vm1 = {
@@ -284,13 +433,11 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         }
         vms_response = {"items": [vm1, vm2, vm3]}
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=[namespace],
         ):
-            # Configure the mock to return vms
             mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.return_value = vms_response
 
@@ -300,6 +447,33 @@ class TestKrknKubernetesVirt(unittest.TestCase):
             self.assertIn(vm1, result)
             self.assertIn(vm2, result)
             self.assertNotIn(vm3, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+            )
+
+    def test_get_vms_no_regex_returns_all(self):
+        """Test get_vms with regex_name=None returns all VMs"""
+        namespace = "test-ns"
+        vm1 = {"metadata": {"name": "test-vm-1"}}
+        vm2 = {"metadata": {"name": "other-vm"}}
+        vms_response = {"items": [vm1, vm2]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vms_response
+
+            result = self.lib_k8s.get_vms(None, namespace)
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vm1, result)
+            self.assertIn(vm2, result)
 
     def test_get_vms_not_found(self):
         """Test get_vms returns empty list when no VMs found"""
@@ -307,13 +481,11 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         namespace = "test-ns"
         api_exception = ApiException(status=404)
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=[namespace],
         ):
-            # Configure the mock to raise 404
             mock_list = self.mock_custom_client.list_namespaced_custom_object
             mock_list.side_effect = api_exception
 
@@ -330,24 +502,154 @@ class TestKrknKubernetesVirt(unittest.TestCase):
         vms_response_1 = {"items": [vm1]}
         vms_response_2 = {"items": [vm2]}
 
-        # Mock list_namespaces_by_regex
         with patch.object(
             self.lib_k8s,
             "list_namespaces_by_regex",
             return_value=namespaces,
         ):
-            # Configure mock for different responses
             mock_list = self.mock_custom_client.list_namespaced_custom_object
-            mock_list.side_effect = [
-                vms_response_1,
-                vms_response_2,
-            ]
+            mock_list.side_effect = [vms_response_1, vms_response_2]
 
             result = self.lib_k8s.get_vms(regex_name, namespace_pattern)
 
             self.assertEqual(len(result), 2)
             self.assertIn(vm1, result)
             self.assertIn(vm2, result)
+
+    def test_get_vms_by_label_success(self):
+        """Test get_vms with label_selector passes it to the API"""
+        namespace = "test-ns"
+        label_selector = "app=myapp,env=prod"
+        vm1 = {
+            "metadata": {
+                "name": "test-vm-1",
+                "labels": {"app": "myapp", "env": "prod"},
+            }
+        }
+        vm2 = {
+            "metadata": {
+                "name": "test-vm-2",
+                "labels": {"app": "myapp", "env": "prod"},
+            }
+        }
+        vms_response = {"items": [vm1, vm2]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vms_response
+
+            result = self.lib_k8s.get_vms(
+                None, namespace, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vm1, result)
+            self.assertIn(vm2, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+                label_selector=label_selector,
+            )
+
+    def test_get_vms_by_label_not_found(self):
+        """Test get_vms with label_selector handles 404 gracefully"""
+        namespace = "test-ns"
+        api_exception = ApiException(status=404)
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = api_exception
+
+            result = self.lib_k8s.get_vms(
+                None, namespace, label_selector="app=missing"
+            )
+            self.assertEqual(result, [])
+
+    def test_get_vms_by_label_multiple_namespaces(self):
+        """Test get_vms with label_selector searches across multiple namespaces"""  # NOQA
+        namespace_pattern = "test-ns-.*"
+        namespaces = ["test-ns-1", "test-ns-2"]
+        label_selector = "app=myapp"
+        vm1 = {"metadata": {"name": "vm-a"}}
+        vm2 = {"metadata": {"name": "vm-b"}}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=namespaces,
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = [{"items": [vm1]}, {"items": [vm2]}]
+
+            result = self.lib_k8s.get_vms(
+                None, namespace_pattern, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 2)
+            self.assertIn(vm1, result)
+            self.assertIn(vm2, result)
+            self.assertEqual(mock_list.call_count, 2)
+            for call_args in mock_list.call_args_list:
+                self.assertEqual(
+                    call_args.kwargs.get("label_selector"), label_selector
+                )
+
+    def test_get_vms_combined_regex_and_label(self):
+        """Test get_vms applies regex name filter on top of server-side label filtering"""  # NOQA
+        namespace = "test-ns"
+        label_selector = "app=myapp"
+        vm_match = {"metadata": {"name": "test-vm-1"}}
+        vm_no_match = {"metadata": {"name": "other-vm"}}
+        vms_response = {"items": [vm_match, vm_no_match]}
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.return_value = vms_response
+
+            result = self.lib_k8s.get_vms(
+                "^test-vm-.*", namespace, label_selector=label_selector
+            )
+
+            self.assertEqual(len(result), 1)
+            self.assertIn(vm_match, result)
+            self.assertNotIn(vm_no_match, result)
+            mock_list.assert_called_once_with(
+                group="kubevirt.io",
+                version="v1",
+                namespace=namespace,
+                plural="virtualmachines",
+                label_selector=label_selector,
+            )
+
+    def test_get_vms_api_error_raises(self):
+        """Test get_vms raises on non-404 API errors"""
+        namespace = "test-ns"
+        api_exception = ApiException(status=500)
+
+        with patch.object(
+            self.lib_k8s,
+            "list_namespaces_by_regex",
+            return_value=[namespace],
+        ):
+            mock_list = self.mock_custom_client.list_namespaced_custom_object
+            mock_list.side_effect = api_exception
+
+            with self.assertRaises(ApiException):
+                self.lib_k8s.get_vms("^test-.*", namespace)
 
     def test_delete_vm_success(self):
         """Test delete_vm successfully deletes a VM"""
