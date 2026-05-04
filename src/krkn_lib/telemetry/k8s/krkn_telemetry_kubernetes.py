@@ -1,4 +1,5 @@
 import base64
+import concurrent.futures
 import os
 import tempfile
 import threading
@@ -85,22 +86,74 @@ class KrknTelemetryKubernetes:
         """
         self.safe_logger.info("collecting telemetry data, please wait....")
 
-        chaos_telemetry.kubernetes_objects_count = (
-            self.__kubecli.get_all_kubernetes_object_count(
-                [
-                    "Deployment",
-                    "Pod",
-                    "Secret",
-                    "ConfigMap",
-                    "Build",
-                    "Route",
-                ]
-            )
+        TIMEOUT = 60  # seconds wall-clock for all parallel calls combined
+
+        def timed(name, fn):
+            t = time.monotonic()
+            try:
+                result = fn()
+                self.safe_logger.info(
+                    f"collect_cluster_metadata: {name} in "
+                    f"{time.monotonic() - t:.2f}s"
+                )
+                return result
+            except Exception as e:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} failed after "
+                    f"{time.monotonic() - t:.2f}s: {e}"
+                )
+                raise
+
+        kube = self.__kubecli
+        calls = {
+            "get_all_kubernetes_object_count": lambda: (
+                kube.get_all_kubernetes_object_count([
+                    "Deployment", "Pod", "Secret",
+                    "ConfigMap", "Build", "Route",
+                ])
+            ),
+            "get_nodes_infos": kube.get_nodes_infos,
+            "get_version": kube.get_version,
+            "is_fips_enabled": kube.is_fips_enabled,
+            "is_etcd_encryption_enabled": kube.is_etcd_encryption_enabled,
+            "is_ipsec_enabled": kube.is_ipsec_enabled,
+        }
+
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(calls)
         )
-        node_infos, taints = self.__kubecli.get_nodes_infos()
+        futures = {
+            name: executor.submit(timed, name, fn)
+            for name, fn in calls.items()
+        }
+        done, _ = concurrent.futures.wait(futures.values(), timeout=TIMEOUT)
+        executor.shutdown(wait=False)
+
+        for name, future in futures.items():
+            if future not in done:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} timed out after "
+                    f"{TIMEOUT}s, skipping"
+                )
+
+        def get_result(name):
+            f = futures[name]
+            if f not in done:
+                return None
+            try:
+                return f.result()
+            except Exception:
+                return None
+
+        chaos_telemetry.kubernetes_objects_count = (
+            get_result("get_all_kubernetes_object_count") or {}
+        )
+        nodes_result = get_result("get_nodes_infos")
+        node_infos, taints = nodes_result if nodes_result is not None else ([], [])
         chaos_telemetry.node_summary_infos = node_infos
-        chaos_telemetry.cluster_version = self.__kubecli.get_version()
-        chaos_telemetry.major_version = chaos_telemetry.cluster_version[1:5]
+        cluster_version = get_result("get_version") or ""
+        chaos_telemetry.cluster_version = cluster_version
+        chaos_telemetry.major_version = cluster_version[1:5]
         chaos_telemetry.node_taints = taints
         chaos_telemetry.build_url = utils.get_ci_job_url()
         for info in node_infos:
@@ -109,13 +162,11 @@ class KrknTelemetryKubernetes:
         for scenario in chaos_telemetry.scenarios:
             if scenario.exit_status > 0:
                 chaos_telemetry.job_status = False
-
-        # Collect security and encryption settings
-        chaos_telemetry.fips_enabled = self.__kubecli.is_fips_enabled()
+        chaos_telemetry.fips_enabled = get_result("is_fips_enabled") or False
         chaos_telemetry.etcd_encryption_enabled = (
-            self.__kubecli.is_etcd_encryption_enabled()
+            get_result("is_etcd_encryption_enabled") or False
         )
-        chaos_telemetry.ipsec_enabled = self.__kubecli.is_ipsec_enabled()
+        chaos_telemetry.ipsec_enabled = get_result("is_ipsec_enabled") or False
 
     def send_telemetry(
         self,
