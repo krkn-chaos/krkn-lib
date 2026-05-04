@@ -105,7 +105,8 @@ class TestKrknElasticModels(BaseTest):
             len(elastic_telemetry.scenarios[0].affected_vmis.unrecovered), 1
         )
         self.assertEqual(
-            elastic_telemetry.scenarios[0].affected_vmis.error, "some vmi error"
+            elastic_telemetry.scenarios[0].affected_vmis.error,
+            "some vmi error",
         )
 
         # scenarios -> affected_vmis -> recovered

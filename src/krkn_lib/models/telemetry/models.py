@@ -7,7 +7,12 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import AffectedNode, PodsStatus, VmisStatus, ResiliencyReport
+from krkn_lib.models.k8s import (
+    AffectedNode,
+    PodsStatus,
+    VmisStatus,
+    ResiliencyReport,
+)
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [

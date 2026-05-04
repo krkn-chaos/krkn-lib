@@ -1,6 +1,5 @@
 import concurrent.futures
 import datetime
-import json
 import logging
 import os
 import threading
@@ -291,33 +290,25 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         self.safe_logger.info("ocp logs successfully uploaded")
 
     def get_vm_number(self) -> int:
-        api_client = self.__ocpcli.api_client
-        if api_client:
-            try:
-                path_params: dict[str, str] = {}
-                query_params: list[str] = []
-                header_params: dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
+        try:
+            count = 0
+            continue_token = None
+            client = self.__ocpcli.custom_object_client
+            while True:
+                kwargs = {"limit": 500}
+                if continue_token:
+                    kwargs["_continue"] = continue_token
+                result = client.list_cluster_custom_object(
+                    group="kubevirt.io",
+                    version="v1",
+                    plural="virtualmachineinstances",
+                    **kwargs,
                 )
-
-                path = "/apis/kubevirt.io/v1/virtualmachineinstances"
-                data = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="str",
-                    auth_settings=auth_settings,
-                )
-                if data[1] != 200:
-                    return 0
-
-                json_obj = json.loads(data[0])
-                return len(json_obj["items"])
-            except Exception:
-                logging.info("failed to parse virtualmachines API")
-                return 0
-        return 0
+                count += len(result["items"])
+                continue_token = result.get("metadata", {}).get("continue")
+                if not continue_token:
+                    break
+            return count
+        except Exception as e:
+            logging.info(f"failed to get virtualmachines: {e}")
+            return 0

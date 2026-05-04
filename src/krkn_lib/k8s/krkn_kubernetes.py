@@ -1575,25 +1575,53 @@ class KrknKubernetes:
         """
         try:
             vmis_list = []
-            namespaces = self.list_namespaces_by_regex(namespace)
             kwargs = {}
             if label_selector:
                 kwargs["label_selector"] = label_selector
-            for ns in namespaces:
-                vmis = self.custom_object_client.list_namespaced_custom_object(
-                    group="kubevirt.io",
-                    version="v1",
-                    namespace=ns,
-                    plural="virtualmachineinstances",
-                    **kwargs,
-                )
-                for vmi in vmis.get("items", []):
-                    if regex_name is None:
-                        vmis_list.append(vmi)
-                    else:
-                        vmi_name = vmi.get("metadata", {}).get("name", "")
-                        if re.match(regex_name, vmi_name):
+
+            if namespace == ".*":
+                # Single cluster-wide call instead of one call per namespace
+                continue_token = None
+                while True:
+                    page_kwargs = {**kwargs, "limit": 500}
+                    if continue_token:
+                        page_kwargs["_continue"] = continue_token
+                    vmis = (
+                        self.custom_object_client.list_cluster_custom_object(
+                            group="kubevirt.io",
+                            version="v1",
+                            plural="virtualmachineinstances",
+                            **page_kwargs,
+                        )
+                    )
+                    for vmi in vmis.get("items", []):
+                        if regex_name is None:
                             vmis_list.append(vmi)
+                        else:
+                            vmi_name = vmi.get("metadata", {}).get("name", "")
+                            if re.match(regex_name, vmi_name):
+                                vmis_list.append(vmi)
+                    continue_token = vmis.get("metadata", {}).get("continue")
+                    if not continue_token:
+                        break
+            else:
+                namespaces = self.list_namespaces_by_regex(namespace)
+                client = self.custom_object_client
+                for ns in namespaces:
+                    vmis = client.list_namespaced_custom_object(
+                        group="kubevirt.io",
+                        version="v1",
+                        namespace=ns,
+                        plural="virtualmachineinstances",
+                        **kwargs,
+                    )
+                    for vmi in vmis.get("items", []):
+                        if regex_name is None:
+                            vmis_list.append(vmi)
+                        else:
+                            vmi_name = vmi.get("metadata", {}).get("name", "")
+                            if re.match(regex_name, vmi_name):
+                                vmis_list.append(vmi)
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
@@ -2514,7 +2542,6 @@ class KrknKubernetes:
         ).rstrip()
         exists = exists if exists else "False"
         return exists == "True"
-
 
     def get_node_cpu_count(self, node_name: str) -> int:
         """
