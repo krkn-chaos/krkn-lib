@@ -10,9 +10,9 @@ homepage = "https://github.com/redhat-chaos/krkn"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-kubernetes ="34.1.0"
+kubernetes = ">=34.1.0"
 sphinxnotes-markdown-builder="^0.5.6"
-requests="^2.29.0"
+requests = "^2.29.0"
 kubeconfig = "^1.1.1"
 base64io = "^1.0.3"
 sphinx-rtd-theme = "^1.2.2"
@@ -29,6 +29,11 @@ numpy= "1.26.4"
 deprecation="2.1.0"
 coverage="^7.6.12"
 importlib-metadata = "^8.7.0"
+urllib3 = ">=2.6.3"
+cryptography = ">=46.0.7"
+pyasn1 = ">=0.6.3"
+pygments = ">=2.20.0"
+pillow = ">=12.2.0"
 
 [tool.poetry.group.test.dependencies]
 jinja2 = "^3.1.2"
