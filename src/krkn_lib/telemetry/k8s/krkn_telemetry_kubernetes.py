@@ -107,10 +107,16 @@ class KrknTelemetryKubernetes:
         kube = self.__kubecli
         calls = {
             "get_all_kubernetes_object_count": lambda: (
-                kube.get_all_kubernetes_object_count([
-                    "Deployment", "Pod", "Secret",
-                    "ConfigMap", "Build", "Route",
-                ])
+                kube.get_all_kubernetes_object_count(
+                    [
+                        "Deployment",
+                        "Pod",
+                        "Secret",
+                        "ConfigMap",
+                        "Build",
+                        "Route",
+                    ]
+                )
             ),
             "get_nodes_infos": kube.get_nodes_infos,
             "get_version": kube.get_version,
@@ -149,7 +155,9 @@ class KrknTelemetryKubernetes:
             get_result("get_all_kubernetes_object_count") or {}
         )
         nodes_result = get_result("get_nodes_infos")
-        node_infos, taints = nodes_result if nodes_result is not None else ([], [])
+        node_infos, taints = (
+            nodes_result if nodes_result is not None else ([], [])
+        )
         chaos_telemetry.node_summary_infos = node_infos
         cluster_version = get_result("get_version") or ""
         chaos_telemetry.cluster_version = cluster_version

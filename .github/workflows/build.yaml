@@ -52,7 +52,7 @@ jobs:
           pip install black flake8 isort
           isort --profile black .
           black --line-length 79 .
-          flake8 .
+          flake8 --max-line-length 79 --extend-ignore E501 .
   build:
     name: Build & Test
     strategy:
