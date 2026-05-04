@@ -1,4 +1,5 @@
 import ast
+import concurrent.futures
 import json
 import logging
 import os
@@ -2475,12 +2476,32 @@ class KrknKubernetes:
     def get_all_kubernetes_object_count(
         self, objects: list[str]
     ) -> dict[str, int]:
-        objects_found = dict[str, int]()
-        objects_found.update(
-            self.get_kubernetes_core_objects_count("v1", objects)
-        )
-        objects_found.update(self.get_kubernetes_custom_objects_count(objects))
-        return objects_found
+        def count_kind(kind):
+            try:
+                resource = self.dyn_client.resources.get(kind=kind)
+                count = 0
+                continue_token = None
+                while True:
+                    kwargs = {"limit": 500}
+                    if continue_token:
+                        kwargs["_continue"] = continue_token
+                    resp = resource.get(**kwargs)
+                    count += len(resp.items)
+                    continue_token = resp.metadata._continue
+                    if not continue_token:
+                        break
+                return kind, count
+            except Exception:
+                return kind, None
+
+        result = {}
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {executor.submit(count_kind, k): k for k in objects}
+            for future in concurrent.futures.as_completed(futures):
+                kind, count = future.result()
+                if count is not None:
+                    result[kind] = count
+        return result
 
     def path_exists_in_pod(
         self, pod_name: str, container_name: str, namespace: str, path: str
@@ -2494,104 +2515,6 @@ class KrknKubernetes:
         exists = exists if exists else "False"
         return exists == "True"
 
-    def get_kubernetes_core_objects_count(
-        self, api_version: str, objects: list[str]
-    ) -> dict[str, int]:
-        """
-        Counts all the occurrences of Kinds contained in
-        the object parameter in the CoreV1 Api
-
-        :param api_version: api version
-        :param objects: list of the kinds that must be counted
-        :return: a dictionary of Kinds and the number of objects counted
-        """
-
-        result = dict[str, int]()
-
-        try:
-            resources = self.cli.get_api_resources()
-            for resource in resources.resources:
-                if resource.kind in objects:
-                    if self.api_client:
-                        path_params: Dict[str, str] = {}
-                        query_params: List[str] = []
-                        header_params: Dict[str, str] = {}
-                        auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            self.api_client.select_header_accept(
-                                ["application/json"]
-                            )
-                        )
-
-                        path = f"/api/{api_version}/{resource.name}"
-                        data = self.api_client.call_api(
-                            path,
-                            "GET",
-                            path_params,
-                            query_params,
-                            header_params,
-                            response_type="str",
-                            auth_settings=auth_settings,
-                        )
-
-                        json_obj = ast.literal_eval(data[0])
-                        count = len(json_obj["items"])
-                        result[resource.kind] = count
-        except ApiException:
-            pass
-        return result
-
-    def get_kubernetes_custom_objects_count(
-        self, objects: list[str]
-    ) -> dict[str, int]:
-        """
-        Counts all the occurrences of Kinds contained in
-        the object parameter in the CustomObject Api
-
-        :param objects: list of Kinds that must be counted
-        :return: a dictionary of Kinds and number of objects counted
-        """
-        groups = client.ApisApi(self.api_client).get_api_versions().groups
-        result = dict[str, int]()
-        for api in groups:
-            versions = []
-            for v in api.versions:
-                name = ""
-                if (
-                    v.version == api.preferred_version.version
-                    and len(api.versions) > 1
-                ):
-                    name += "*"
-                name += v.version
-                versions.append(name)
-            try:
-                data = self.get_api_resources_by_group(
-                    api.name, api.preferred_version.version
-                )
-                for resource in data.resources:
-                    if resource.kind in objects:
-                        cust_cli = self.custom_object_client
-                        custom_resource = cust_cli.list_cluster_custom_object(
-                            group=api.name,
-                            version=api.preferred_version.version,
-                            plural=resource.name,
-                        )
-                        result[resource.kind] = len(custom_resource["items"])
-
-            except Exception:
-                pass
-        return result
-
-    def get_api_resources_by_group(self, group, version):
-        try:
-            api_response = self.custom_object_client.get_api_resources(
-                group, version
-            )
-            return api_response
-        except Exception:
-            pass
-
-        return None
 
     def get_node_cpu_count(self, node_name: str) -> int:
         """

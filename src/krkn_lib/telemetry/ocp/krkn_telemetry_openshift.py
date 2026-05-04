@@ -1,8 +1,10 @@
+import concurrent.futures
 import datetime
 import json
 import logging
 import os
 import threading
+import time
 from queue import Queue
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
@@ -65,28 +67,78 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         )
 
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
+        t0 = time.monotonic()
         super().collect_cluster_metadata(chaos_telemetry)
-        chaos_telemetry.cloud_infrastructure = (
-            self.__ocpcli.get_cloud_infrastructure()
+        self.safe_logger.info(
+            f"collect_cluster_metadata: base metadata collected in "
+            f"{time.monotonic() - t0:.2f}s"
         )
-        chaos_telemetry.cloud_type = self.__ocpcli.get_cluster_type()
-        chaos_telemetry.cluster_version = (
-            self.__ocpcli.get_clusterversion_string()
-        )
-        chaos_telemetry.major_version = chaos_telemetry.cluster_version[:4]
 
+        TIMEOUT = 30  # seconds wall-clock for all OCP calls combined
+
+        def timed(name, fn):
+            t = time.monotonic()
+            try:
+                result = fn()
+                self.safe_logger.info(
+                    f"collect_cluster_metadata: {name} in "
+                    f"{time.monotonic() - t:.2f}s"
+                )
+                return result
+            except Exception as e:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} failed after "
+                    f"{time.monotonic() - t:.2f}s: {e}"
+                )
+                raise
+
+        ocp = self.__ocpcli
+        calls = {
+            "get_cloud_infrastructure": ocp.get_cloud_infrastructure,
+            "get_cluster_type": ocp.get_cluster_type,
+            "get_clusterversion_string": ocp.get_clusterversion_string,
+            "get_cluster_network_plugins": ocp.get_cluster_network_plugins,
+            "get_vm_number": self.get_vm_number,
+        }
+
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(calls)
+        )
+        futures = {
+            name: executor.submit(timed, name, fn)
+            for name, fn in calls.items()
+        }
+        done, _ = concurrent.futures.wait(futures.values(), timeout=TIMEOUT)
+        executor.shutdown(wait=False)
+
+        for name, future in futures.items():
+            if future not in done:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} timed out after "
+                    f"{TIMEOUT}s, skipping"
+                )
+
+        def get_result(name):
+            f = futures[name]
+            if f not in done:
+                return None
+            try:
+                return f.result()
+            except Exception:
+                return None
+
+        chaos_telemetry.cloud_infrastructure = get_result(
+            "get_cloud_infrastructure"
+        )
+        chaos_telemetry.cloud_type = get_result("get_cluster_type")
+        cluster_version = get_result("get_clusterversion_string")
+        if cluster_version:
+            chaos_telemetry.cluster_version = cluster_version
+            chaos_telemetry.major_version = cluster_version[:4]
         chaos_telemetry.network_plugins = (
-            self.__ocpcli.get_cluster_network_plugins()
+            get_result("get_cluster_network_plugins") or []
         )
-
-        # Collect security and encryption settings
-        chaos_telemetry.fips_enabled = self.__ocpcli.is_fips_enabled()
-        chaos_telemetry.etcd_encryption_enabled = (
-            self.__ocpcli.is_etcd_encryption_enabled()
-        )
-        chaos_telemetry.ipsec_enabled = self.__ocpcli.is_ipsec_enabled()
-
-        vm_number = self.get_vm_number()
+        vm_number = get_result("get_vm_number") or 0
         if vm_number > 0:
             chaos_telemetry.kubernetes_objects_count[
                 "VirtualMachineInstance"

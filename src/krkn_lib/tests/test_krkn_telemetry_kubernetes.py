@@ -174,6 +174,31 @@ class TestCollectClusterMetadata(unittest.TestCase):
 
         self.assertEqual(chaos_telemetry.total_node_count, 8)  # 3 + 5
 
+    @patch("krkn_lib.utils.get_ci_job_url")
+    def test_collect_cluster_metadata_nodes_infos_failure(
+        self, mock_get_ci_url
+    ):
+        """node_taints must be a list when get_nodes_infos fails so that
+        downstream consumers iterating Taint objects don't raise
+        AttributeError."""
+        mock_get_ci_url.return_value = None
+        self.mock_kubecli.get_all_kubernetes_object_count.return_value = {}
+        self.mock_kubecli.get_nodes_infos.side_effect = Exception(
+            "API timeout"
+        )
+        self.mock_kubecli.get_version.return_value = "v1.28.0"
+        self.mock_kubecli.is_fips_enabled.return_value = False
+        self.mock_kubecli.is_etcd_encryption_enabled.return_value = False
+        self.mock_kubecli.is_ipsec_enabled.return_value = False
+
+        chaos_telemetry = ChaosRunTelemetry()
+        self.telemetry.collect_cluster_metadata(chaos_telemetry)
+
+        self.assertIsInstance(chaos_telemetry.node_taints, list)
+        self.assertEqual(chaos_telemetry.node_taints, [])
+        self.assertEqual(chaos_telemetry.node_summary_infos, [])
+        self.assertEqual(chaos_telemetry.total_node_count, 0)
+
 
 class TestSendTelemetry(unittest.TestCase):
     """Test send_telemetry method."""
