@@ -98,6 +98,8 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             "get_clusterversion_string": ocp.get_clusterversion_string,
             "get_cluster_network_plugins": ocp.get_cluster_network_plugins,
             "get_vm_number": self.get_vm_number,
+            "get_build_count": self.get_build_count,
+            "get_route_count": self.get_route_count,
         }
 
         executor = concurrent.futures.ThreadPoolExecutor(
@@ -142,6 +144,10 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             chaos_telemetry.kubernetes_objects_count[
                 "VirtualMachineInstance"
             ] = vm_number
+        build_count = get_result("get_build_count") or 0
+        chaos_telemetry.kubernetes_objects_count["Build"] = build_count
+        route_count = get_result("get_route_count") or 0
+        chaos_telemetry.kubernetes_objects_count["Route"] = route_count
 
     def put_ocp_logs(
         self,
@@ -289,26 +295,51 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         queue.join()
         self.safe_logger.info("ocp logs successfully uploaded")
 
+    def _count_custom_objects(
+        self, group: str, version: str, plural: str
+    ) -> int:
+        count = 0
+        continue_token = None
+        client = self.__ocpcli.custom_object_client
+        while True:
+            kwargs = {"limit": 500}
+            if continue_token:
+                kwargs["_continue"] = continue_token
+            result = client.list_cluster_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                **kwargs,
+            )
+            count += len(result["items"])
+            continue_token = result.get("metadata", {}).get("continue")
+            if not continue_token:
+                break
+        return count
+
     def get_vm_number(self) -> int:
         try:
-            count = 0
-            continue_token = None
-            client = self.__ocpcli.custom_object_client
-            while True:
-                kwargs = {"limit": 500}
-                if continue_token:
-                    kwargs["_continue"] = continue_token
-                result = client.list_cluster_custom_object(
-                    group="kubevirt.io",
-                    version="v1",
-                    plural="virtualmachineinstances",
-                    **kwargs,
-                )
-                count += len(result["items"])
-                continue_token = result.get("metadata", {}).get("continue")
-                if not continue_token:
-                    break
-            return count
+            return self._count_custom_objects(
+                "kubevirt.io", "v1", "virtualmachineinstances"
+            )
         except Exception as e:
             logging.info(f"failed to get virtualmachines: {e}")
+            return 0
+
+    def get_build_count(self) -> int:
+        try:
+            return self._count_custom_objects(
+                "build.openshift.io", "v1", "builds"
+            )
+        except Exception as e:
+            logging.info(f"failed to get builds: {e}")
+            return 0
+
+    def get_route_count(self) -> int:
+        try:
+            return self._count_custom_objects(
+                "route.openshift.io", "v1", "routes"
+            )
+        except Exception as e:
+            logging.info(f"failed to get routes: {e}")
             return 0
