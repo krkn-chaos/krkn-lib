@@ -113,8 +113,6 @@ class KrknTelemetryKubernetes:
                         "Pod",
                         "Secret",
                         "ConfigMap",
-                        "Build",
-                        "Route",
                     ]
                 )
             ),

@@ -1,3 +1,6 @@
+# Run: poetry run python3 -m coverage run -a -m unittest src/krkn_lib/tests/test_krkn_kubernetes_get.py -v
+# Requires: KUBECONFIG pointing to a running Kubernetes cluster
+
 import logging
 import os
 import random
@@ -203,6 +206,7 @@ class KrknKubernetesTestsGet(BaseTest):
         self.assertIn("ConfigMap", objs)
         self.assertNotIn("Unknown", objs)
         self.assertGreater(objs["Namespace"], 0)
+        self.assertGreater(objs["ConfigMap"], 0)
 
     def test_get_nodes_infos(self):
         telemetry = ChaosRunTelemetry()
@@ -330,6 +334,7 @@ class KrknKubernetesTestsGet(BaseTest):
         """Test FIPS detection returns a boolean."""
         result = self.lib_k8s.is_fips_enabled()
         self.assertIsInstance(result, bool)
+        self.assertFalse(result)
 
     def test_is_etcd_encryption_enabled(self):
         """Test etcd encryption detection returns a boolean."""
@@ -342,6 +347,7 @@ class KrknKubernetesTestsGet(BaseTest):
         """Test IPsec detection returns a boolean."""
         result = self.lib_k8s.is_ipsec_enabled()
         self.assertIsInstance(result, bool)
+        self.assertFalse(result)
 
 
 if __name__ == "__main__":

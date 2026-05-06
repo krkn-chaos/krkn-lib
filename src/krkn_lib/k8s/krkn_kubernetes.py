@@ -78,8 +78,12 @@ class KrknKubernetes:
         return client.NetworkingV1Api(self.api_client)
 
     @property
-    def dyn_client(cls) -> DynamicClient:
-        return DynamicClient(cls.api_client)
+    def dyn_client(self) -> DynamicClient:
+        if self._dyn_client is None:
+            with self._dyn_client_lock:
+                if self._dyn_client is None:
+                    self._dyn_client = DynamicClient(self.api_client)
+        return self._dyn_client
 
     @property
     def custom_object_client(cls) -> client.CustomObjectsApi:
@@ -110,6 +114,8 @@ class KrknKubernetes:
             action="ignore", message="unclosed", category=ResourceWarning
         )
 
+        self._dyn_client = None
+        self._dyn_client_lock = threading.Lock()
         self.request_chunk_size = request_chunk_size
 
         if kubeconfig_string is not None:
@@ -2504,27 +2510,59 @@ class KrknKubernetes:
     def get_all_kubernetes_object_count(
         self, objects: list[str]
     ) -> dict[str, int]:
+        # Use typed API clients so we never touch DynamicClient/LazyDiscoverer.
+        # LazyDiscoverer scans every API group on first call — on OCP with
+        # hundreds of CRDs that takes > 60s and blows the telemetry timeout.
+        # Typed clients go directly to the specific endpoint with no discovery.
+        # _continue is the correct kwarg name for the typed clients; they remap
+        # it to ?continue=… in the query string internally.
+        kind_listers = {
+            "Pod": self.cli.list_pod_for_all_namespaces,
+            "Secret": self.cli.list_secret_for_all_namespaces,
+            "ConfigMap": self.cli.list_config_map_for_all_namespaces,
+            "Namespace": self.cli.list_namespace,
+            "ServiceAccount": self.cli.list_service_account_for_all_namespaces,
+            "Deployment": self.apps_api.list_deployment_for_all_namespaces,
+            "ReplicaSet": self.apps_api.list_replica_set_for_all_namespaces,
+            "DaemonSet": self.apps_api.list_daemon_set_for_all_namespaces,
+            "StatefulSet": self.apps_api.list_stateful_set_for_all_namespaces,
+        }
+
         def count_kind(kind):
+            lister = kind_listers.get(kind)
+            if lister is None:
+                logging.warning(
+                    "get_all_kubernetes_object_count: no typed lister for %s,"
+                    " skipping",
+                    kind,
+                )
+                return kind, None
             try:
-                resource = self.dyn_client.resources.get(kind=kind)
                 count = 0
                 continue_token = None
                 while True:
                     kwargs = {"limit": 500}
                     if continue_token:
                         kwargs["_continue"] = continue_token
-                    resp = resource.get(**kwargs)
+                    resp = lister(**kwargs)
                     count += len(resp.items)
-                    continue_token = resp.metadata._continue
+                    continue_token = resp.metadata._continue or None
                     if not continue_token:
                         break
                 return kind, count
-            except Exception:
+            except Exception as e:
+                logging.warning(
+                    "get_all_kubernetes_object_count: skipping %s: %s",
+                    kind,
+                    e,
+                )
                 return kind, None
 
         result = {}
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            futures = {executor.submit(count_kind, k): k for k in objects}
+            futures = {
+                executor.submit(count_kind, k): k for k in objects
+            }
             for future in concurrent.futures.as_completed(futures):
                 kind, count = future.result()
                 if count is not None:

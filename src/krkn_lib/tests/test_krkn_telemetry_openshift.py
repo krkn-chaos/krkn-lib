@@ -76,5 +76,110 @@ class TestGetVmNumber(unittest.TestCase):
         )
 
 
+class TestGetBuildCount(unittest.TestCase):
+
+    def test_returns_correct_count(self):
+        """Returns count from a single-page cluster-wide response."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.return_value = (
+            _cluster_response([{}, {}])
+        )
+        self.assertEqual(telemetry.get_build_count(), 2)
+        client.list_cluster_custom_object.assert_called_once_with(
+            group="build.openshift.io",
+            version="v1",
+            plural="builds",
+            limit=500,
+        )
+
+    def test_paginates_across_pages(self):
+        """Follows continue token and sums items across pages."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.side_effect = [
+            _cluster_response([{}, {}], continue_token="tok1"),
+            _cluster_response([{}, {}], continue_token="tok2"),
+            _cluster_response([{}]),
+        ]
+        self.assertEqual(telemetry.get_build_count(), 5)
+        self.assertEqual(client.list_cluster_custom_object.call_count, 3)
+
+    def test_empty_build_list_returns_zero(self):
+        """Empty cluster returns 0."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.return_value = (
+            _cluster_response([])
+        )
+        self.assertEqual(telemetry.get_build_count(), 0)
+
+    @patch("krkn_lib.telemetry.ocp.krkn_telemetry_openshift.logging")
+    def test_exception_returns_zero_and_logs(self, mock_logging):
+        """Exception returns 0 and logs the error message."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.side_effect = (
+            Exception("builds api not found")
+        )
+        self.assertEqual(telemetry.get_build_count(), 0)
+        mock_logging.info.assert_called_once()
+        self.assertIn(
+            "builds api not found", mock_logging.info.call_args[0][0]
+        )
+
+
+class TestGetRouteCount(unittest.TestCase):
+
+    def test_returns_correct_count(self):
+        """Returns count from a single-page cluster-wide response."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.return_value = (
+            _cluster_response([{}, {}, {}, {}])
+        )
+        self.assertEqual(telemetry.get_route_count(), 4)
+        client.list_cluster_custom_object.assert_called_once_with(
+            group="route.openshift.io",
+            version="v1",
+            plural="routes",
+            limit=500,
+        )
+
+    def test_paginates_across_pages(self):
+        """Follows continue token and sums items across pages."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.side_effect = [
+            _cluster_response([{}, {}], continue_token="tok1"),
+            _cluster_response([{}]),
+        ]
+        self.assertEqual(telemetry.get_route_count(), 3)
+        self.assertEqual(client.list_cluster_custom_object.call_count, 2)
+
+    def test_empty_route_list_returns_zero(self):
+        """Empty cluster returns 0."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.return_value = (
+            _cluster_response([])
+        )
+        self.assertEqual(telemetry.get_route_count(), 0)
+
+    @patch("krkn_lib.telemetry.ocp.krkn_telemetry_openshift.logging")
+    def test_exception_returns_zero_and_logs(self, mock_logging):
+        """Exception returns 0 and logs the error message."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        client = mock_ocpcli.custom_object_client
+        client.list_cluster_custom_object.side_effect = (
+            Exception("routes api not found")
+        )
+        self.assertEqual(telemetry.get_route_count(), 0)
+        mock_logging.info.assert_called_once()
+        self.assertIn(
+            "routes api not found", mock_logging.info.call_args[0][0]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
