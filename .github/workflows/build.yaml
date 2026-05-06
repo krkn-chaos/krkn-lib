@@ -68,7 +68,7 @@ jobs:
           fetch-tags: true
       - name: Fetch version number
         run: |
-          echo "NEXT_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> $GITHUB_ENV
+          echo "NEXT_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_ENV
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
