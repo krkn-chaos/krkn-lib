@@ -105,8 +105,7 @@ class TestKrknElasticModels(BaseTest):
             len(elastic_telemetry.scenarios[0].affected_vmis.unrecovered), 1
         )
         self.assertEqual(
-            elastic_telemetry.scenarios[0].affected_vmis.error,
-            "some vmi error",
+            elastic_telemetry.scenarios[0].affected_vmis.error, "some vmi error"
         )
 
         # scenarios -> affected_vmis -> recovered
@@ -329,6 +328,7 @@ class TestKrknElasticModels(BaseTest):
         self.assertTrue(elastic_telemetry.fips_enabled)
         self.assertTrue(elastic_telemetry.etcd_encryption_enabled)
         self.assertFalse(elastic_telemetry.ipsec_enabled)
+        self.assertEqual(elastic_telemetry.time_to_recovery, 45.5)
         self.assertEqual(
             elastic_telemetry.build_url,
             "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",
