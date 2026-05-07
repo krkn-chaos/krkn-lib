@@ -181,5 +181,196 @@ class TestGetRouteCount(unittest.TestCase):
         )
 
 
+class TestPutOcpLogs(unittest.TestCase):
+
+    def _make_config(self, **overrides):
+        base = {
+            "logs_backup": True,
+            "api_url": "https://telemetry.example.com",
+            "username": "user",
+            "password": "pass",
+            "backup_threads": 2,
+            "max_retries": 3,
+            "archive_path": "/tmp",
+            "logs_filter_patterns": [r".*"],
+            "oc_cli_path": None,
+            "telemetry_group": "test",
+        }
+        base.update(overrides)
+        return base
+
+    def test_skips_when_api_url_is_none(self):
+        """Returns early and logs info when api_url is None."""
+        telemetry, _ = _make_telemetry()
+        telemetry.put_ocp_logs("req-id", self._make_config(api_url=None), 0, 1)
+        telemetry.safe_logger.info.assert_called_once()
+        self.assertIn(
+            "api_url", telemetry.safe_logger.info.call_args[0][0]
+        )
+
+    def test_skips_when_api_url_is_empty_string(self):
+        """Returns early and logs info when api_url is an empty string."""
+        telemetry, _ = _make_telemetry()
+        telemetry.put_ocp_logs("req-id", self._make_config(api_url=""), 0, 1)
+        telemetry.safe_logger.info.assert_called_once()
+        self.assertIn(
+            "api_url", telemetry.safe_logger.info.call_args[0][0]
+        )
+
+    def test_raises_when_api_url_has_invalid_scheme(self):
+        """Raises Exception when api_url does not start with http/https."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id",
+                self._make_config(api_url="ftp://telemetry.example.com"),
+                0,
+                1,
+            )
+        self.assertIn("api_url is invalid", str(ctx.exception))
+
+    def test_raises_when_api_url_has_no_scheme(self):
+        """Raises Exception when api_url is a bare hostname with no scheme."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id",
+                self._make_config(api_url="telemetry.example.com"),
+                0,
+                1,
+            )
+        self.assertIn("api_url is invalid", str(ctx.exception))
+
+    def test_raises_when_logs_backup_missing(self):
+        """Raises Exception when logs_backup is absent from config."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(logs_backup=None), 0, 1
+            )
+        self.assertIn("logs_backup flag is missing", str(ctx.exception))
+
+    def test_raises_when_backup_threads_missing(self):
+        """Raises Exception when backup_threads is absent, not also a type error."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(backup_threads=None), 0, 1
+            )
+        msg = str(ctx.exception)
+        self.assertIn("backup_threads is missing", msg)
+        self.assertNotIn("must be a number", msg)
+
+    def test_raises_when_backup_threads_is_string(self):
+        """Raises Exception when backup_threads is a string, not an int."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(backup_threads="4"), 0, 1
+            )
+        msg = str(ctx.exception)
+        self.assertIn("must be a number not a string", msg)
+        self.assertNotIn("is missing", msg)
+
+    def test_raises_when_username_missing(self):
+        """Raises Exception when username is absent from config."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(username=None), 0, 1
+            )
+        self.assertIn("username is missing", str(ctx.exception))
+
+    def test_raises_when_password_missing(self):
+        """Raises Exception when password is absent from config."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(password=None), 0, 1
+            )
+        self.assertIn("password is missing", str(ctx.exception))
+
+    def test_raises_when_max_retries_missing(self):
+        """Raises Exception when max_retries is absent from config."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(max_retries=None), 0, 1
+            )
+        self.assertIn("max_retries is missing", str(ctx.exception))
+
+    def test_raises_when_archive_path_missing(self):
+        """Raises Exception when archive_path is absent from config."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(archive_path=None), 0, 1
+            )
+        self.assertIn("archive_path is missing", str(ctx.exception))
+
+    def test_raises_when_logs_filter_patterns_missing(self):
+        """Raises Exception when logs_filter_patterns is absent, not also a type error."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id", self._make_config(logs_filter_patterns=None), 0, 1
+            )
+        msg = str(ctx.exception)
+        self.assertIn("logs_filter_patterns is missing", msg)
+        self.assertNotIn("must be a list", msg)
+
+    def test_raises_when_logs_filter_patterns_not_a_list(self):
+        """Raises Exception when logs_filter_patterns is a string, not a list."""
+        telemetry, _ = _make_telemetry()
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs(
+                "req-id",
+                self._make_config(logs_filter_patterns=".*"),
+                0,
+                1,
+            )
+        msg = str(ctx.exception)
+        self.assertIn("must be a list of regex pattern", msg)
+        self.assertNotIn("is missing", msg)
+
+    def test_raises_with_all_missing_fields_joined(self):
+        """Single exception message contains all missing field names joined."""
+        telemetry, _ = _make_telemetry()
+        config = {
+            "api_url": "https://telemetry.example.com",
+            "logs_backup": None,
+            "backup_threads": None,
+            "username": None,
+            "password": None,
+            "max_retries": None,
+            "archive_path": None,
+            "logs_filter_patterns": None,
+        }
+        with self.assertRaises(Exception) as ctx:
+            telemetry.put_ocp_logs("req-id", config, 0, 1)
+        msg = str(ctx.exception)
+        for fragment in [
+            "logs_backup flag is missing",
+            "backup_threads is missing",
+            "username is missing",
+            "password is missing",
+            "max_retries is missing",
+            "archive_path is missing",
+            "logs_filter_patterns is missing",
+        ]:
+            self.assertIn(fragment, msg)
+
+    def test_skips_when_logs_backup_is_false(self):
+        """Returns early and logs info when logs_backup is False."""
+        telemetry, _ = _make_telemetry()
+        telemetry.put_ocp_logs(
+            "req-id", self._make_config(logs_backup=False), 0, 1
+        )
+        telemetry.safe_logger.info.assert_called_once()
+        self.assertIn(
+            "logs_backup is False", telemetry.safe_logger.info.call_args[0][0]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

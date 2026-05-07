@@ -176,6 +176,15 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         queue = Queue()
         logs_backup = telemetry_config.get("logs_backup")
         url = telemetry_config.get("api_url")
+        if not url:
+            self.safe_logger.info(
+                "api_url is not set: skipping OCP logs upload"
+            )
+            return
+        if not url.startswith(("http://", "https://")):
+            raise Exception(
+                f"telemetry -> api_url is invalid: '{url}' must start with http:// or https://"
+            )
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         backup_threads = telemetry_config.get("backup_threads")
@@ -192,14 +201,10 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         if backup_threads is None:
             exceptions.append("telemetry -> backup_threads is missing")
             is_exception = True
-
-        if not isinstance(backup_threads, int):
+        elif not isinstance(backup_threads, int):
             exceptions.append(
                 "telemetry -> backup_threads must be a number not a string"
             )
-            is_exception = True
-        if url is None:
-            exceptions.append("telemetry -> api_url is missing")
             is_exception = True
         if username is None:
             exceptions.append("telemetry -> username is missing")
@@ -214,7 +219,13 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             exceptions.append("telemetry -> archive_path is missing")
             is_exception = True
         if logs_filter_patterns is None:
-            exceptions.append("telemetry -> logs_filter_pastterns is missing")
+            exceptions.append("telemetry -> logs_filter_patterns is missing")
+            is_exception = True
+        elif not isinstance(logs_filter_patterns, list):
+            exceptions.append(
+                "telemetry -> logs_filter_patterns must be a "
+                "list of regex pattern"
+            )
             is_exception = True
         if not group:
             group = self.default_telemetry_group
@@ -223,13 +234,6 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         # None to let the config flexible
         if oc_cli_path == "":
             oc_cli_path = None
-
-        if not isinstance(logs_filter_patterns, list):
-            exceptions.append(
-                "telemetry -> logs_filter_pastterns must be a "
-                "list of regex pattern"
-            )
-            is_exception = True
 
         if is_exception:
             raise Exception(", ".join(exceptions))
