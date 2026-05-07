@@ -191,7 +191,7 @@ class PodsStatus:
         self.unrecovered = []
         self.error = None
         if json_object:
-            for recovered in json_object["recovered"]:
+            for recovered in (json_object.get("recovered") or []):
                 self.recovered.append(
                     AffectedPod(
                         recovered["pod_name"],
@@ -201,7 +201,7 @@ class PodsStatus:
                         float(recovered["pod_rescheduling_time"]),
                     )
                 )
-            for unrecovered in json_object["unrecovered"]:
+            for unrecovered in (json_object.get("unrecovered") or []):
                 self.unrecovered.append(
                     AffectedPod(
                         unrecovered["pod_name"],
@@ -276,7 +276,7 @@ class VmisStatus:
         self.unrecovered = []
         self.error = None
         if json_object:
-            for recovered in json_object["recovered"]:
+            for recovered in (json_object.get("recovered") or []):
                 self.recovered.append(
                     AffectedVMI(
                         recovered["vmi_name"],
@@ -286,7 +286,7 @@ class VmisStatus:
                         float(recovered["vmi_rescheduling_time"]),
                     )
                 )
-            for unrecovered in json_object["unrecovered"]:
+            for unrecovered in (json_object.get("unrecovered") or []):
                 self.unrecovered.append(
                     AffectedVMI(
                         unrecovered["vmi_name"],
