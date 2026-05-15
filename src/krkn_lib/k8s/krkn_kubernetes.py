@@ -8,6 +8,7 @@ import re
 import tempfile
 import threading
 import time
+import uuid
 import warnings
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -1237,7 +1238,7 @@ class KrknKubernetes:
         file_loader = PackageLoader("krkn_lib.k8s", "templates")
         env = Environment(loader=file_loader, autoescape=True)
         template = env.get_template("io_throttle_pod.j2")
-        pod_suffix = str(random.randint(10000, 99999))
+        pod_suffix = uuid.uuid4().hex[:10]
         pod_body = yaml.safe_load(
             template.render(
                 pod_suffix=pod_suffix,
@@ -1346,26 +1347,35 @@ class KrknKubernetes:
         :param namespace: namespace where the pod is created
         :param timeout: request timeout
         """
+        pod_stat = None
+        pod_name = body["metadata"]["name"]
         try:
-            pod_stat = None
             pod_stat = self.cli.create_namespaced_pod(
                 body=body, namespace=namespace
             )
             end_time = time.time() + timeout
             while True:
                 pod_stat = self.cli.read_namespaced_pod(
-                    name=body["metadata"]["name"], namespace=namespace
+                    name=pod_name, namespace=namespace
                 )
                 if pod_stat.status.phase == "Running":
                     break
                 if time.time() > end_time:
                     raise Exception("Starting pod failed")
                 time.sleep(1)
+        except ApiException as e:
+            logging.error("Pod creation failed %s", str(e))
+            if e.status == 409:
+                raise e
+            if pod_stat is not None:
+                self.delete_pod(pod_name, namespace)
+            raise e
         except Exception as e:
             logging.error("Pod creation failed %s", str(e))
-            if pod_stat:
-                logging.error(pod_stat.status.container_statuses)
-            self.delete_pod(body["metadata"]["name"], namespace)
+            if pod_stat is not None:
+                if pod_stat.status and pod_stat.status.container_statuses:
+                    logging.error(pod_stat.status.container_statuses)
+                self.delete_pod(pod_name, namespace)
             raise e
 
     def read_pod(self, name: str, namespace: str = "default") -> client.V1Pod:
