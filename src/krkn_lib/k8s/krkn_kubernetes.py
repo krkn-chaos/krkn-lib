@@ -1216,6 +1216,39 @@ class KrknKubernetes:
 
         return ret
 
+    def deploy_io_throttle_pod(
+        self,
+        node_name: str,
+        image: str,
+        namespace: str = "default",
+        timeout: int = 300,
+    ) -> str:
+        """
+        Deploy a privileged pod on a node for I/O throttling via cgroup.
+
+        The pod mounts the host root filesystem at /host.
+
+        :param node_name: target node
+        :param image: container image to use
+        :param namespace: namespace for the pod
+        :param timeout: seconds to wait for pod readiness
+        :return: the generated pod name
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        template = env.get_template("io_throttle_pod.j2")
+        pod_suffix = str(random.randint(10000, 99999))
+        pod_body = yaml.safe_load(
+            template.render(
+                pod_suffix=pod_suffix,
+                nodename=node_name,
+                image=image,
+            )
+        )
+        pod_name = "io-throttle-%s" % pod_suffix
+        self.create_pod(pod_body, namespace, timeout)
+        return pod_name
+
     def exec_command_on_node(
         self,
         node_name: str,
