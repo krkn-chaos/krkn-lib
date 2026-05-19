@@ -1,5 +1,6 @@
 ![action](https://github.com/krkn-chaos/krkn-lib/actions/workflows/build.yaml/badge.svg)
 ![coverage](https://krkn-chaos.github.io/krkn-lib-docs/coverage_badge.svg)
+![security](https://krkn-chaos.github.io/krkn-lib-docs/security_badge_krkn_lib.svg)
 ![PyPI](https://img.shields.io/pypi/v/krkn-lib?label=PyPi)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/krkn-lib)
 # krkn-lib
