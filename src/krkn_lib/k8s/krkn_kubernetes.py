@@ -8,6 +8,7 @@ import re
 import tempfile
 import threading
 import time
+import uuid
 import warnings
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -1216,6 +1217,39 @@ class KrknKubernetes:
 
         return ret
 
+    def deploy_io_throttle_pod(
+        self,
+        node_name: str,
+        image: str,
+        namespace: str = "default",
+        timeout: int = 300,
+    ) -> str:
+        """
+        Deploy a privileged pod on a node for I/O throttling via cgroup.
+
+        The pod mounts the host root filesystem at /host.
+
+        :param node_name: target node
+        :param image: container image to use
+        :param namespace: namespace for the pod
+        :param timeout: seconds to wait for pod readiness
+        :return: the generated pod name
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        template = env.get_template("io_throttle_pod.j2")
+        pod_suffix = uuid.uuid4().hex[:10]
+        pod_body = yaml.safe_load(
+            template.render(
+                pod_suffix=pod_suffix,
+                nodename=node_name,
+                image=image,
+            )
+        )
+        pod_name = "io-throttle-%s" % pod_suffix
+        self.create_pod(pod_body, namespace, timeout)
+        return pod_name
+
     def exec_command_on_node(
         self,
         node_name: str,
@@ -1313,26 +1347,35 @@ class KrknKubernetes:
         :param namespace: namespace where the pod is created
         :param timeout: request timeout
         """
+        pod_stat = None
+        pod_name = body["metadata"]["name"]
         try:
-            pod_stat = None
             pod_stat = self.cli.create_namespaced_pod(
                 body=body, namespace=namespace
             )
             end_time = time.time() + timeout
             while True:
                 pod_stat = self.cli.read_namespaced_pod(
-                    name=body["metadata"]["name"], namespace=namespace
+                    name=pod_name, namespace=namespace
                 )
                 if pod_stat.status.phase == "Running":
                     break
                 if time.time() > end_time:
                     raise Exception("Starting pod failed")
                 time.sleep(1)
+        except ApiException as e:
+            logging.error("Pod creation failed %s", str(e))
+            if e.status == 409:
+                raise e
+            if pod_stat is not None:
+                self.delete_pod(pod_name, namespace)
+            raise e
         except Exception as e:
             logging.error("Pod creation failed %s", str(e))
-            if pod_stat:
-                logging.error(pod_stat.status.container_statuses)
-            self.delete_pod(body["metadata"]["name"], namespace)
+            if pod_stat is not None:
+                if pod_stat.status and pod_stat.status.container_statuses:
+                    logging.error(pod_stat.status.container_statuses)
+                self.delete_pod(pod_name, namespace)
             raise e
 
     def read_pod(self, name: str, namespace: str = "default") -> client.V1Pod:
