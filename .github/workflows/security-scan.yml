@@ -1,0 +1,149 @@
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  security-scan-pr:
+    name: Security Scan - Dependencies
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan dependencies for vulnerabilities
+        run: |
+          echo "🔍 Scanning dependencies for vulnerabilities..."
+          grype dir:. --only-fixed -o table > /tmp/grype-scan.txt || true
+
+          SCAN_OUTPUT=$(grype dir:. --only-fixed -o json)
+          CRITICAL=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length')
+          HIGH=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "High")] | length')
+          MEDIUM=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length')
+
+          # Create Job Summary with table
+          echo "## 🔒 Security Scan - Python Dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | $CRITICAL | $([ $CRITICAL -eq 0 ] && echo '✅' || echo '⚠️') |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | $HIGH | $([ $HIGH -eq 0 ] && echo '✅' || echo '⚠️') |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Medium | $MEDIUM | $([ $MEDIUM -eq 0 ] && echo '✅' || echo '⚠️') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "⚠️ **Found $CRITICAL Critical and $HIGH High vulnerabilities with available fixes**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **No Critical or High vulnerabilities found**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Add collapsible full scan results
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>📋 Full Scan Results (only fixable vulnerabilities)</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/grype-scan.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  security-badge:
+    permissions:
+      contents: write
+    name: Generate Security Badge
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Check out doc repo
+        uses: actions/checkout@master
+        with:
+          repository: krkn-chaos/krkn-lib-docs
+          path: krkn-lib-docs
+          ssh-key: ${{ secrets.KRKN_LIB_DOCS_PRIV_KEY }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version 1.8.5
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan and generate security badge
+        run: |
+          # Scan with grype (no --only-fixed to get all CVEs for baseline)
+          SCAN_OUTPUT=$(grype dir:. -o json)
+
+          # Count vulnerabilities by severity
+          CRITICAL=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length')
+          HIGH=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "High")] | length')
+          MEDIUM=$(echo "$SCAN_OUTPUT" | jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length')
+          TOTAL=$(echo "$SCAN_OUTPUT" | jq '[.matches[]] | length')
+
+          # Determine badge color based on severity
+          if [ $CRITICAL -gt 0 ]; then
+            COLOR="critical"
+          elif [ $HIGH -gt 10 ]; then
+            COLOR="important"
+          elif [ $HIGH -gt 5 ]; then
+            COLOR="orange"
+          elif [ $HIGH -gt 0 ]; then
+            COLOR="yellow"
+          else
+            COLOR="brightgreen"
+          fi
+
+          echo "Security Scan Results:"
+          echo "  Critical: $CRITICAL"
+          echo "  High: $HIGH"
+          echo "  Medium: $MEDIUM"
+          echo "  Total: $TOTAL"
+          echo "  Badge Color: $COLOR"
+
+          # Generate detailed badge: "C:0 H:7 M:3"
+          curl "https://img.shields.io/badge/security-C:$CRITICAL%20H:$HIGH%20M:$MEDIUM-$COLOR" > ./krkn-lib-docs/security_badge_krkn_lib.svg
+
+      - name: Push updated Security Badge
+        run: |
+          cd krkn-lib-docs
+          git add .
+          git config user.name "krkn-chaos"
+          git config user.email "krkn-actions@users.noreply.github.com"
+          git commit -m "[KRKN-LIB] Security Badge ${GITHUB_REF##*/}" || echo "no changes to commit"
+          git push
