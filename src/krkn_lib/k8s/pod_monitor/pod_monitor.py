@@ -16,7 +16,7 @@ from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
     PodStatus,
 )
-
+from kubernetes.client.exceptions import ApiException
 
 def _select_pods(
     select_partial: partial,
@@ -231,6 +231,31 @@ def _monitor_pods(
             w.stop()
             return snapshot
 
+        except ApiException as e:
+            if e.status == 410:
+                logging.warning(
+                    "resourceVersion expired, refreshing watch"
+                )
+                refreshed = monitor_partial.func()
+                
+                snapshot.resource_version = (
+                    refreshed.metadata.resource_version
+                )
+                
+                updated_keywords = dict(monitor_partial.keywords)
+                updated_keywords["resource_version"] = (
+                    snapshot.resource_version
+                )
+
+                monitor_partial = partial(
+                    monitor_partial.func,
+                    **updated_keywords,
+                )
+                
+                retry_count += 1
+                continue
+            raise
+        
         except ProtocolError as e:
             logging.warning(f"ProtocolError encountered: {e}")
 
