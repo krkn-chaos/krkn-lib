@@ -654,6 +654,7 @@ class BaseTest(unittest.TestCase):
             "fips_enabled": True,
             "etcd_encryption_enabled": True,
             "ipsec_enabled": False,
+            "time_to_recovery": 45.5,
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",

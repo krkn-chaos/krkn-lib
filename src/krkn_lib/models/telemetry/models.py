@@ -7,12 +7,7 @@ from datetime import datetime, timezone
 
 import yaml
 
-from krkn_lib.models.k8s import (
-    AffectedNode,
-    PodsStatus,
-    VmisStatus,
-    ResiliencyReport,
-)
+from krkn_lib.models.k8s import AffectedNode, PodsStatus, VmisStatus, ResiliencyReport
 
 relevant_event_reasons: frozenset[str] = frozenset(
     [
@@ -609,6 +604,7 @@ class ChaosRunTelemetry:
         self.health_checks = list[HealthCheck]()
         self.virt_checks = list[VirtCheck]()
         self.error_logs = []
+        self.time_to_recovery: float | None = None
         self.overall_resiliency_report = ResiliencyReport()
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
@@ -656,6 +652,7 @@ class ChaosRunTelemetry:
             )
             self.ipsec_enabled = json_dict.get("ipsec_enabled", False)
             self.error_logs = json_dict.get("error_logs")
+            self.time_to_recovery = json_dict.get("time_to_recovery")
 
             if json_dict.get("overall_resiliency_report"):
                 report_data = json_dict.get("overall_resiliency_report")
