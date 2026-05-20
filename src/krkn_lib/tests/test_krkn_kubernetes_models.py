@@ -169,7 +169,7 @@ class TestKrknKubernetesModels(BaseTest):
         )
         self.assertEqual(nodes_status_1.affected_nodes[0].running_time, 0.11)
 
-class TestPodsStatusVmisStatus:
+class TestPodsStatusVmisStatus(BaseTest):
     """Handle None / missing fields safely"""
 
     def test_pods_status_none_recovered(self):
