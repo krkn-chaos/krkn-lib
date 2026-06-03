@@ -13,6 +13,7 @@ from krkn_lib.models.telemetry import (
     ClusterEvent,
     ScenarioTelemetry,
 )
+from krkn_lib.models.telemetry.models import VirtCheck
 
 
 class KrknTelemetryModelsTests(unittest.TestCase):
@@ -640,6 +641,81 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertFalse(telemetry.fips_enabled)
         self.assertFalse(telemetry.etcd_encryption_enabled)
         self.assertFalse(telemetry.ipsec_enabled)
+
+
+class VirtCheckModelTests(unittest.TestCase):
+    def _base_dict(self, **overrides) -> dict:
+        base = {
+            "vm_name": "test-vm",
+            "ip_address": "192.168.1.1",
+            "new_ip_address": "",
+            "namespace": "default",
+            "node_name": "worker-1",
+            "start_timestamp": "2025-03-12T14:57:34.555878",
+            "end_timestamp": "2025-03-12T14:57:54.904352",
+            "duration": 20.0,
+        }
+        base.update(overrides)
+        return base
+
+    def test_healthy(self):
+        vc = VirtCheck(self._base_dict(ssh_status=True, vmi_ready=True))
+        self.assertTrue(vc.ssh_status)
+        self.assertTrue(vc.vmi_ready)
+        self.assertTrue(vc.status)
+        self.assertEqual(vc.check_type, "healthy")
+
+    def test_ssh_access_down(self):
+        vc = VirtCheck(self._base_dict(ssh_status=False, vmi_ready=True))
+        self.assertFalse(vc.ssh_status)
+        self.assertTrue(vc.vmi_ready)
+        self.assertFalse(vc.status)
+        self.assertEqual(vc.check_type, "ssh_access")
+
+    def test_vmi_not_ready(self):
+        vc = VirtCheck(self._base_dict(ssh_status=True, vmi_ready=False))
+        self.assertTrue(vc.ssh_status)
+        self.assertFalse(vc.vmi_ready)
+        self.assertFalse(vc.status)
+        self.assertEqual(vc.check_type, "vmi_ready")
+
+    def test_both_down(self):
+        vc = VirtCheck(self._base_dict(ssh_status=False, vmi_ready=False))
+        self.assertFalse(vc.ssh_status)
+        self.assertFalse(vc.vmi_ready)
+        self.assertFalse(vc.status)
+        self.assertEqual(vc.check_type, "both")
+
+    def test_status_derived_from_ssh_and_vmi(self):
+        # status not explicitly set: derived from ssh_status AND vmi_ready
+        vc = VirtCheck(self._base_dict(ssh_status=True, vmi_ready=True))
+        self.assertTrue(vc.status)
+        vc2 = VirtCheck(self._base_dict(ssh_status=False, vmi_ready=True))
+        self.assertFalse(vc2.status)
+
+    def test_status_explicit_overrides_derived(self):
+        # explicit status=False wins even when both checks pass
+        vc = VirtCheck(
+            self._base_dict(ssh_status=True, vmi_ready=True, status=False)
+        )
+        self.assertFalse(vc.status)
+
+    def test_defaults_when_fields_absent(self):
+        # omitting the new fields should default to True / "healthy"
+        vc = VirtCheck(self._base_dict())
+        self.assertTrue(vc.ssh_status)
+        self.assertTrue(vc.vmi_ready)
+        self.assertTrue(vc.status)
+        self.assertEqual(vc.check_type, "healthy")
+
+    def test_new_ip_address_carried_through(self):
+        vc = VirtCheck(
+            self._base_dict(
+                ssh_status=False, vmi_ready=True, new_ip_address="10.0.0.5"
+            )
+        )
+        self.assertEqual(vc.new_ip_address, "10.0.0.5")
+        self.assertEqual(vc.check_type, "ssh_access")
 
 
 if __name__ == "__main__":

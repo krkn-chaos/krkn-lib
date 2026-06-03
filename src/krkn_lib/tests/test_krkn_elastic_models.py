@@ -289,7 +289,11 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.virt_checks[0].node_name, "h03-r660"
         )
 
+        # virt_checks[0]: ssh up, vmi ready → healthy
+        self.assertEqual(elastic_telemetry.virt_checks[0].ssh_status, True)
+        self.assertEqual(elastic_telemetry.virt_checks[0].vmi_ready, True)
         self.assertEqual(elastic_telemetry.virt_checks[0].status, True)
+        self.assertEqual(elastic_telemetry.virt_checks[0].check_type, "healthy")
         self.assertEqual(
             elastic_telemetry.virt_checks[0].start_timestamp,
             datetime.datetime.fromisoformat("2025-03-12T14:57:34.555878"),
@@ -299,6 +303,18 @@ class TestKrknElasticModels(BaseTest):
             datetime.datetime.fromisoformat("2025-03-12T14:57:54.904352"),
         )
         self.assertEqual(elastic_telemetry.virt_checks[0].duration, 20.348474)
+
+        # virt_checks[1]: ssh up, vmi not ready → vmi_ready
+        self.assertEqual(elastic_telemetry.virt_checks[1].ssh_status, True)
+        self.assertEqual(elastic_telemetry.virt_checks[1].vmi_ready, False)
+        self.assertEqual(elastic_telemetry.virt_checks[1].status, False)
+        self.assertEqual(elastic_telemetry.virt_checks[1].check_type, "vmi_ready")
+
+        # virt_checks[2]: ssh down, vmi ready → ssh_access
+        self.assertEqual(elastic_telemetry.virt_checks[2].ssh_status, False)
+        self.assertEqual(elastic_telemetry.virt_checks[2].vmi_ready, True)
+        self.assertEqual(elastic_telemetry.virt_checks[2].status, False)
+        self.assertEqual(elastic_telemetry.virt_checks[2].check_type, "ssh_access")
 
         # post_virt_checks
         self.assertEqual(len(elastic_telemetry.post_virt_checks), 1)
@@ -311,7 +327,6 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(
             elastic_telemetry.post_virt_checks[0].new_ip_address, ""
         )
-
         self.assertEqual(
             elastic_telemetry.post_virt_checks[0].namespace, "benchmark-runner"
         )
@@ -319,7 +334,11 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.post_virt_checks[0].node_name, "h10-r660"
         )
 
+        # post_virt_checks[0]: both down → both
+        self.assertEqual(elastic_telemetry.post_virt_checks[0].ssh_status, False)
+        self.assertEqual(elastic_telemetry.post_virt_checks[0].vmi_ready, False)
         self.assertEqual(elastic_telemetry.post_virt_checks[0].status, False)
+        self.assertEqual(elastic_telemetry.post_virt_checks[0].check_type, "both")
 
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
