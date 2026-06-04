@@ -462,9 +462,21 @@ class VirtCheck:
     """
     Node Name
     """
+    ssh_status: bool
+    """
+    SSH access check result
+    """
+    vmi_ready: bool
+    """
+    VMI readiness check result (Running phase with Ready=True condition)
+    """
     status: bool
     """
-    Status of VMI ssh connection
+    Overall health: True only when both ssh_status and vmi_ready are True
+    """
+    check_type: str
+    """
+    Which check(s) are failing: 'ssh_access', 'vmi_ready', 'both', or 'healthy'
     """
     start_timestamp: str
     """
@@ -485,7 +497,16 @@ class VirtCheck:
             self.ip_address = json_dict["ip_address"]
             self.namespace = json_dict["namespace"]
             self.vm_name = json_dict["vm_name"]
-            self.status = json_dict.get("status", True)
+            self.ssh_status = json_dict.get("ssh_status", True)
+            self.vmi_ready = json_dict.get("vmi_ready", True)
+            self.status = json_dict.get("status", self.ssh_status and self.vmi_ready)
+            default_check_type = (
+                "both" if not self.ssh_status and not self.vmi_ready
+                else "ssh_access" if not self.ssh_status
+                else "vmi_ready" if not self.vmi_ready
+                else "healthy"
+            )
+            self.check_type = json_dict.get("check_type", default_check_type)
             self.start_timestamp = json_dict.get("start_timestamp", "")
             self.end_timestamp = json_dict.get("end_timestamp", "")
             self.duration = json_dict.get("duration", "")

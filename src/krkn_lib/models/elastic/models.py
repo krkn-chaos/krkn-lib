@@ -167,7 +167,10 @@ class ElasticVirtChecks(InnerDoc):
     new_ip_address = Text()
     namespace = Text()
     node_name = Text()
+    ssh_status = Boolean()
+    vmi_ready = Boolean()
     status = Boolean()
+    check_type = Text(fields={"keyword": Keyword()})
     start_timestamp = Date()
     end_timestamp = Date()
     duration = Float()
@@ -324,7 +327,10 @@ class ElasticChaosRunTelemetry(Document):
                     new_ip_address=info.new_ip_address,
                     namespace=info.namespace,
                     node_name=info.node_name,
+                    ssh_status=info.ssh_status,
+                    vmi_ready=info.vmi_ready,
                     status=info.status,
+                    check_type=info.check_type,
                     start_timestamp=datetime.datetime.fromisoformat(
                         str(info.start_timestamp)
                     ),
@@ -346,7 +352,10 @@ class ElasticChaosRunTelemetry(Document):
                     new_ip_address=post_info.new_ip_address,
                     namespace=post_info.namespace,
                     node_name=post_info.node_name,
+                    ssh_status=post_info.ssh_status,
+                    vmi_ready=post_info.vmi_ready,
                     status=post_info.status,
+                    check_type=post_info.check_type,
                     start_timestamp=datetime.datetime.fromisoformat(
                         str(post_info.start_timestamp)
                     ),
