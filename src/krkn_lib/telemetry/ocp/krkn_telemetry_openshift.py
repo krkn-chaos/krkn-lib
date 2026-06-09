@@ -1,8 +1,9 @@
-import ast
+import concurrent.futures
 import datetime
 import logging
 import os
 import threading
+import time
 from queue import Queue
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
@@ -65,25 +66,88 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         )
 
     def collect_cluster_metadata(self, chaos_telemetry: ChaosRunTelemetry):
+        t0 = time.monotonic()
         super().collect_cluster_metadata(chaos_telemetry)
-        chaos_telemetry.cloud_infrastructure = (
-            self.__ocpcli.get_cloud_infrastructure()
+        self.safe_logger.info(
+            f"collect_cluster_metadata: base metadata collected in "
+            f"{time.monotonic() - t0:.2f}s"
         )
-        chaos_telemetry.cloud_type = self.__ocpcli.get_cluster_type()
-        chaos_telemetry.cluster_version = (
-            self.__ocpcli.get_clusterversion_string()
-        )
-        chaos_telemetry.major_version = chaos_telemetry.cluster_version[:4]
 
+        TIMEOUT = 30  # seconds wall-clock for all OCP calls combined
+
+        def timed(name, fn):
+            t = time.monotonic()
+            try:
+                result = fn()
+                self.safe_logger.info(
+                    f"collect_cluster_metadata: {name} in "
+                    f"{time.monotonic() - t:.2f}s"
+                )
+                return result
+            except Exception as e:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} failed after "
+                    f"{time.monotonic() - t:.2f}s: {e}"
+                )
+                raise
+
+        ocp = self.__ocpcli
+        calls = {
+            "get_cloud_infrastructure": ocp.get_cloud_infrastructure,
+            "get_cluster_type": ocp.get_cluster_type,
+            "get_clusterversion_string": ocp.get_clusterversion_string,
+            "get_cluster_network_plugins": ocp.get_cluster_network_plugins,
+            "get_vm_number": self.get_vm_number,
+            "get_build_count": self.get_build_count,
+            "get_route_count": self.get_route_count,
+        }
+
+        executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=len(calls)
+        )
+        futures = {
+            name: executor.submit(timed, name, fn)
+            for name, fn in calls.items()
+        }
+        done, _ = concurrent.futures.wait(futures.values(), timeout=TIMEOUT)
+        executor.shutdown(wait=False)
+
+        for name, future in futures.items():
+            if future not in done:
+                self.safe_logger.warning(
+                    f"collect_cluster_metadata: {name} timed out after "
+                    f"{TIMEOUT}s, skipping"
+                )
+
+        def get_result(name):
+            f = futures[name]
+            if f not in done:
+                return None
+            try:
+                return f.result()
+            except Exception:
+                return None
+
+        chaos_telemetry.cloud_infrastructure = get_result(
+            "get_cloud_infrastructure"
+        )
+        chaos_telemetry.cloud_type = get_result("get_cluster_type")
+        cluster_version = get_result("get_clusterversion_string")
+        if cluster_version:
+            chaos_telemetry.cluster_version = cluster_version
+            chaos_telemetry.major_version = cluster_version[:4]
         chaos_telemetry.network_plugins = (
-            self.__ocpcli.get_cluster_network_plugins()
+            get_result("get_cluster_network_plugins") or []
         )
-
-        vm_number = self.get_vm_number()
+        vm_number = get_result("get_vm_number") or 0
         if vm_number > 0:
             chaos_telemetry.kubernetes_objects_count[
                 "VirtualMachineInstance"
             ] = vm_number
+        build_count = get_result("get_build_count") or 0
+        chaos_telemetry.kubernetes_objects_count["Build"] = build_count
+        route_count = get_result("get_route_count") or 0
+        chaos_telemetry.kubernetes_objects_count["Route"] = route_count
 
     def put_ocp_logs(
         self,
@@ -112,6 +176,15 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         queue = Queue()
         logs_backup = telemetry_config.get("logs_backup")
         url = telemetry_config.get("api_url")
+        if not url:
+            self.safe_logger.info(
+                "api_url is not set: skipping OCP logs upload"
+            )
+            return
+        if not url.startswith(("http://", "https://")):
+            raise Exception(
+                f"telemetry -> api_url is invalid: '{url}' must start with http:// or https://"
+            )
         username = telemetry_config.get("username")
         password = telemetry_config.get("password")
         backup_threads = telemetry_config.get("backup_threads")
@@ -128,14 +201,10 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         if backup_threads is None:
             exceptions.append("telemetry -> backup_threads is missing")
             is_exception = True
-
-        if not isinstance(backup_threads, int):
+        elif not isinstance(backup_threads, int):
             exceptions.append(
                 "telemetry -> backup_threads must be a number not a string"
             )
-            is_exception = True
-        if url is None:
-            exceptions.append("telemetry -> api_url is missing")
             is_exception = True
         if username is None:
             exceptions.append("telemetry -> username is missing")
@@ -150,7 +219,13 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             exceptions.append("telemetry -> archive_path is missing")
             is_exception = True
         if logs_filter_patterns is None:
-            exceptions.append("telemetry -> logs_filter_pastterns is missing")
+            exceptions.append("telemetry -> logs_filter_patterns is missing")
+            is_exception = True
+        elif not isinstance(logs_filter_patterns, list):
+            exceptions.append(
+                "telemetry -> logs_filter_patterns must be a "
+                "list of regex pattern"
+            )
             is_exception = True
         if not group:
             group = self.default_telemetry_group
@@ -159,13 +234,6 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         # None to let the config flexible
         if oc_cli_path == "":
             oc_cli_path = None
-
-        if not isinstance(logs_filter_patterns, list):
-            exceptions.append(
-                "telemetry -> logs_filter_pastterns must be a "
-                "list of regex pattern"
-            )
-            is_exception = True
 
         if is_exception:
             raise Exception(", ".join(exceptions))
@@ -231,34 +299,51 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         queue.join()
         self.safe_logger.info("ocp logs successfully uploaded")
 
+    def _count_custom_objects(
+        self, group: str, version: str, plural: str
+    ) -> int:
+        count = 0
+        continue_token = None
+        client = self.__ocpcli.custom_object_client
+        while True:
+            kwargs = {"limit": 500}
+            if continue_token:
+                kwargs["_continue"] = continue_token
+            result = client.list_cluster_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                **kwargs,
+            )
+            count += len(result["items"])
+            continue_token = result.get("metadata", {}).get("continue")
+            if not continue_token:
+                break
+        return count
+
     def get_vm_number(self) -> int:
-        api_client = self.__ocpcli.api_client
-        if api_client:
-            try:
-                path_params: dict[str, str] = {}
-                query_params: list[str] = []
-                header_params: dict[str, str] = {}
-                auth_settings = ["BearerToken"]
-                header_params["Accept"] = api_client.select_header_accept(
-                    ["application/json"]
-                )
+        try:
+            return self._count_custom_objects(
+                "kubevirt.io", "v1", "virtualmachineinstances"
+            )
+        except Exception as e:
+            logging.info(f"failed to get virtualmachines: {e}")
+            return 0
 
-                path = "/apis/kubevirt.io/v1/virtualmachineinstances"
-                data = api_client.call_api(
-                    path,
-                    "GET",
-                    path_params,
-                    query_params,
-                    header_params,
-                    response_type="str",
-                    auth_settings=auth_settings,
-                )
-                if data[1] != 200:
-                    return 0
+    def get_build_count(self) -> int:
+        try:
+            return self._count_custom_objects(
+                "build.openshift.io", "v1", "builds"
+            )
+        except Exception as e:
+            logging.info(f"failed to get builds: {e}")
+            return 0
 
-                json_obj = ast.literal_eval(data[0])
-                return len(json_obj["items"])
-            except Exception:
-                logging.info("failed to parse virtualmachines API")
-                return 0
-        return 0
+    def get_route_count(self) -> int:
+        try:
+            return self._count_custom_objects(
+                "route.openshift.io", "v1", "routes"
+            )
+        except Exception as e:
+            logging.info(f"failed to get routes: {e}")
+            return 0

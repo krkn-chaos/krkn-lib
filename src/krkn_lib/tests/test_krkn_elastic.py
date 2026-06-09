@@ -171,6 +171,56 @@ class TestKrknElastic(BaseTest):
                 es_url,
             )
 
+    def test_push_alert_no_es_client(self):
+        """Test push_alert returns -1 when es client is not initialized"""
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        alert = ElasticAlert(
+            alert="test", severity="WARNING", run_uuid="test-uuid"
+        )
+        result = elastic.push_alert(alert, "test-index")
+        self.assertEqual(result, -1)
+
+    def test_push_metric_no_es_client(self):
+        """Test push_metric returns -1 when es client is not initialized"""
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        metric = ElasticMetric(run_uuid="test-uuid")
+        result = elastic.push_metric(metric, "test-index")
+        self.assertEqual(result, -1)
+
+    def test_push_telemetry_no_es_client(self):
+        """Test push_telemetry returns -1 when es not initialized"""
+        run_uuid = str(uuid.uuid4())
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        telemetry = ChaosRunTelemetry(
+            json_dict=self.get_ChaosRunTelemetry_json(run_uuid)
+        )
+        result = elastic.push_telemetry(telemetry, "test-index")
+        self.assertEqual(result, -1)
+
+    def test_search_alert_no_es_client(self):
+        """Test search_alert returns [] when es client is not initialized"""
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        result = elastic.search_alert("test-uuid", "test-index")
+        self.assertEqual(result, [])
+
+    def test_search_metric_no_es_client(self):
+        """Test search_metric returns [] when es client is not initialized"""
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        result = elastic.search_metric("test-uuid", "test-index")
+        self.assertEqual(result, [])
+
+    def test_search_telemetry_no_es_client(self):
+        """Test search_telemetry returns [] when es not initialized"""
+        elastic = KrknElastic(SafeLogger(), "http://localhost")
+        elastic.es = None
+        result = elastic.search_telemetry("test-uuid", "test-index")
+        self.assertEqual(result, [])
+
 
 class TestKrknElasticOpenSearch(BaseTest):
     """Test suite for OpenSearch backend support using mocks"""

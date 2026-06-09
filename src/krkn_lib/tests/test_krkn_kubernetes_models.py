@@ -3,6 +3,7 @@ from krkn_lib.models.k8s import (
     AffectedNodeStatus,
     AffectedPod,
     PodsStatus,
+    VmisStatus,
 )
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.tests import BaseTest
@@ -167,3 +168,36 @@ class TestKrknKubernetesModels(BaseTest):
             nodes_status_1.affected_nodes[0].not_ready_time, 0.737
         )
         self.assertEqual(nodes_status_1.affected_nodes[0].running_time, 0.11)
+
+class TestPodsStatusVmisStatus(BaseTest):
+    """Handle None / missing fields safely"""
+
+    def test_pods_status_none_recovered(self):
+        ps = PodsStatus({"recovered": None, "unrecovered": []})
+        assert ps.recovered == []
+        assert ps.unrecovered == []
+
+    def test_pods_status_none_unrecovered(self):
+        ps = PodsStatus({"recovered": [], "unrecovered": None})
+        assert ps.recovered == []
+        assert ps.unrecovered == []
+
+    def test_pods_status_missing_unrecovered(self):
+        ps = PodsStatus({"recovered": []})
+        assert ps.recovered == []
+        assert ps.unrecovered == []
+
+    def test_vmis_status_none_recovered(self):
+        vs = VmisStatus({"recovered": None, "unrecovered": []})
+        assert vs.recovered == []
+        assert vs.unrecovered == []
+
+    def test_vmis_status_none_unrecovered(self):
+        vs = VmisStatus({"recovered": [], "unrecovered": None})
+        assert vs.recovered == []
+        assert vs.unrecovered == []
+
+    def test_vmis_status_missing_unrecovered(self):
+        vs = VmisStatus({"recovered": []})
+        assert vs.recovered == []
+        assert vs.unrecovered == []

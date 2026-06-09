@@ -16,7 +16,7 @@ from krkn_lib.models.pod_monitor.models import (
     PodsSnapshot,
     PodStatus,
 )
-
+from kubernetes.client.exceptions import ApiException
 
 def _select_pods(
     select_partial: partial,
@@ -178,15 +178,15 @@ def _monitor_pods(
                             w.stop()
                             return snapshot
 
-                        if (
-                            len(deleted_parent_pods) > 0
-                            and len(deleted_parent_pods) == len(restored_pods)
-                        ):
+                        if len(deleted_parent_pods) > 0 and len(
+                            deleted_parent_pods
+                        ) == len(restored_pods):
                             # Check that restored pods are actually new pods
                             # (not just initial pods that stayed ready)
                             # by verifying they have ADDED events
                             new_pods_count = sum(
-                                1 for pod_name in restored_pods
+                                1
+                                for pod_name in restored_pods
                                 if pod_name in snapshot.added_pods
                             )
                             if new_pods_count == len(deleted_parent_pods):
@@ -212,9 +212,7 @@ def _monitor_pods(
                             had_disruption = any(
                                 any(
                                     ev.status == PodStatus.NOT_READY
-                                    for ev in snapshot.pods[
-                                        p
-                                    ].status_changes
+                                    for ev in snapshot.pods[p].status_changes
                                 )
                                 for p in snapshot.initial_pods
                                 if p in snapshot.pods
@@ -229,12 +227,35 @@ def _monitor_pods(
                                 return snapshot
 
             # If we exit the loop normally (timeout reached), we're done
-            logging.info(
-                "Watch stream completed normally (timeout reached)"
-            )
+            logging.info("Watch stream completed normally (timeout reached)")
             w.stop()
             return snapshot
 
+        except ApiException as e:
+            if e.status == 410:
+                logging.warning(
+                    "resourceVersion expired, refreshing watch"
+                )
+                refreshed = monitor_partial.func()
+                
+                snapshot.resource_version = (
+                    refreshed.metadata.resource_version
+                )
+                
+                updated_keywords = dict(monitor_partial.keywords)
+                updated_keywords["resource_version"] = (
+                    snapshot.resource_version
+                )
+
+                monitor_partial = partial(
+                    monitor_partial.func,
+                    **updated_keywords,
+                )
+                
+                retry_count += 1
+                continue
+            raise
+        
         except ProtocolError as e:
             logging.warning(f"ProtocolError encountered: {e}")
 

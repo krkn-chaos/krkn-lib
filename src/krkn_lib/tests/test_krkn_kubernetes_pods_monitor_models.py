@@ -186,9 +186,7 @@ class TestMonitorPodsMonitorModels(unittest.TestCase):
         parent_pod.name = "parent-pod"
         parent_pod.namespace = "parent-ns"
         deletion_ts = time.time() - 20
-        deletion_event = PodEvent(
-            timestamp=deletion_ts
-        )
+        deletion_event = PodEvent(timestamp=deletion_ts)
         deletion_event.status = PodStatus.DELETION_SCHEDULED
         parent_pod.status_changes.append(deletion_event)
 

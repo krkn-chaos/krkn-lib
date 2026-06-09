@@ -535,6 +535,21 @@ class BaseTest(unittest.TestCase):
                         ],
                         "error": "some error",
                     },
+                    "affected_vmis": {
+                        "recovered": [
+                            {
+                                "vmi_name": "vmi1",
+                                "namespace": "default",
+                                "total_recovery_time": 15.0,
+                                "vmi_readiness_time": 8.0,
+                                "vmi_rescheduling_time": 3.0,
+                            }
+                        ],
+                        "unrecovered": [
+                            {"vmi_name": "vmi2", "namespace": "default"}
+                        ],
+                        "error": "some vmi error",
+                    },
                     "affected_nodes": [
                         {
                             "node_name": "kind-control-plane",
@@ -585,7 +600,10 @@ class BaseTest(unittest.TestCase):
                     "namespace": "benchmark-runner",
                     "ip_address": "0.0.0.0",
                     "vm_name": "windows-vm-50",
+                    "ssh_status": True,
+                    "vmi_ready": True,
                     "status": True,
+                    "check_type": "healthy",
                     "start_timestamp": "2025-03-12T14:57:34.555878",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.348474,
@@ -596,7 +614,10 @@ class BaseTest(unittest.TestCase):
                     "namespace": "benchmark-runner",
                     "vm_name": "windows-vm-51",
                     "ip_address": "0.0.0.1",
-                    "status": True,
+                    "ssh_status": True,
+                    "vmi_ready": False,
+                    "status": False,
+                    "check_type": "vmi_ready",
                     "start_timestamp": "2025-03-12T14:57:34.759105",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.145247,
@@ -607,7 +628,10 @@ class BaseTest(unittest.TestCase):
                     "namespace": "benchmark-runner",
                     "vm_name": "windows-vm-52",
                     "ip_address": "0.0.0.2",
+                    "ssh_status": False,
+                    "vmi_ready": True,
                     "status": False,
+                    "check_type": "ssh_access",
                     "start_timestamp": "2025-03-12T14:57:35.308957",
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 19.595395,
@@ -620,7 +644,10 @@ class BaseTest(unittest.TestCase):
                     "namespace": "benchmark-runner",
                     "ip_address": "0.0.0.0",
                     "vm_name": "windows-vm-52",
+                    "ssh_status": False,
+                    "vmi_ready": False,
                     "status": False,
+                    "check_type": "both",
                     "start_timestamp": "2025-03-12T14:57:55.904352",
                     "end_timestamp": "2025-03-12T14:57:55.904352",
                     "duration": 0.00,
@@ -635,6 +662,10 @@ class BaseTest(unittest.TestCase):
             "major_verison": "4.18",
             "job_status": True,
             "build_url": "https://github.com/krkn-chaos/krkn-lib/actions/runs/16724993547",  # NOQA
+            "tag": "github-action",
+            "fips_enabled": True,
+            "etcd_encryption_enabled": True,
+            "ipsec_enabled": False,
             "error_logs": [
                 {
                     "timestamp": "2023-05-22T14:55:05Z",

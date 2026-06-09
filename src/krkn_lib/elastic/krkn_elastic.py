@@ -283,6 +283,12 @@ class KrknElastic:
             is pushed
         :return: the time needed to save if succeeded -1 if failed
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_alert"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -304,6 +310,12 @@ class KrknElastic:
             is pushed
         :return: the time needed to save if succeeded -1 if failed
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_metric"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -318,6 +330,12 @@ class KrknElastic:
             return -1
 
     def push_telemetry(self, telemetry: ChaosRunTelemetry, index: str):
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping push_telemetry"
+            )
+            return -1
         if not index:
             raise Exception("index cannot be None or empty")
         try:
@@ -340,6 +358,12 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_telemetry"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)
@@ -365,6 +389,12 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_alert"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)
@@ -390,6 +420,12 @@ class KrknElastic:
         :return: the list of objects retrieved (Empty if nothing
             has been found)
         """
+        if not self.es:
+            self.safe_logger.error(
+                "Elasticsearch client is not initialized, "
+                "skipping search_metric"
+            )
+            return []
         try:
             # Use raw search query instead of DSL
             # (works with both ES and OpenSearch)

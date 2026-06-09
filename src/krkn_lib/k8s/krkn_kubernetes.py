@@ -1,4 +1,5 @@
 import ast
+import concurrent.futures
 import json
 import logging
 import os
@@ -7,6 +8,7 @@ import re
 import tempfile
 import threading
 import time
+import uuid
 import warnings
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -77,8 +79,12 @@ class KrknKubernetes:
         return client.NetworkingV1Api(self.api_client)
 
     @property
-    def dyn_client(cls) -> DynamicClient:
-        return DynamicClient(cls.api_client)
+    def dyn_client(self) -> DynamicClient:
+        if self._dyn_client is None:
+            with self._dyn_client_lock:
+                if self._dyn_client is None:
+                    self._dyn_client = DynamicClient(self.api_client)
+        return self._dyn_client
 
     @property
     def custom_object_client(cls) -> client.CustomObjectsApi:
@@ -109,6 +115,8 @@ class KrknKubernetes:
             action="ignore", message="unclosed", category=ResourceWarning
         )
 
+        self._dyn_client = None
+        self._dyn_client_lock = threading.Lock()
         self.request_chunk_size = request_chunk_size
 
         if kubeconfig_string is not None:
@@ -261,6 +269,97 @@ class KrknKubernetes:
         """
 
         return self.cli.api_client.configuration.get_default_copy().host
+
+    def is_fips_enabled(self) -> bool:
+        """
+        Check if FIPS (Federal Information Processing Standards)
+        is enabled in the cluster.
+
+        For Kubernetes clusters, this checks node labels and
+        annotations for FIPS indicators.
+
+        :return: True if FIPS is enabled, False otherwise
+        """
+        try:
+            nodes = self.cli.list_node()
+            for node in nodes.items:
+                # Check annotations for FIPS
+                annotations = node.metadata.annotations or {}
+                if annotations.get("config.openshift.io/fips") == "true":
+                    return True
+                # Check labels for FIPS
+                labels = node.metadata.labels or {}
+                if labels.get("fips-enabled") == "true":
+                    return True
+            return False
+        except ApiException as e:
+            logging.warning("Failed to check FIPS status: %s", str(e))
+            return False
+
+    def is_etcd_encryption_enabled(self) -> bool:
+        """
+        Check if etcd encryption is enabled in the cluster.
+
+        For vanilla Kubernetes, this is difficult to detect without
+        direct etcd access. This method returns False by default and
+        should be overridden by OpenShift implementation.
+
+        :return: False for vanilla Kubernetes
+        """
+        # For vanilla Kubernetes, etcd encryption status is not
+        # easily accessible. This should be overridden by
+        # OpenShift-specific implementation
+        return False
+
+    def is_ipsec_enabled(self) -> bool:
+        """
+        Check if IPsec is enabled in the cluster.
+
+        This checks for common IPsec daemonsets in kube-system or
+        other namespaces.
+
+        :return: True if IPsec is enabled, False otherwise
+        """
+        try:
+            # Check for common IPsec daemonsets in various namespaces
+            namespaces_to_check = [
+                "kube-system",
+                "openshift-ovn-kubernetes",
+                "calico-system",
+            ]
+
+            for namespace in namespaces_to_check:
+                try:
+                    daemonsets = self.apps_api.list_namespaced_daemon_set(
+                        namespace
+                    )
+                    for ds in daemonsets.items:
+                        if "ipsec" in ds.metadata.name.lower():
+                            # Check if daemonset has desired pods
+                            if (
+                                ds.status.desired_number_scheduled
+                                and ds.status.desired_number_scheduled > 0
+                            ):
+                                return True
+                        # Check for Calico IPsec configuration
+                        if ds.metadata.name == "calico-node":
+                            # Check environment variables for IPsec
+                            containers = ds.spec.template.spec.containers
+                            for container in containers:
+                                for env in container.env or []:
+                                    if (
+                                        env.name == "FELIX_IPSECENABLED"
+                                        and env.value == "true"
+                                    ):
+                                        return True
+                except ApiException:
+                    # Namespace might not exist, continue to next
+                    continue
+
+            return False
+        except ApiException as e:
+            logging.debug("Failed to check IPsec status: %s", str(e))
+            return False
 
     def list_continue_helper(self, func, *args, **keyword_args):
         """
@@ -1115,10 +1214,43 @@ class KrknKubernetes:
 
         return ret
 
+    def deploy_io_throttle_pod(
+        self,
+        node_name: str,
+        image: str,
+        namespace: str = "default",
+        timeout: int = 300,
+    ) -> str:
+        """
+        Deploy a privileged pod on a node for I/O throttling via cgroup.
+
+        The pod mounts the host root filesystem at /host.
+
+        :param node_name: target node
+        :param image: container image to use
+        :param namespace: namespace for the pod
+        :param timeout: seconds to wait for pod readiness
+        :return: the generated pod name
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=True)
+        template = env.get_template("io_throttle_pod.j2")
+        pod_suffix = uuid.uuid4().hex[:10]
+        pod_body = yaml.safe_load(
+            template.render(
+                pod_suffix=pod_suffix,
+                nodename=node_name,
+                image=image,
+            )
+        )
+        pod_name = "io-throttle-%s" % pod_suffix
+        self.create_pod(pod_body, namespace, timeout)
+        return pod_name
+
     def exec_command_on_node(
         self,
         node_name: str,
-        command: [str],
+        command: list[str],
         exec_pod_name: str,
         exec_pod_namespace: str = "default",
         exec_pod_container: str = None,
@@ -1212,26 +1344,35 @@ class KrknKubernetes:
         :param namespace: namespace where the pod is created
         :param timeout: request timeout
         """
+        pod_stat = None
+        pod_name = body["metadata"]["name"]
         try:
-            pod_stat = None
             pod_stat = self.cli.create_namespaced_pod(
                 body=body, namespace=namespace
             )
             end_time = time.time() + timeout
             while True:
                 pod_stat = self.cli.read_namespaced_pod(
-                    name=body["metadata"]["name"], namespace=namespace
+                    name=pod_name, namespace=namespace
                 )
                 if pod_stat.status.phase == "Running":
                     break
                 if time.time() > end_time:
                     raise Exception("Starting pod failed")
                 time.sleep(1)
+        except ApiException as e:
+            logging.error("Pod creation failed %s", str(e))
+            if e.status == 409:
+                raise e
+            if pod_stat is not None:
+                self.delete_pod(pod_name, namespace)
+            raise e
         except Exception as e:
             logging.error("Pod creation failed %s", str(e))
-            if pod_stat:
-                logging.error(pod_stat.status.container_statuses)
-            self.delete_pod(body["metadata"]["name"], namespace)
+            if pod_stat is not None:
+                if pod_stat.status and pod_stat.status.container_statuses:
+                    logging.error(pod_stat.status.container_statuses)
+                self.delete_pod(pod_name, namespace)
             raise e
 
     def read_pod(self, name: str, namespace: str = "default") -> client.V1Pod:
@@ -1462,41 +1603,84 @@ class KrknKubernetes:
             logging.error(f"Unexpected error getting VMI {name}: {e}")
             raise
 
-    def get_vmis(self, regex_name: str, namespace: str) -> Optional[Dict]:
+    def get_vmis(
+        self,
+        regex_name: Optional[str],
+        namespace: str,
+        label_selector: Optional[str] = None,
+    ) -> List[Dict]:
         """
-        Get a Virtual Machine Instance by name and namespace.
+        Get Virtual Machine Instances, optionally filtered by name regex
+        and/or label selector.
 
-        :param name: Name of the VMI to retrieve
-        :param namespace: Namespace of the VMI
-        :return: The VMI object if found, None otherwise
+        :param regex_name: Regex to match VMI names against; None matches all
+        :param namespace: Namespace regex (matched via list_namespaces_by_regex)  # NOQA
+        :param label_selector: Label selector (e.g. "app=myapp,env=prod");
+            None disables label filtering
+        :return: List of matching VMI objects
         """
         try:
             vmis_list = []
-            namespaces = self.list_namespaces_by_regex(namespace)
-            for namespace in namespaces:
-                vmis = self.custom_object_client.list_namespaced_custom_object(
-                    group="kubevirt.io",
-                    version="v1",
-                    namespace=namespace,
-                    plural="virtualmachineinstances",
-                )
+            kwargs = {}
+            if label_selector:
+                kwargs["label_selector"] = label_selector
 
-                for vmi in vmis.get("items"):
-                    vmi_name = vmi.get("metadata", {}).get("name")
-                    match = re.match(regex_name, vmi_name)
-                    if match:
-                        vmis_list.append(vmi)
+            if namespace == ".*":
+                # Single cluster-wide call instead of one call per namespace
+                continue_token = None
+                while True:
+                    page_kwargs = {**kwargs, "limit": 500}
+                    if continue_token:
+                        page_kwargs["_continue"] = continue_token
+                    vmis = (
+                        self.custom_object_client.list_cluster_custom_object(
+                            group="kubevirt.io",
+                            version="v1",
+                            plural="virtualmachineinstances",
+                            **page_kwargs,
+                        )
+                    )
+                    for vmi in vmis.get("items", []):
+                        if regex_name is None:
+                            vmis_list.append(vmi)
+                        else:
+                            vmi_name = vmi.get("metadata", {}).get("name", "")
+                            if re.match(regex_name, vmi_name):
+                                vmis_list.append(vmi)
+                    continue_token = vmis.get("metadata", {}).get("continue")
+                    if not continue_token:
+                        break
+            else:
+                namespaces = self.list_namespaces_by_regex(namespace)
+                client = self.custom_object_client
+                for ns in namespaces:
+                    vmis = client.list_namespaced_custom_object(
+                        group="kubevirt.io",
+                        version="v1",
+                        namespace=ns,
+                        plural="virtualmachineinstances",
+                        **kwargs,
+                    )
+                    for vmi in vmis.get("items", []):
+                        if regex_name is None:
+                            vmis_list.append(vmi)
+                        else:
+                            vmi_name = vmi.get("metadata", {}).get("name", "")
+                            if re.match(regex_name, vmi_name):
+                                vmis_list.append(vmi)
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VMI {regex_name} not found in namespace {namespace}"
+                    f"No VMIs found (regex={regex_name}, "
+                    f"label_selector={label_selector}) "
+                    f"in namespace {namespace}"
                 )
                 return []
             else:
-                logging.error(f"Error getting VMI {regex_name}: {e}")
+                logging.error(f"Error getting VMIs: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VMI {regex_name}: {e}")
+            logging.error(f"Unexpected error getting VMIs: {e}")
             raise
         return vmis_list
 
@@ -1601,42 +1785,57 @@ class KrknKubernetes:
             logging.error(f"Unexpected error patching VMI {name}: {e}")
             raise
 
-    def get_vms(self, regex_name: str, namespace: str) -> Optional[Dict]:
+    def get_vms(
+        self,
+        regex_name: Optional[str],
+        namespace: str,
+        label_selector: Optional[str] = None,
+    ) -> List[Dict]:
         """
-        Get a Virtual Machine by name and namespace.
+        Get Virtual Machines, optionally filtered by name regex and/or
+        label selector.
 
-        :param name: Name of the VM to retrieve
-        :param namespace: Namespace of the VM
-        :return: The VM object if found, None otherwise
+        :param regex_name: Regex to match VM names against; None matches all
+        :param namespace: Namespace regex (matched via list_namespaces_by_regex)  # NOQA
+        :param label_selector: Label selector (e.g. "app=myapp,env=prod");
+            None disables label filtering
+        :return: List of matching VM objects
         """
         try:
             vms_list = []
             namespaces = self.list_namespaces_by_regex(namespace)
-            for namespace in namespaces:
+            kwargs = {}
+            if label_selector:
+                kwargs["label_selector"] = label_selector
+            for ns in namespaces:
                 vms = self.custom_object_client.list_namespaced_custom_object(
                     group="kubevirt.io",
                     version="v1",
-                    namespace=namespace,
+                    namespace=ns,
                     plural="virtualmachines",
+                    **kwargs,
                 )
-
-                for vm in vms.get("items"):
-                    vm_name = vm.get("metadata", {}).get("name")
-                    match = re.match(regex_name, vm_name)
-                    if match:
+                for vm in vms.get("items", []):
+                    if regex_name is None:
                         vms_list.append(vm)
+                    else:
+                        vm_name = vm.get("metadata", {}).get("name", "")
+                        if re.match(regex_name, vm_name):
+                            vms_list.append(vm)
             return vms_list
         except ApiException as e:
             if e.status == 404:
                 logging.warning(
-                    f"VM {regex_name} not found in namespace {namespace}"
+                    f"No VMs found (regex={regex_name}, "
+                    f"label_selector={label_selector}) "
+                    f"in namespace {namespace}"
                 )
                 return []
             else:
-                logging.error(f"Error getting VM {regex_name}: {e}")
+                logging.error(f"Error getting VMs: {e}")
                 raise
         except Exception as e:
-            logging.error(f"Unexpected error getting VM {regex_name}: {e}")
+            logging.error(f"Unexpected error getting VMs: {e}")
             raise
 
     def get_snapshot(self, name: str, namespace: str) -> Optional[Dict]:
@@ -2351,12 +2550,64 @@ class KrknKubernetes:
     def get_all_kubernetes_object_count(
         self, objects: list[str]
     ) -> dict[str, int]:
-        objects_found = dict[str, int]()
-        objects_found.update(
-            self.get_kubernetes_core_objects_count("v1", objects)
-        )
-        objects_found.update(self.get_kubernetes_custom_objects_count(objects))
-        return objects_found
+        # Use typed API clients so we never touch DynamicClient/LazyDiscoverer.
+        # LazyDiscoverer scans every API group on first call — on OCP with
+        # hundreds of CRDs that takes > 60s and blows the telemetry timeout.
+        # Typed clients go directly to the specific endpoint with no discovery.
+        # _continue is the correct kwarg name for the typed clients; they remap
+        # it to ?continue=… in the query string internally.
+        kind_listers = {
+            "Pod": self.cli.list_pod_for_all_namespaces,
+            "Secret": self.cli.list_secret_for_all_namespaces,
+            "ConfigMap": self.cli.list_config_map_for_all_namespaces,
+            "Namespace": self.cli.list_namespace,
+            "ServiceAccount": self.cli.list_service_account_for_all_namespaces,
+            "Deployment": self.apps_api.list_deployment_for_all_namespaces,
+            "ReplicaSet": self.apps_api.list_replica_set_for_all_namespaces,
+            "DaemonSet": self.apps_api.list_daemon_set_for_all_namespaces,
+            "StatefulSet": self.apps_api.list_stateful_set_for_all_namespaces,
+        }
+
+        def count_kind(kind):
+            lister = kind_listers.get(kind)
+            if lister is None:
+                logging.warning(
+                    "get_all_kubernetes_object_count: no typed lister for %s,"
+                    " skipping",
+                    kind,
+                )
+                return kind, None
+            try:
+                count = 0
+                continue_token = None
+                while True:
+                    kwargs = {"limit": 500}
+                    if continue_token:
+                        kwargs["_continue"] = continue_token
+                    resp = lister(**kwargs)
+                    count += len(resp.items)
+                    continue_token = resp.metadata._continue or None
+                    if not continue_token:
+                        break
+                return kind, count
+            except Exception as e:
+                logging.warning(
+                    "get_all_kubernetes_object_count: skipping %s: %s",
+                    kind,
+                    e,
+                )
+                return kind, None
+
+        result = {}
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(count_kind, k): k for k in objects
+            }
+            for future in concurrent.futures.as_completed(futures):
+                kind, count = future.result()
+                if count is not None:
+                    result[kind] = count
+        return result
 
     def path_exists_in_pod(
         self, pod_name: str, container_name: str, namespace: str, path: str
@@ -2369,105 +2620,6 @@ class KrknKubernetes:
         ).rstrip()
         exists = exists if exists else "False"
         return exists == "True"
-
-    def get_kubernetes_core_objects_count(
-        self, api_version: str, objects: list[str]
-    ) -> dict[str, int]:
-        """
-        Counts all the occurrences of Kinds contained in
-        the object parameter in the CoreV1 Api
-
-        :param api_version: api version
-        :param objects: list of the kinds that must be counted
-        :return: a dictionary of Kinds and the number of objects counted
-        """
-
-        result = dict[str, int]()
-
-        try:
-            resources = self.cli.get_api_resources()
-            for resource in resources.resources:
-                if resource.kind in objects:
-                    if self.api_client:
-                        path_params: Dict[str, str] = {}
-                        query_params: List[str] = []
-                        header_params: Dict[str, str] = {}
-                        auth_settings = ["BearerToken"]
-                        header_params["Accept"] = (
-                            self.api_client.select_header_accept(
-                                ["application/json"]
-                            )
-                        )
-
-                        path = f"/api/{api_version}/{resource.name}"
-                        data = self.api_client.call_api(
-                            path,
-                            "GET",
-                            path_params,
-                            query_params,
-                            header_params,
-                            response_type="str",
-                            auth_settings=auth_settings,
-                        )
-
-                        json_obj = ast.literal_eval(data[0])
-                        count = len(json_obj["items"])
-                        result[resource.kind] = count
-        except ApiException:
-            pass
-        return result
-
-    def get_kubernetes_custom_objects_count(
-        self, objects: list[str]
-    ) -> dict[str, int]:
-        """
-        Counts all the occurrences of Kinds contained in
-        the object parameter in the CustomObject Api
-
-        :param objects: list of Kinds that must be counted
-        :return: a dictionary of Kinds and number of objects counted
-        """
-        groups = client.ApisApi(self.api_client).get_api_versions().groups
-        result = dict[str, int]()
-        for api in groups:
-            versions = []
-            for v in api.versions:
-                name = ""
-                if (
-                    v.version == api.preferred_version.version
-                    and len(api.versions) > 1
-                ):
-                    name += "*"
-                name += v.version
-                versions.append(name)
-            try:
-                data = self.get_api_resources_by_group(
-                    api.name, api.preferred_version.version
-                )
-                for resource in data.resources:
-                    if resource.kind in objects:
-                        cust_cli = self.custom_object_client
-                        custom_resource = cust_cli.list_cluster_custom_object(
-                            group=api.name,
-                            version=api.preferred_version.version,
-                            plural=resource.name,
-                        )
-                        result[resource.kind] = len(custom_resource["items"])
-
-            except Exception:
-                pass
-        return result
-
-    def get_api_resources_by_group(self, group, version):
-        try:
-            api_response = self.custom_object_client.get_api_resources(
-                group, version
-            )
-            return api_response
-        except Exception:
-            pass
-
-        return None
 
     def get_node_cpu_count(self, node_name: str) -> int:
         """
@@ -3396,6 +3548,83 @@ class KrknKubernetes:
         )
 
         self.create_pod(namespace=namespace, body=pod_body)
+
+    def deploy_http_load(
+        self,
+        name: str,
+        namespace: str,
+        image: str,
+        targets_json_base64: str,
+        duration: str,
+        rate: str = "50/1s",
+        workers: int = 10,
+        max_workers: int = 100,
+        connections: int = 100,
+        timeout: str = "10s",
+        keepalive: bool = True,
+        http2: bool = True,
+        insecure: bool = False,
+        node_selectors: dict = None,
+        timeout_sec: int = 500,
+    ):
+        """
+        Deploy an HTTP load testing pod using Vegeta.
+
+        :param name: Pod name
+        :param namespace: Namespace to deploy pod
+        :param image: Container image
+        :param targets_json_base64: Base64-encoded newline-delimited
+            Vegeta JSON targets
+        :param duration: Attack duration (e.g., "30s", "5m")
+        :param rate: Request rate (e.g., "50/1s", "1000/1m")
+        :param workers: Initial number of concurrent workers
+        :param max_workers: Maximum workers (Vegeta scales horizontally)
+        :param connections: Max idle connections per host
+        :param timeout: Request timeout (e.g., "10s")
+        :param keepalive: Use persistent connections
+        :param http2: Enable HTTP/2
+        :param insecure: Skip TLS certificate verification
+        :param node_selectors: Node affinity labels
+        :param timeout_sec: Pod creation timeout in seconds
+        """
+        file_loader = PackageLoader("krkn_lib.k8s", "templates")
+        env = Environment(loader=file_loader, autoescape=False)
+        pod_template = env.get_template("http_load_pod.j2")
+
+        has_node_selectors = (
+            node_selectors is not None and len(node_selectors) > 0
+        )
+
+        pod_body = yaml.safe_load(
+            pod_template.render(
+                name=name,
+                namespace=namespace,
+                image=image,
+                targets_json_base64=targets_json_base64,
+                duration=duration,
+                rate=rate,
+                workers=str(workers),
+                max_workers=str(max_workers),
+                connections=str(connections),
+                timeout=timeout,
+                keepalive="true" if keepalive else "false",
+                http2="true" if http2 else "false",
+                insecure="true" if insecure else "false",
+                has_node_selectors=has_node_selectors,
+                node_selectors=node_selectors if has_node_selectors else {},
+            )
+        )
+
+        logging.info(
+            f"Deploying HTTP load pod {name} for {duration} at {rate}"
+        )
+
+        try:
+            self.create_pod(pod_body, namespace, timeout_sec)
+            logging.info(f"HTTP load pod {name} created successfully")
+        except Exception as e:
+            logging.error(f"Failed to create HTTP load pod {name}: {e}")
+            raise e
 
     def deploy_hog(self, pod_name: str, hog_config: HogConfig):
         """

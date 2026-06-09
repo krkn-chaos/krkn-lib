@@ -102,6 +102,9 @@ class TestCollectClusterMetadata(unittest.TestCase):
             mock_taints,
         )
         self.mock_kubecli.get_version.return_value = "v1.28.0"
+        self.mock_kubecli.is_fips_enabled.return_value = True
+        self.mock_kubecli.is_etcd_encryption_enabled.return_value = False
+        self.mock_kubecli.is_ipsec_enabled.return_value = True
 
         # Create telemetry with successful scenario
         chaos_telemetry = ChaosRunTelemetry()
@@ -125,6 +128,11 @@ class TestCollectClusterMetadata(unittest.TestCase):
         )
         self.assertEqual(chaos_telemetry.total_node_count, 3)
         self.assertTrue(chaos_telemetry.job_status)  # No failed scenarios
+
+        # Verify security settings were collected
+        self.assertTrue(chaos_telemetry.fips_enabled)
+        self.assertFalse(chaos_telemetry.etcd_encryption_enabled)
+        self.assertTrue(chaos_telemetry.ipsec_enabled)
 
         self.mock_logger.info.assert_called()
 
@@ -165,6 +173,31 @@ class TestCollectClusterMetadata(unittest.TestCase):
         self.telemetry.collect_cluster_metadata(chaos_telemetry)
 
         self.assertEqual(chaos_telemetry.total_node_count, 8)  # 3 + 5
+
+    @patch("krkn_lib.utils.get_ci_job_url")
+    def test_collect_cluster_metadata_nodes_infos_failure(
+        self, mock_get_ci_url
+    ):
+        """node_taints must be a list when get_nodes_infos fails so that
+        downstream consumers iterating Taint objects don't raise
+        AttributeError."""
+        mock_get_ci_url.return_value = None
+        self.mock_kubecli.get_all_kubernetes_object_count.return_value = {}
+        self.mock_kubecli.get_nodes_infos.side_effect = Exception(
+            "API timeout"
+        )
+        self.mock_kubecli.get_version.return_value = "v1.28.0"
+        self.mock_kubecli.is_fips_enabled.return_value = False
+        self.mock_kubecli.is_etcd_encryption_enabled.return_value = False
+        self.mock_kubecli.is_ipsec_enabled.return_value = False
+
+        chaos_telemetry = ChaosRunTelemetry()
+        self.telemetry.collect_cluster_metadata(chaos_telemetry)
+
+        self.assertIsInstance(chaos_telemetry.node_taints, list)
+        self.assertEqual(chaos_telemetry.node_taints, [])
+        self.assertEqual(chaos_telemetry.node_summary_infos, [])
+        self.assertEqual(chaos_telemetry.total_node_count, 0)
 
 
 class TestSendTelemetry(unittest.TestCase):
@@ -230,8 +263,9 @@ class TestSendTelemetry(unittest.TestCase):
             # telemetry_group not specified
         }
 
+        chaos_telemetry = ChaosRunTelemetry()
         self.telemetry.send_telemetry(
-            telemetry_config, "test-uuid", ChaosRunTelemetry()
+            telemetry_config, "test-uuid", chaos_telemetry
         )
 
         call_kwargs = mock_post.call_args[1]
@@ -241,8 +275,9 @@ class TestSendTelemetry(unittest.TestCase):
         """Test when telemetry is disabled."""
         telemetry_config = {"enabled": False}
 
+        chaos_telemetry = ChaosRunTelemetry()
         result = self.telemetry.send_telemetry(
-            telemetry_config, "test-uuid", ChaosRunTelemetry()
+            telemetry_config, "test-uuid", chaos_telemetry
         )
 
         self.assertIsNone(result)
@@ -255,9 +290,10 @@ class TestSendTelemetry(unittest.TestCase):
             "password": "testpass",
         }
 
+        chaos_telemetry = ChaosRunTelemetry()
         with self.assertRaises(Exception) as context:
             self.telemetry.send_telemetry(
-                telemetry_config, "test-uuid", ChaosRunTelemetry()
+                telemetry_config, "test-uuid", chaos_telemetry
             )
 
         self.assertIn("api_url is missing", str(context.exception))
@@ -270,9 +306,10 @@ class TestSendTelemetry(unittest.TestCase):
             "password": "testpass",
         }
 
+        chaos_telemetry = ChaosRunTelemetry()
         with self.assertRaises(Exception) as context:
             self.telemetry.send_telemetry(
-                telemetry_config, "test-uuid", ChaosRunTelemetry()
+                telemetry_config, "test-uuid", chaos_telemetry
             )
 
         self.assertIn("username is missing", str(context.exception))
@@ -285,9 +322,10 @@ class TestSendTelemetry(unittest.TestCase):
             "username": "testuser",
         }
 
+        chaos_telemetry = ChaosRunTelemetry()
         with self.assertRaises(Exception) as context:
             self.telemetry.send_telemetry(
-                telemetry_config, "test-uuid", ChaosRunTelemetry()
+                telemetry_config, "test-uuid", chaos_telemetry
             )
 
         self.assertIn("password is missing", str(context.exception))
@@ -296,9 +334,10 @@ class TestSendTelemetry(unittest.TestCase):
         """Test with multiple missing required fields."""
         telemetry_config = {"enabled": True}
 
+        chaos_telemetry = ChaosRunTelemetry()
         with self.assertRaises(Exception) as context:
             self.telemetry.send_telemetry(
-                telemetry_config, "test-uuid", ChaosRunTelemetry()
+                telemetry_config, "test-uuid", chaos_telemetry
             )
 
         exception_str = str(context.exception)
@@ -321,9 +360,10 @@ class TestSendTelemetry(unittest.TestCase):
             "password": "testpass",
         }
 
+        chaos_telemetry = ChaosRunTelemetry()
         with self.assertRaises(Exception) as context:
             self.telemetry.send_telemetry(
-                telemetry_config, "test-uuid", ChaosRunTelemetry()
+                telemetry_config, "test-uuid", chaos_telemetry
             )
 
         self.assertIn("failed to send telemetry", str(context.exception))
