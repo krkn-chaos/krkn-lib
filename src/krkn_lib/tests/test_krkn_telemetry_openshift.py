@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.ocp import KrknTelemetryOpenshift
 from krkn_lib.utils.safe_logger import SafeLogger
+from krkn_lib.models.telemetry import ChaosRunTelemetry
 
 
 def _make_telemetry():
@@ -369,6 +370,151 @@ class TestPutOcpLogs(unittest.TestCase):
         telemetry.safe_logger.info.assert_called_once()
         self.assertIn(
             "logs_backup is False", telemetry.safe_logger.info.call_args[0][0]
+        )
+
+
+
+class TestGetLibOcp(unittest.TestCase):
+    def test_returns_ocpcli(self):
+        """Returns the internal __ocpcli assigned during initialization."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        self.assertIs(telemetry.get_lib_ocp(), mock_ocpcli)
+
+
+class TestGetOcpPrometheusData(unittest.TestCase):
+    @patch.object(KrknTelemetryOpenshift, "get_prometheus_pod_data")
+    def test_delegates_to_kubernetes_prometheus_with_ocp_defaults(self, mock_get_pod_data):
+        """Invokes get_prometheus_pod_data with specific OpenShift strings."""
+        telemetry, _ = _make_telemetry()
+        mock_get_pod_data.return_value = [(1, "test_file.tar.gz")]
+        telemetry_config = {"api_url": "test"}
+        request_id = "req-123"
+        result = telemetry.get_ocp_prometheus_data(
+            telemetry_config,
+            request_id
+        )
+        mock_get_pod_data.assert_called_once_with(
+            telemetry_config,
+            request_id,
+            "prometheus-k8s-0",
+            "prometheus",
+            "openshift-monitoring",
+        )
+        self.assertEqual(result, [(1, "test_file.tar.gz")])
+
+
+class TestCollectClusterMetadata(unittest.TestCase):
+
+    @patch.object(KrknTelemetryOpenshift, "get_route_count")
+    @patch.object(KrknTelemetryOpenshift, "get_build_count")
+    @patch.object(KrknTelemetryOpenshift, "get_vm_number")
+    def test_collects_metadata_successfully(
+        self,
+        mock_get_vm,
+        mock_get_build,
+        mock_get_route,
+    ):
+        """Populates chaos_telemetry with metadata successfully."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.get_cloud_infrastructure.return_value = "AWS"
+        mock_ocpcli.get_cluster_type.return_value = "Managed"
+        mock_ocpcli.get_clusterversion_string.return_value = "4.15.2"
+        mock_ocpcli.get_cluster_network_plugins.return_value = ["OVN"]
+        mock_get_vm.return_value = 10
+        mock_get_build.return_value = 20
+        mock_get_route.return_value = 30
+        chaos_telemetry = ChaosRunTelemetry()
+        with patch(
+            "krkn_lib.telemetry.k8s.KrknTelemetryKubernetes.collect_cluster_metadata"
+        ) as mock_super_collect:
+            telemetry.collect_cluster_metadata(chaos_telemetry)
+            mock_super_collect.assert_called_once_with(chaos_telemetry)
+        self.assertEqual(chaos_telemetry.cloud_infrastructure, "AWS")
+        self.assertEqual(chaos_telemetry.cloud_type, "Managed")
+        # Assert both the raw version string and the derived major_version slice
+        # to make clear we are validating current [:4] behavior, not invented semantics.
+        self.assertEqual(chaos_telemetry.cluster_version, "4.15.2")
+        self.assertEqual(chaos_telemetry.major_version, "4.15")
+        self.assertEqual(chaos_telemetry.network_plugins, ["OVN"])
+        self.assertEqual(
+            chaos_telemetry.kubernetes_objects_count["VirtualMachineInstance"],
+            10,
+        )
+        self.assertEqual(
+            chaos_telemetry.kubernetes_objects_count["Build"],
+            20,
+        )
+        self.assertEqual(
+            chaos_telemetry.kubernetes_objects_count["Route"],
+            30,
+        )
+
+    @patch.object(KrknTelemetryOpenshift, "get_route_count")
+    @patch.object(KrknTelemetryOpenshift, "get_build_count")
+    @patch.object(KrknTelemetryOpenshift, "get_vm_number")
+    def test_handles_exceptions_gracefully(
+        self,
+        mock_get_vm,
+        mock_get_build,
+        mock_get_route,
+    ):
+        """Exceptions in timed methods do not crash and leave fields as None."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.get_cloud_infrastructure.return_value = "AWS"
+        mock_ocpcli.get_cluster_type.side_effect = Exception("API error")
+        mock_ocpcli.get_clusterversion_string.return_value = "4.15.2"
+        mock_ocpcli.get_cluster_network_plugins.return_value = ["OVN"]
+        mock_get_vm.return_value = 10
+        mock_get_build.return_value = 20
+        mock_get_route.return_value = 30
+        chaos_telemetry = ChaosRunTelemetry()
+        with patch(
+            "krkn_lib.telemetry.k8s.KrknTelemetryKubernetes.collect_cluster_metadata"
+        ):
+            telemetry.collect_cluster_metadata(chaos_telemetry)
+        self.assertEqual(chaos_telemetry.cloud_infrastructure, "AWS")
+        # cloud_type is None because the failed timed() call causes get_result
+        # to return None, overwriting the 'self-managed' default.
+        self.assertIsNone(chaos_telemetry.cloud_type)
+        self.assertEqual(chaos_telemetry.cluster_version, "4.15.2")
+        # The timed() wrapper emits a warning before re-raising;
+        # verify the warning is observable on the exception path.
+        telemetry.safe_logger.warning.assert_called()
+
+    @patch.object(KrknTelemetryOpenshift, "get_route_count")
+    @patch.object(KrknTelemetryOpenshift, "get_build_count")
+    @patch.object(KrknTelemetryOpenshift, "get_vm_number")
+    def test_does_not_add_vmi_count_when_zero(
+        self,
+        mock_get_vm,
+        mock_get_build,
+        mock_get_route,
+    ):
+        """VirtualMachineInstance key is absent when vm_number returns 0."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.get_cloud_infrastructure.return_value = "AWS"
+        mock_ocpcli.get_cluster_type.return_value = "Managed"
+        mock_ocpcli.get_clusterversion_string.return_value = "4.15.2"
+        mock_ocpcli.get_cluster_network_plugins.return_value = ["OVN"]
+        mock_get_vm.return_value = 0
+        mock_get_build.return_value = 5
+        mock_get_route.return_value = 3
+        chaos_telemetry = ChaosRunTelemetry()
+        with patch(
+            "krkn_lib.telemetry.k8s.KrknTelemetryKubernetes.collect_cluster_metadata"
+        ):
+            telemetry.collect_cluster_metadata(chaos_telemetry)
+        self.assertNotIn(
+            "VirtualMachineInstance",
+            chaos_telemetry.kubernetes_objects_count,
+        )
+        self.assertEqual(
+            chaos_telemetry.kubernetes_objects_count["Build"],
+            5,
+        )
+        self.assertEqual(
+            chaos_telemetry.kubernetes_objects_count["Route"],
+            3,
         )
 
 
