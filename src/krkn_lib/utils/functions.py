@@ -441,23 +441,42 @@ def get_junit_test_case(
         containing the version on the test
     :return: the XML string to be written in the junit xml file
     """
+    failures = "0" if success else "1"
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%S"
+    )
 
-    root = ET.Element("testsuite")
-    root.attrib["name"] = test_suite_name
-    root.attrib["tests"] = "1"
-    root.attrib["skipped"] = "0"
-    root.attrib["failures"] = "0" if success else "1"
-    root.attrib["time"] = f"{time}"
+    testsuites = ET.Element("testsuites")
+    testsuites.attrib["tests"] = "1"
+    testsuites.attrib["skipped"] = "0"
+    testsuites.attrib["errors"] = "0"
+    testsuites.attrib["failures"] = failures
+    testsuites.attrib["time"] = f"{time}"
+
+    testsuite = ET.SubElement(testsuites, "testsuite")
+    testsuite.attrib["name"] = test_suite_name
+    testsuite.attrib["tests"] = "1"
+    testsuite.attrib["skipped"] = "0"
+    testsuite.attrib["errors"] = "0"
+    testsuite.attrib["failures"] = failures
+    testsuite.attrib["time"] = f"{time}"
+    testsuite.attrib["timestamp"] = timestamp
+
     if test_version:
-        ET.SubElement(root, "property", name="TestVersion", value=test_version)
+        properties = ET.SubElement(testsuite, "properties")
+        ET.SubElement(properties, "property", name="TestVersion", value=test_version)
 
     test_case = ET.SubElement(
-        root, "testcase", name=test_case_description, time=f"{time}"
+        testsuite,
+        "testcase",
+        name=test_case_description,
+        classname="",
+        time=f"{time}",
     )
     if not success:
         ET.SubElement(test_case, "failure", message="").text = test_stdout
 
-    return ET.tostring(root, encoding="utf-8").decode("UTF-8")
+    return ET.tostring(testsuites, encoding="utf-8").decode("UTF-8")
 
 
 def get_ci_job_url():

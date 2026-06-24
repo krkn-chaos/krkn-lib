@@ -3,6 +3,7 @@ import datetime
 import os
 import re
 import tempfile
+import xml.etree.ElementTree as ET
 
 import yaml
 from dateutil.tz import tzutc
@@ -358,57 +359,78 @@ class UtilFunctionTests(BaseTest):
         test_stdout = "KRKN STDOUT"
         test_version = "OCP 4.16"
         time = 10
-        success_output = (
-            f'<testsuite name="{test_suite_name}" tests="1" skipped="0" failures="0" time="10">'  # NOQA
-            f'<property name="TestVersion" value="{test_version}" />'
-            f'<testcase name="{test_case_description_success}" time="{time}" />'  # NOQA
-            f"</testsuite>"
+
+        # --- success with test_version ---
+        success_root = ET.fromstring(
+            get_junit_test_case(
+                True,
+                time,
+                test_suite_name,
+                test_case_description_success,
+                test_stdout,
+                test_version,
+            )
+        )
+        self.assertEqual(success_root.tag, "testsuites")
+        self.assertEqual(success_root.attrib["tests"], "1")
+        self.assertEqual(success_root.attrib["failures"], "0")
+        self.assertEqual(success_root.attrib["errors"], "0")
+
+        suite = success_root.find("testsuite")
+        self.assertIsNotNone(suite)
+        self.assertEqual(suite.attrib["name"], test_suite_name)
+        self.assertEqual(suite.attrib["failures"], "0")
+        self.assertRegex(
+            suite.attrib["timestamp"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$"
         )
 
-        success_output_not_test_version = (
-            f'<testsuite name="{test_suite_name}" tests="1" skipped="0" failures="0" time="10">'  # NOQA
-            f'<testcase name="{test_case_description_success}" time="{time}" />'  # NOQA
-            f"</testsuite>"
-        )
+        props = suite.find("properties")
+        self.assertIsNotNone(props)
+        prop = props.find("property")
+        self.assertIsNotNone(prop)
+        self.assertEqual(prop.attrib["name"], "TestVersion")
+        self.assertEqual(prop.attrib["value"], test_version)
 
-        failure_output = (
-            f'<testsuite name="{test_suite_name}" tests="1" skipped="0" failures="1" time="10">'  # NOQA
-            f'<property name="TestVersion" value="{test_version}" />'
-            f'<testcase name="{test_case_description_failure}" time="{time}">'
-            f'<failure message="">{test_stdout}</failure>'
-            f"</testcase>"
-            f"</testsuite>"
-        )
-        success_test = get_junit_test_case(
-            True,
-            time,
-            test_suite_name,
-            test_case_description_success,
-            test_stdout,
-            test_version,
-        )
-        success_test_not_test_version = get_junit_test_case(
-            True,
-            time,
-            test_suite_name,
-            test_case_description_success,
-            test_stdout,
-        )
+        tc = suite.find("testcase")
+        self.assertIsNotNone(tc)
+        self.assertEqual(tc.attrib["name"], test_case_description_success)
+        self.assertEqual(tc.attrib["classname"], "")
+        self.assertIsNone(tc.find("failure"))
 
-        failure_test = get_junit_test_case(
-            False,
-            time,
-            test_suite_name,
-            test_case_description_failure,
-            test_stdout,
-            test_version,
+        # --- success without test_version ---
+        no_ver_root = ET.fromstring(
+            get_junit_test_case(
+                True,
+                time,
+                test_suite_name,
+                test_case_description_success,
+                test_stdout,
+            )
         )
+        suite_no_ver = no_ver_root.find("testsuite")
+        self.assertIsNone(suite_no_ver.find("properties"))
 
-        self.assertEqual(success_output, success_test)
-        self.assertEqual(
-            success_output_not_test_version, success_test_not_test_version
+        # --- failure with test_version ---
+        failure_root = ET.fromstring(
+            get_junit_test_case(
+                False,
+                time,
+                test_suite_name,
+                test_case_description_failure,
+                test_stdout,
+                test_version,
+            )
         )
-        self.assertEqual(failure_output, failure_test)
+        self.assertEqual(failure_root.attrib["failures"], "1")
+
+        suite_fail = failure_root.find("testsuite")
+        self.assertEqual(suite_fail.attrib["failures"], "1")
+
+        tc_fail = suite_fail.find("testcase")
+        self.assertEqual(tc_fail.attrib["name"], test_case_description_failure)
+        failure_elem = tc_fail.find("failure")
+        self.assertIsNotNone(failure_elem)
+        self.assertEqual(failure_elem.text, test_stdout)
 
     def test_get_ci_job_url(self):
 
