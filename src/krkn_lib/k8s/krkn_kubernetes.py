@@ -1178,7 +1178,7 @@ class KrknKubernetes:
                 exec_command = ["bash", "-c"]
             else:
                 exec_command = ["sh", "-c"]
-            exec_command.extend(command)
+            exec_command.append(" ".join(command))
         else:
             exec_command = [base_command]
             exec_command.extend(command)
