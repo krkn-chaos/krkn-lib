@@ -1,10 +1,12 @@
 import logging
 import time
 import unittest
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from kubernetes.client import ApiException
 
 from krkn_lib.k8s import ApiRequestException
+from krkn_lib.k8s.krkn_kubernetes import KrknKubernetes
 from krkn_lib.tests import BaseTest
 
 
@@ -119,6 +121,121 @@ class KrknKubernetesTestsDelete(BaseTest):
                 )
                 break
         self.lib_k8s.delete_namespace(namespace)
+
+    def test_delete_deployment_already_deleted(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_deployment.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            self.lib_k8s.delete_deployment("name", "namespace")
+
+    def test_delete_deployment_api_error_raises(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_deployment.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            with self.assertRaises(ApiException):
+                self.lib_k8s.delete_deployment("name", "namespace")
+
+    def test_delete_daemonset_already_deleted(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_daemon_set.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            self.lib_k8s.delete_daemonset("name", "namespace")
+
+    def test_delete_daemonset_api_error_raises(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_daemon_set.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            with self.assertRaises(ApiException):
+                self.lib_k8s.delete_daemonset("name", "namespace")
+
+    def test_delete_statefulset_already_deleted(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_stateful_set.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            self.lib_k8s.delete_statefulset("name", "namespace")
+
+    def test_delete_statefulset_api_error_raises(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_stateful_set.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            with self.assertRaises(ApiException):
+                self.lib_k8s.delete_statefulset("name", "namespace")
+
+    def test_delete_replicaset_already_deleted(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_replica_set.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            self.lib_k8s.delete_replicaset("name", "namespace")
+
+    def test_delete_replicaset_api_error_raises(self):
+        mock_apps = MagicMock()
+        mock_apps.delete_namespaced_replica_set.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "apps_api",
+            new_callable=PropertyMock,
+            return_value=mock_apps,
+        ):
+            with self.assertRaises(ApiException):
+                self.lib_k8s.delete_replicaset("name", "namespace")
+
+    def test_delete_services_already_deleted(self):
+        mock_cli = MagicMock()
+        mock_cli.delete_namespaced_service.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            self.lib_k8s.delete_services("name", "namespace")
+
+    def test_delete_services_api_error_raises(self):
+        mock_cli = MagicMock()
+        mock_cli.delete_namespaced_service.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            with self.assertRaises(ApiException):
+                self.lib_k8s.delete_services("name", "namespace")
 
 
 if __name__ == "__main__":

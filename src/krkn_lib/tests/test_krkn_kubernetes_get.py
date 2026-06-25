@@ -7,6 +7,7 @@ import random
 import re
 import time
 import unittest
+from unittest.mock import patch
 
 from kubernetes import config
 from kubernetes.client import ApiException
@@ -348,6 +349,33 @@ class KrknKubernetesTestsGet(BaseTest):
         result = self.lib_k8s.is_ipsec_enabled()
         self.assertIsInstance(result, bool)
         self.assertFalse(result)
+
+    def test_get_node_name_in_ready_nodes(self):
+        with patch.object(self.lib_k8s, "list_ready_nodes", side_effect=[["node-a", "node-b"]]):
+            result = self.lib_k8s.get_node("node-a", "label", 1)
+            self.assertEqual(result, ["node-a"])
+
+    def test_get_node_name_not_ready_falls_through(self):
+        with patch.object(self.lib_k8s, "list_ready_nodes", side_effect=[["node-b"], ["node-b"]]):
+            result = self.lib_k8s.get_node("node-a", "label", 1)
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result, ["node-b"])
+
+    def test_get_node_no_ready_nodes_raises(self):
+        with patch.object(self.lib_k8s, "list_ready_nodes", side_effect=[["node-b"], []]):
+            with self.assertRaises(Exception):
+                self.lib_k8s.get_node("node-a", "label", 1)
+
+    def test_get_node_kill_count_equals_total(self):
+        with patch.object(self.lib_k8s, "list_ready_nodes", side_effect=[["node-c"], ["node-a", "node-b"]]):
+            result = self.lib_k8s.get_node("node-a", "label", 2)
+            self.assertEqual(result, ["node-a", "node-b"])
+
+    def test_get_node_random_subset(self):
+        with patch.object(self.lib_k8s, "list_ready_nodes", side_effect=[["node-d"], ["node-a", "node-b", "node-c"]]):
+            result = self.lib_k8s.get_node("node-a", "label", 1)
+            self.assertEqual(len(result), 1)
+            self.assertIn(result[0], ["node-a", "node-b", "node-c"])
 
 
 if __name__ == "__main__":

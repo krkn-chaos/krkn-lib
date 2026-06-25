@@ -1,5 +1,8 @@
 import logging
 import unittest
+from unittest.mock import MagicMock
+
+from kubernetes.client import ApiException
 
 from krkn_lib.tests import BaseTest
 
@@ -185,6 +188,22 @@ class KrknKubernetesTestsList(BaseTest):
         )
         self.assertGreater(len(nics), 0)
         self.assertTrue("eth0" in nics)
+
+    def test_list_continue_helper_api_exception(self):
+        mock_func = MagicMock(side_effect=ApiException(status=500))
+        result = self.lib_k8s.list_continue_helper(mock_func)
+        self.assertEqual(result, [])
+
+    def test_list_continue_helper_pagination(self):
+        page_1 = MagicMock()
+        page_1.metadata._continue = "token1"
+        page_2 = MagicMock()
+        page_2.metadata._continue = None
+        mock_func = MagicMock(side_effect=[page_1, page_2])
+
+        result = self.lib_k8s.list_continue_helper(mock_func)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result, [page_1, page_2])
 
 
 if __name__ == "__main__":
