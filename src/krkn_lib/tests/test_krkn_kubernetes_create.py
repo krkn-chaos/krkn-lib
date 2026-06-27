@@ -13,11 +13,13 @@ import logging
 import tempfile
 import time
 import unittest
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from kubernetes.client import ApiException
 
+from krkn_lib.k8s.krkn_kubernetes import KrknKubernetes
 from krkn_lib.tests import BaseTest
 
 
@@ -147,6 +149,43 @@ class KrknKubernetesTestsCreate(BaseTest):
             self.assertIn("Ready", condition_types)
         finally:
             self.pod_delete_queue.put([pod_name, namespace])
+
+
+    def test_create_job_already_exists(self):
+        mock_batch = MagicMock()
+        mock_batch.create_namespaced_job.side_effect = ApiException(status=409)
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            result = self.lib_k8s.create_job({}, "namespace")
+            self.assertIsNone(result)
+
+    def test_create_job_unexpected_api_exception_returns_none(self):
+        mock_batch = MagicMock()
+        mock_batch.create_namespaced_job.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            result = self.lib_k8s.create_job({}, "namespace")
+            self.assertIsNone(result)
+
+    def test_create_job_exception_raises(self):
+        mock_batch = MagicMock()
+        mock_batch.create_namespaced_job.side_effect = Exception("mock error")
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            with self.assertRaises(Exception):
+                self.lib_k8s.create_job({}, "namespace")
 
 
 if __name__ == "__main__":
