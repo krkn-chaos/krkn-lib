@@ -10,7 +10,7 @@ homepage = "https://github.com/redhat-chaos/krkn"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-kubernetes = ">=34.1.0"
+kubernetes = ">=35.0.0,<36.0.0"
 sphinxnotes-markdown-builder="^0.5.6"
 requests = ">=2.32.4"  # Fix CVE GHSA-9hjg-9r4m-mvj7, GHSA-9wx4-h78v-vm56, GHSA-gc5v-m9x4-r6x2
 kubeconfig = "^1.1.1"
