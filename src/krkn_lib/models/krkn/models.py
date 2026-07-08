@@ -128,6 +128,12 @@ class HogConfig:
     node_selector: str
     tolerations: list[str]
 
+    # standalone mode (SSH)
+    targets: list[str]
+    ssh_user: str
+    ssh_private_key: str
+    ssh_port: int
+
     def __init__(self):
         self.type = HogType.cpu
         self.image = "quay.io/krkn-chaos/krkn-hog"
@@ -147,6 +153,10 @@ class HogConfig:
         self.namespace = "default"
         self.node_selector = ""
         self.tolerations = []
+        self.targets = []
+        self.ssh_user = "root"
+        self.ssh_private_key = "~/.ssh/id_rsa"
+        self.ssh_port = 22
 
     @staticmethod
     def from_yaml_dict(yaml_dict: dict[str, str]) -> HogConfig:
@@ -232,5 +242,21 @@ class HogConfig:
                 and yaml_dict["memory-vm-bytes"]
             ):
                 config.memory_vm_bytes = yaml_dict["memory-vm-bytes"]
+
+        # standalone mode (SSH) — accept both kebab-case and snake_case
+        if "targets" in yaml_dict.keys() and yaml_dict["targets"]:
+            config.targets = yaml_dict["targets"]
+        for key in ("ssh-user", "ssh_user"):
+            if key in yaml_dict.keys() and yaml_dict[key]:
+                config.ssh_user = yaml_dict[key]
+                break
+        for key in ("ssh-private-key", "ssh_private_key"):
+            if key in yaml_dict.keys() and yaml_dict[key]:
+                config.ssh_private_key = yaml_dict[key]
+                break
+        for key in ("ssh-port", "ssh_port"):
+            if key in yaml_dict.keys() and yaml_dict[key]:
+                config.ssh_port = int(yaml_dict[key])
+                break
 
         return config
