@@ -515,6 +515,35 @@ class VirtCheck:
 
 
 @dataclass(order=False)
+class FailedAlert:
+    """
+    A Prometheus alert that fired during the chaos run
+    """
+
+    name: str = ""
+    """ Alert name """
+    severity: str = ""
+    """ Alert severity (critical, warning, info) """
+    message: str = ""
+    """ Alert message or description """
+    namespace: str = ""
+    """ Namespace associated with the alert (if any) """
+    starts_at: str = ""
+    """ Timestamp when the alert started firing """
+
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.name = json_dict.get("name", "")
+            self.severity = json_dict.get("severity", "")
+            self.message = json_dict.get("message", "")
+            self.namespace = json_dict.get("namespace", "")
+            self.starts_at = json_dict.get("starts_at", "")
+
+    def to_json(self) -> str:
+        return json.dumps(self, default=lambda o: o.__dict__, indent=4)
+
+
+@dataclass(order=False)
 class ChaosRunTelemetry:
     """
     Root object for the Telemetry Collection
@@ -618,6 +647,10 @@ class ChaosRunTelemetry:
     """
     Overall resiliency report for the chaos run
     """
+    failed_alerts: list[FailedAlert] = None
+    """
+    Prometheus alerts that fired during the chaos run
+    """
 
     def __init__(self, json_dict: any = None):
         self.scenarios = list[ScenarioTelemetry]()
@@ -632,6 +665,7 @@ class ChaosRunTelemetry:
         self.virt_checks = list[VirtCheck]()
         self.error_logs = []
         self.overall_resiliency_report = ResiliencyReport()
+        self.failed_alerts = []
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -687,6 +721,11 @@ class ChaosRunTelemetry:
                     passed_slos=report_data.get("passed_slos", 0),
                     total_slos=report_data.get("total_slos", 0),
                 )
+            self.failed_alerts = (
+                [FailedAlert(a) for a in json_dict.get("failed_alerts")]
+                if json_dict.get("failed_alerts")
+                else []
+            )
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)

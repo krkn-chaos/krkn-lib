@@ -13,7 +13,7 @@ from krkn_lib.models.telemetry import (
     ClusterEvent,
     ScenarioTelemetry,
 )
-from krkn_lib.models.telemetry.models import VirtCheck
+from krkn_lib.models.telemetry.models import FailedAlert, VirtCheck
 
 
 class KrknTelemetryModelsTests(unittest.TestCase):
@@ -665,6 +665,132 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(NodeInfo({"count": 3}).count, 3)
         # json_dict missing count (e.g. old telemetry data)
         self.assertEqual(NodeInfo({"architecture": "amd64"}).count, 1)
+    def test_failed_alert_model(self):
+        """Test FailedAlert dataclass construction and field values"""
+        alert_dict = {
+            "name": "KubePodCrashLooping",
+            "severity": "critical",
+            "message": "Pod test-ns/test-pod is crash looping",
+            "namespace": "test-ns",
+            "starts_at": "2024-09-02T14:00:53Z",
+        }
+        alert = FailedAlert(alert_dict)
+        self.assertEqual(alert.name, "KubePodCrashLooping")
+        self.assertEqual(alert.severity, "critical")
+        self.assertEqual(alert.message, "Pod test-ns/test-pod is crash looping")
+        self.assertEqual(alert.namespace, "test-ns")
+        self.assertEqual(alert.starts_at, "2024-09-02T14:00:53Z")
+
+        json_str = alert.to_json()
+        self.assertIsNotNone(json_str)
+        parsed = json.loads(json_str)
+        self.assertEqual(parsed["name"], "KubePodCrashLooping")
+        self.assertEqual(parsed["severity"], "critical")
+
+    def test_failed_alert_model_defaults(self):
+        """Test FailedAlert defaults to empty strings for missing fields"""
+        alert = FailedAlert({})
+        self.assertEqual(alert.name, "")
+        self.assertEqual(alert.severity, "")
+        self.assertEqual(alert.message, "")
+        self.assertEqual(alert.namespace, "")
+        self.assertEqual(alert.starts_at, "")
+
+    def test_chaos_run_telemetry_with_failed_alerts(self):
+        """Test failed_alerts field is properly parsed from JSON and serialized"""
+        test_json = """
+        {
+            "scenarios": [{
+                "start_timestamp": 1686141432,
+                "end_timestamp": 1686141435,
+                "scenario": "test",
+                "scenario_type": "pod_disruption_scenarios",
+                "exit_status": 0,
+                "parameters_base64": ""
+            }],
+            "node_summary_infos": [],
+            "node_taints": [],
+            "failed_alerts": [
+                {
+                    "name": "KubePodCrashLooping",
+                    "severity": "critical",
+                    "message": "Pod default/my-pod is crash looping",
+                    "namespace": "default",
+                    "starts_at": "2024-09-02T14:00:00Z"
+                },
+                {
+                    "name": "NodeNotReady",
+                    "severity": "warning",
+                    "message": "Node worker-1 is not ready",
+                    "namespace": "",
+                    "starts_at": "2024-09-02T14:05:00Z"
+                }
+            ]
+        }
+        """  # NOQA
+        telemetry = ChaosRunTelemetry(json.loads(test_json))
+
+        self.assertIsNotNone(telemetry.failed_alerts)
+        self.assertEqual(len(telemetry.failed_alerts), 2)
+
+        self.assertIsInstance(telemetry.failed_alerts[0], FailedAlert)
+        self.assertEqual(telemetry.failed_alerts[0].name, "KubePodCrashLooping")
+        self.assertEqual(telemetry.failed_alerts[0].severity, "critical")
+        self.assertEqual(
+            telemetry.failed_alerts[0].message,
+            "Pod default/my-pod is crash looping",
+        )
+        self.assertEqual(telemetry.failed_alerts[0].namespace, "default")
+        self.assertEqual(
+            telemetry.failed_alerts[0].starts_at, "2024-09-02T14:00:00Z"
+        )
+
+        self.assertEqual(telemetry.failed_alerts[1].name, "NodeNotReady")
+        self.assertEqual(telemetry.failed_alerts[1].severity, "warning")
+
+        json_str = telemetry.to_json()
+        self.assertIn("failed_alerts", json_str)
+        self.assertIn("KubePodCrashLooping", json_str)
+        self.assertIn("NodeNotReady", json_str)
+
+    def test_chaos_run_telemetry_failed_alerts_edge_cases(self):
+        """Test failed_alerts field handles empty, missing, and null cases"""
+        base_scenarios = """[{
+            "start_timestamp": 1686141432,
+            "end_timestamp": 1686141435,
+            "scenario": "test",
+            "scenario_type": "pod_disruption_scenarios",
+            "exit_status": 0,
+            "parameters_base64": ""
+        }]"""
+
+        # Empty list
+        t = ChaosRunTelemetry(json.loads(
+            f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
+            f'"node_taints": [], "failed_alerts": []}}'
+        ))
+        self.assertEqual(t.failed_alerts, [])
+
+        # Missing field
+        t = ChaosRunTelemetry(json.loads(
+            f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
+            f'"node_taints": []}}'
+        ))
+        self.assertEqual(t.failed_alerts, [])
+
+        # Null field
+        t = ChaosRunTelemetry(json.loads(
+            f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
+            f'"node_taints": [], "failed_alerts": null}}'
+        ))
+        self.assertEqual(t.failed_alerts, [])
+
+    def test_chaos_run_telemetry_empty_constructor_has_failed_alerts(self):
+        """Test failed_alerts is initialized when using empty constructor"""
+        telemetry = ChaosRunTelemetry()
+        self.assertTrue(hasattr(telemetry, "failed_alerts"))
+        self.assertIsNotNone(telemetry.failed_alerts)
+        self.assertEqual(telemetry.failed_alerts, [])
 
 
 class VirtCheckModelTests(unittest.TestCase):
