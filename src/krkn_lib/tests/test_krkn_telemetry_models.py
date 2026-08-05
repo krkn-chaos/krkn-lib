@@ -642,6 +642,30 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertFalse(telemetry.etcd_encryption_enabled)
         self.assertFalse(telemetry.ipsec_enabled)
 
+    def test_node_info_single_count_survives_serialization(self):
+        from krkn_lib.models.telemetry.models import NodeInfo
+
+        node = NodeInfo()
+        telemetry = ChaosRunTelemetry()
+        telemetry.node_summary_infos.append(node)
+
+        json_str = telemetry.to_json()
+        roundtripped = ChaosRunTelemetry(json.loads(json_str))
+
+        self.assertEqual(len(roundtripped.node_summary_infos), 1)
+        self.assertIsNotNone(roundtripped.node_summary_infos[0].count)
+        self.assertEqual(roundtripped.node_summary_infos[0].count, 1)
+
+    def test_node_info_count_never_null(self):
+        from krkn_lib.models.telemetry.models import NodeInfo
+
+        # no json_dict
+        self.assertEqual(NodeInfo().count, 1)
+        # json_dict with count present
+        self.assertEqual(NodeInfo({"count": 3}).count, 3)
+        # json_dict missing count (e.g. old telemetry data)
+        self.assertEqual(NodeInfo({"architecture": "amd64"}).count, 1)
+
 
 class VirtCheckModelTests(unittest.TestCase):
     def _base_dict(self, **overrides) -> dict:
