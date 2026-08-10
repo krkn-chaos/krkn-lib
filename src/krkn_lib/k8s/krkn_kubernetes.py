@@ -219,6 +219,7 @@ class KrknKubernetes:
                 "config.openshift.io",
                 "v1",
                 "clusterversions",
+                _request_timeout=30,
             )
             for cv in cvs["items"]:
                 for condition in cv["status"]["conditions"]:
@@ -227,6 +228,12 @@ class KrknKubernetes:
             return ""
         except client.exceptions.ApiException as e:
             if e.status == 404:
+                return ""
+            elif e.status >= 500:
+                logging.warning(
+                    f"Transient API error ({e.status}) checking cluster "
+                    f"version, assuming Kubernetes: {e.reason}"
+                )
                 return ""
             else:
                 raise e

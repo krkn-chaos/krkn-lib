@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from kubernetes.client.exceptions import ApiException
+
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.ocp import KrknTelemetryOpenshift
 from krkn_lib.utils.safe_logger import SafeLogger
@@ -63,18 +65,38 @@ class TestGetVmNumber(unittest.TestCase):
         self.assertEqual(telemetry.get_vm_number(), 0)
 
     @patch("krkn_lib.telemetry.ocp.krkn_telemetry_openshift.logging")
-    def test_exception_returns_zero_and_logs(self, mock_logging):
-        """Exception returns 0 and logs the error message."""
+    def test_404_api_exception_returns_zero_and_logs_info(self, mock_logging):
+        """ApiException 404 (KubeVirt absent) returns 0 and logs at info."""
         telemetry, mock_ocpcli = _make_telemetry()
-        client = mock_ocpcli.custom_object_client
-        client.list_cluster_custom_object.side_effect = (
-            Exception("connection refused")
+        mock_ocpcli.custom_object_client.list_cluster_custom_object.side_effect = (
+            ApiException(status=404, reason="Not Found")
         )
         self.assertEqual(telemetry.get_vm_number(), 0)
         mock_logging.info.assert_called_once()
-        self.assertIn(
-            "connection refused", mock_logging.info.call_args[0][0]
+        mock_logging.error.assert_not_called()
+
+    @patch("krkn_lib.telemetry.ocp.krkn_telemetry_openshift.logging")
+    def test_non_404_api_exception_returns_zero_and_logs_error(self, mock_logging):
+        """ApiException with status other than 404 returns 0 and logs at error."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.custom_object_client.list_cluster_custom_object.side_effect = (
+            ApiException(status=403, reason="Forbidden")
         )
+        self.assertEqual(telemetry.get_vm_number(), 0)
+        mock_logging.error.assert_called_once()
+        mock_logging.info.assert_not_called()
+
+    @patch("krkn_lib.telemetry.ocp.krkn_telemetry_openshift.logging")
+    def test_unexpected_exception_returns_zero_and_logs_error(self, mock_logging):
+        """Non-ApiException returns 0 and logs at error with 'unexpected' prefix."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.custom_object_client.list_cluster_custom_object.side_effect = (
+            Exception("connection refused")
+        )
+        self.assertEqual(telemetry.get_vm_number(), 0)
+        mock_logging.error.assert_called_once()
+        self.assertIn("unexpected", mock_logging.error.call_args[0][0])
+        mock_logging.info.assert_not_called()
 
 
 class TestGetBuildCount(unittest.TestCase):
