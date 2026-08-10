@@ -249,8 +249,9 @@ class NodeInfo:
     "Operating system version"
 
     def __init__(self, json_dict: dict = None):
+        self.count = 1
         if json_dict is not None:
-            self.count = json_dict["count"] if "count" in json_dict else None
+            self.count = json_dict["count"] if "count" in json_dict else 1
             self.architecture = (
                 json_dict["architecture"]
                 if "architecture" in json_dict
