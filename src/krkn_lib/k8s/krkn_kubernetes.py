@@ -1311,18 +1311,33 @@ class KrknKubernetes:
         except Exception as e:
             raise e
 
-    def delete_pod(self, name: str, namespace: str = "default"):
+    def delete_pod(
+        self,
+        name: str,
+        namespace: str = "default",
+        grace_period_seconds: Optional[int] = None,
+    ):
         """
         Delete a pod in a namespace
 
         :param name: pod name
         :param namespace: namespace (optional default `default`)
+        :param grace_period_seconds: optional grace period in seconds.
+            When set to 0, the pod is terminated immediately without
+            waiting for graceful shutdown. When None (default), the
+            pod's terminationGracePeriodSeconds is used.
         """
         try:
             starting_creation_timestamp = self.cli.read_namespaced_pod(
                 name=name, namespace=namespace
             ).metadata.creation_timestamp
-            self.cli.delete_namespaced_pod(name=name, namespace=namespace)
+
+            delete_kwargs = {"name": name, "namespace": namespace}
+            if grace_period_seconds is not None:
+                delete_kwargs["body"] = client.V1DeleteOptions(
+                    grace_period_seconds=grace_period_seconds
+                )
+            self.cli.delete_namespaced_pod(**delete_kwargs)
 
             while self.cli.read_namespaced_pod(name=name, namespace=namespace):
 
