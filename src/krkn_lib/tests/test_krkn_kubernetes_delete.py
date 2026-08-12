@@ -1,8 +1,10 @@
 import logging
 import time
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, PropertyMock, patch
 
+from kubernetes import client
 from kubernetes.client import ApiException
 
 from krkn_lib.k8s import ApiRequestException
@@ -236,6 +238,100 @@ class KrknKubernetesTestsDelete(BaseTest):
         ):
             with self.assertRaises(ApiException):
                 self.lib_k8s.delete_services("name", "namespace")
+
+
+    def test_delete_pod_force_passes_grace_period_zero(self):
+        """Verify force delete passes V1DeleteOptions with grace_period_seconds=0"""
+        mock_cli = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.metadata.creation_timestamp = datetime(
+            2026, 1, 1, tzinfo=timezone.utc
+        )
+        mock_cli.read_namespaced_pod.side_effect = [
+            mock_pod,
+            ApiException(status=404),
+        ]
+        mock_cli.delete_namespaced_pod.return_value = None
+
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            self.lib_k8s.delete_pod("test-pod", "test-ns", grace_period_seconds=0)
+
+        mock_cli.delete_namespaced_pod.assert_called_once()
+        call_kwargs = mock_cli.delete_namespaced_pod.call_args[1]
+        self.assertEqual(call_kwargs["name"], "test-pod")
+        self.assertEqual(call_kwargs["namespace"], "test-ns")
+        self.assertIsInstance(call_kwargs["body"], client.V1DeleteOptions)
+        self.assertEqual(call_kwargs["body"].grace_period_seconds, 0)
+
+    def test_delete_pod_graceful_no_delete_options(self):
+        """Verify graceful delete (default) does not pass V1DeleteOptions body"""
+        mock_cli = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.metadata.creation_timestamp = datetime(
+            2026, 1, 1, tzinfo=timezone.utc
+        )
+        mock_cli.read_namespaced_pod.side_effect = [
+            mock_pod,
+            ApiException(status=404),
+        ]
+        mock_cli.delete_namespaced_pod.return_value = None
+
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            self.lib_k8s.delete_pod("test-pod", "test-ns")
+
+        mock_cli.delete_namespaced_pod.assert_called_once_with(
+            name="test-pod", namespace="test-ns"
+        )
+
+    def test_delete_pod_custom_grace_period(self):
+        """Verify a custom grace_period_seconds value is passed correctly"""
+        mock_cli = MagicMock()
+        mock_pod = MagicMock()
+        mock_pod.metadata.creation_timestamp = datetime(
+            2026, 1, 1, tzinfo=timezone.utc
+        )
+        mock_cli.read_namespaced_pod.side_effect = [
+            mock_pod,
+            ApiException(status=404),
+        ]
+        mock_cli.delete_namespaced_pod.return_value = None
+
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            self.lib_k8s.delete_pod("test-pod", "test-ns", grace_period_seconds=15)
+
+        call_kwargs = mock_cli.delete_namespaced_pod.call_args[1]
+        self.assertIsInstance(call_kwargs["body"], client.V1DeleteOptions)
+        self.assertEqual(call_kwargs["body"].grace_period_seconds, 15)
+
+    def test_delete_pod_force_already_deleted(self):
+        """Verify force delete handles 404 (already deleted) gracefully"""
+        mock_cli = MagicMock()
+        mock_cli.read_namespaced_pod.side_effect = ApiException(status=404)
+
+        with patch.object(
+            KrknKubernetes,
+            "cli",
+            new_callable=PropertyMock,
+            return_value=mock_cli,
+        ):
+            self.lib_k8s.delete_pod("test-pod", "test-ns", grace_period_seconds=0)
+
+        mock_cli.delete_namespaced_pod.assert_not_called()
 
 
 if __name__ == "__main__":
