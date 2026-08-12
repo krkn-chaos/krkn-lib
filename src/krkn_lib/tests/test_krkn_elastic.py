@@ -221,6 +221,79 @@ class TestKrknElastic(BaseTest):
         result = elastic.search_telemetry("test-uuid", "test-index")
         self.assertEqual(result, [])
 
+    @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.Elasticsearch")
+    def test_push_metric_exception_logs_error_not_print(
+        self, mock_es_class, mock_requests_get
+    ):
+        """push_metric exception is logged at error level and not printed."""
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "version": {"number": "7.17"},
+            "tagline": "You Know, for Search",
+        }
+        mock_requests_get.return_value = mock_response
+
+        mock_es_instance = mock.MagicMock()
+        mock_es_instance.index.side_effect = Exception("connection reset")
+        mock_es_class.return_value = mock_es_instance
+
+        mock_logger = mock.MagicMock(spec=SafeLogger)
+        client = KrknElastic(mock_logger, "http://localhost", 9200)
+
+        metric = ElasticMetric(run_uuid="test-uuid")
+        with mock.patch("builtins.print") as mock_print:
+            result = client.push_metric(metric, "test-index")
+
+        self.assertEqual(result, -1)
+        mock_logger.error.assert_called()
+        mock_print.assert_not_called()
+
+    @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.Elasticsearch")
+    def test_push_telemetry_exception_logs_error_not_info(
+        self, mock_es_class, mock_requests_get
+    ):
+        """push_telemetry exception is logged at error level, not info."""
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "version": {"number": "7.17"},
+            "tagline": "You Know, for Search",
+        }
+        mock_requests_get.return_value = mock_response
+
+        mock_es_instance = mock.MagicMock()
+        mock_es_instance.index.side_effect = Exception("timeout")
+        mock_es_class.return_value = mock_es_instance
+
+        mock_logger = mock.MagicMock(spec=SafeLogger)
+        client = KrknElastic(mock_logger, "http://localhost", 9200)
+
+        run_uuid = str(uuid.uuid4())
+        telemetry = ChaosRunTelemetry(
+            json_dict=self.get_ChaosRunTelemetry_json(run_uuid)
+        )
+        result = client.push_telemetry(telemetry, "test-index")
+
+        self.assertEqual(result, -1)
+        # error must be called, info must NOT be called for the push failure
+        error_messages = [
+            str(call) for call in mock_logger.error.call_args_list
+        ]
+        self.assertTrue(
+            any("timeout" in m for m in error_messages),
+            "Expected exception message in error log",
+        )
+        info_messages = [
+            str(call) for call in mock_logger.info.call_args_list
+        ]
+        self.assertFalse(
+            any("timeout" in m for m in info_messages),
+            "Exception message must not appear in info log",
+        )
+
 
 class TestKrknElasticOpenSearch(BaseTest):
     """Test suite for OpenSearch backend support using mocks"""

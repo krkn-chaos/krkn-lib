@@ -106,6 +106,70 @@ class TestGetClusterversionString(unittest.TestCase):
         self.assertEqual(result, "")
 
 
+class TestGetClusterversionStringApiErrors(unittest.TestCase):
+    """Test _get_clusterversion_string error handling."""
+
+    def setUp(self):
+        with patch("krkn_lib.k8s.krkn_kubernetes.config"):
+            self.ocp = KrknOpenshift()
+
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_404_returns_empty_string(self, mock_prop):
+        """404 means no OpenShift CRD — returns '' (vanilla Kubernetes)."""
+        mock_client = Mock()
+        mock_client.list_cluster_custom_object.side_effect = ApiException(status=404)
+        mock_prop.return_value = mock_client
+        self.assertEqual(self.ocp._get_clusterversion_string(), "")
+
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_504_gateway_timeout_returns_empty_string_and_warns(self, mock_prop):
+        """504 Gateway Timeout returns '' and logs a warning instead of crashing."""
+        mock_client = Mock()
+        mock_client.list_cluster_custom_object.side_effect = ApiException(
+            status=504, reason="Gateway Timeout"
+        )
+        mock_prop.return_value = mock_client
+        with patch("krkn_lib.k8s.krkn_kubernetes.logging") as mock_logging:
+            result = self.ocp._get_clusterversion_string()
+        self.assertEqual(result, "")
+        mock_logging.warning.assert_called_once()
+        self.assertIn("504", mock_logging.warning.call_args[0][0])
+
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_5xx_errors_return_empty_string(self, mock_prop):
+        """Any 5xx API error returns '' rather than crashing."""
+        mock_client = Mock()
+        mock_prop.return_value = mock_client
+        for status in (500, 502, 503, 504):
+            mock_client.list_cluster_custom_object.side_effect = ApiException(
+                status=status
+            )
+            result = self.ocp._get_clusterversion_string()
+            self.assertEqual(
+                result, "", f"Expected '' for status {status}, got {result!r}"
+            )
+
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_non_transient_api_error_reraises(self, mock_prop):
+        """A 403 Forbidden is not transient and must re-raise."""
+        mock_client = Mock()
+        mock_client.list_cluster_custom_object.side_effect = ApiException(status=403)
+        mock_prop.return_value = mock_client
+        with self.assertRaises(ApiException) as ctx:
+            self.ocp._get_clusterversion_string()
+        self.assertEqual(ctx.exception.status, 403)
+
+    @patch.object(KrknOpenshift, "custom_object_client", new_callable=PropertyMock)
+    def test_request_timeout_kwarg_is_passed(self, mock_prop):
+        """list_cluster_custom_object must be called with _request_timeout=30."""
+        mock_client = Mock()
+        mock_client.list_cluster_custom_object.return_value = {"items": []}
+        mock_prop.return_value = mock_client
+        self.ocp._get_clusterversion_string()
+        call_kwargs = mock_client.list_cluster_custom_object.call_args[1]
+        self.assertEqual(call_kwargs.get("_request_timeout"), 30)
+
+
 class TestIsOpenshift(unittest.TestCase):
     """Test is_openshift method."""
 

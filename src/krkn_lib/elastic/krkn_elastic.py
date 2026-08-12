@@ -325,7 +325,6 @@ class KrknElastic:
             self.es.index(index=index, body=metric.to_dict())
             return int(time.time() - time_start)
         except Exception as e:
-            print("error" + str(e))
             self.safe_logger.error(f"Exception pushing metric: {e}")
             return -1
 
@@ -346,7 +345,7 @@ class KrknElastic:
             self.es.index(index=index, body=elastic_chaos.to_dict())
             return int(time.time() - time_start)
         except Exception as e:
-            self.safe_logger.info(f"Elastic push telemetry error: {e}")
+            self.safe_logger.error(f"Elastic push telemetry error: {e}")
             return -1
 
     def search_telemetry(self, run_uuid: str, index: str):

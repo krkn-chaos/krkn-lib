@@ -6,6 +6,8 @@ import threading
 import time
 from queue import Queue
 
+from kubernetes.client.exceptions import ApiException
+
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.ocp import KrknOpenshift
 from krkn_lib.telemetry.k8s import KrknTelemetryKubernetes
@@ -326,8 +328,14 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
             return self._count_custom_objects(
                 "kubevirt.io", "v1", "virtualmachineinstances"
             )
+        except ApiException as e:
+            if e.status == 404:
+                logging.info("KubeVirt CRD not found on cluster, skipping VM count")
+            else:
+                logging.error(f"failed to get virtualmachines: {e}")
+            return 0
         except Exception as e:
-            logging.info(f"failed to get virtualmachines: {e}")
+            logging.error(f"unexpected error getting virtualmachines: {e}")
             return 0
 
     def get_build_count(self) -> int:
