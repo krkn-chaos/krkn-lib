@@ -14,6 +14,11 @@ env:
   ELASTIC_URL: "https://localhost"
   ELASTIC_PORT: 9091
   ELASTIC_USER: "elastic"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-secret:
     runs-on: ubuntu-latest
