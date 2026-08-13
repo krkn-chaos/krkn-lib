@@ -678,7 +678,6 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(alert.name, "KubePodCrashLooping")
         self.assertEqual(alert.severity, "critical")
         self.assertEqual(alert.message, "Pod test-ns/test-pod is crash looping")
-        self.assertEqual(alert.namespace, "test-ns")
         self.assertEqual(alert.starts_at, "2024-09-02T14:00:53Z")
 
         json_str = alert.to_json()
@@ -693,7 +692,6 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(alert.name, "")
         self.assertEqual(alert.severity, "")
         self.assertEqual(alert.message, "")
-        self.assertEqual(alert.namespace, "")
         self.assertEqual(alert.starts_at, "")
 
     def test_chaos_run_telemetry_with_failed_alerts(self):
@@ -715,14 +713,12 @@ class KrknTelemetryModelsTests(unittest.TestCase):
                     "name": "KubePodCrashLooping",
                     "severity": "critical",
                     "message": "Pod default/my-pod is crash looping",
-                    "namespace": "default",
                     "starts_at": "2024-09-02T14:00:00Z"
                 },
                 {
                     "name": "NodeNotReady",
                     "severity": "warning",
                     "message": "Node worker-1 is not ready",
-                    "namespace": "",
                     "starts_at": "2024-09-02T14:05:00Z"
                 }
             ]
@@ -740,7 +736,6 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             telemetry.failed_alerts[0].message,
             "Pod default/my-pod is crash looping",
         )
-        self.assertEqual(telemetry.failed_alerts[0].namespace, "default")
         self.assertEqual(
             telemetry.failed_alerts[0].starts_at, "2024-09-02T14:00:00Z"
         )

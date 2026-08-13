@@ -526,8 +526,6 @@ class FailedAlert:
     """ Alert severity (critical, warning, info) """
     message: str = ""
     """ Alert message or description """
-    namespace: str = ""
-    """ Namespace associated with the alert (if any) """
     starts_at: str = ""
     """ Timestamp when the alert started firing """
 
@@ -536,7 +534,6 @@ class FailedAlert:
             self.name = json_dict.get("name", "")
             self.severity = json_dict.get("severity", "")
             self.message = json_dict.get("message", "")
-            self.namespace = json_dict.get("namespace", "")
             self.starts_at = json_dict.get("starts_at", "")
 
     def to_json(self) -> str:
