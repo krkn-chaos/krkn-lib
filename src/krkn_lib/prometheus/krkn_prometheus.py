@@ -18,7 +18,7 @@ class KrknPrometheus:
         self,
         prometheus_url: str,
         prometheus_bearer_token: str = None,
-        timeout: int = None,
+        timeout: Optional[int] = None,
     ):
         """
         Instantiates a KrknPrometheus class with the Prometheus API
@@ -45,10 +45,7 @@ class KrknPrometheus:
             headers = {"Authorization": bearer}
         try:
             self.prom_cli = PrometheusConnect(
-                url=prometheus_url,
-                headers=headers,
-                disable_ssl=True,
-                timeout=timeout,
+                url=prometheus_url, headers=headers, disable_ssl=True, timeout=timeout,
             )
         except Exception as e:
             logging.error("Not able to initialize the client %s" % e)
