@@ -159,6 +159,7 @@ class ElasticHealthChecks(InnerDoc):
     start_timestamp = Date()
     end_timestamp = Date()
     duration = Float()
+    phase = Text(fields={"keyword": Keyword()})
 
 
 class ElasticVirtChecks(InnerDoc):
@@ -174,11 +175,29 @@ class ElasticVirtChecks(InnerDoc):
     start_timestamp = Date()
     end_timestamp = Date()
     duration = Float()
+    phase = Text(fields={"keyword": Keyword()})
 
 
 class ElasticErrorLog(InnerDoc):
     timestamp = Text()
     message = Text()
+
+
+class ElasticObjectStateCheck(InnerDoc):
+    check_name = Text(fields={"keyword": Keyword()})
+    kind = Text(fields={"keyword": Keyword()})
+    namespace = Text()
+    object_name = Text()
+    condition_type = Text()
+    condition_status = Text()
+    passed = Boolean()
+    objects_checked = Integer()
+    objects_failed = Integer()
+    start_timestamp = Date()
+    end_timestamp = Date()
+    duration = Float()
+    message = Text()
+    phase = Text(fields={"keyword": Keyword()})
 
 
 class ElasticChaosRunTelemetry(Document):
@@ -202,7 +221,7 @@ class ElasticChaosRunTelemetry(Document):
     run_uuid = Text(fields={"keyword": Keyword()})
     health_checks = Nested(ElasticHealthChecks, multi=True)
     virt_checks = Nested(ElasticVirtChecks, multi=True)
-    post_virt_checks = Nested(ElasticVirtChecks, multi=True)
+    object_state_checks = Nested(ElasticObjectStateCheck, multi=True)
     error_logs = Nested(ElasticErrorLog, multi=True)
     overall_resiliency_report = Nested(ElasticResiliencyReport)
 
@@ -308,11 +327,12 @@ class ElasticChaosRunTelemetry(Document):
                     status_code=info.status_code,
                     start_timestamp=datetime.datetime.fromisoformat(
                         str(info.start_timestamp)
-                    ),
+                    ) if info.start_timestamp else None,
                     end_timestamp=datetime.datetime.fromisoformat(
                         str(info.end_timestamp)
-                    ),
+                    ) if info.end_timestamp else None,
                     duration=info.duration,
+                    phase=info.phase,
                 )
                 for info in chaos_run_telemetry.health_checks
             ]
@@ -333,41 +353,44 @@ class ElasticChaosRunTelemetry(Document):
                     check_type=info.check_type,
                     start_timestamp=datetime.datetime.fromisoformat(
                         str(info.start_timestamp)
-                    ),
+                    ) if info.start_timestamp else None,
                     end_timestamp=datetime.datetime.fromisoformat(
                         str(info.end_timestamp)
-                    ),
+                    ) if info.end_timestamp else None,
                     duration=info.duration,
+                    phase=info.phase,
                 )
                 for info in chaos_run_telemetry.virt_checks
             ]
         else:
             self.virt_checks = None
 
-        if chaos_run_telemetry.post_virt_checks:
-            self.post_virt_checks = [
-                ElasticVirtChecks(
-                    vm_name=post_info.vm_name,
-                    ip_address=post_info.ip_address,
-                    new_ip_address=post_info.new_ip_address,
-                    namespace=post_info.namespace,
-                    node_name=post_info.node_name,
-                    ssh_status=post_info.ssh_status,
-                    vmi_ready=post_info.vmi_ready,
-                    status=post_info.status,
-                    check_type=post_info.check_type,
+        if chaos_run_telemetry.object_state_checks:
+            self.object_state_checks = [
+                ElasticObjectStateCheck(
+                    check_name=check.check_name,
+                    kind=check.kind,
+                    namespace=check.namespace,
+                    object_name=check.object_name,
+                    condition_type=check.condition_type,
+                    condition_status=check.condition_status,
+                    passed=check.passed,
+                    objects_checked=check.objects_checked,
+                    objects_failed=check.objects_failed,
                     start_timestamp=datetime.datetime.fromisoformat(
-                        str(post_info.start_timestamp)
-                    ),
+                        str(check.start_timestamp)
+                    ) if check.start_timestamp else None,
                     end_timestamp=datetime.datetime.fromisoformat(
-                        str(post_info.end_timestamp)
-                    ),
-                    duration=post_info.duration,
+                        str(check.end_timestamp)
+                    ) if check.end_timestamp else None,
+                    duration=check.duration,
+                    message=check.message,
+                    phase=check.phase,
                 )
-                for post_info in chaos_run_telemetry.post_virt_checks
+                for check in chaos_run_telemetry.object_state_checks
             ]
         else:
-            self.post_virt_checks = None
+            self.object_state_checks = None
 
         self.timestamp = chaos_run_telemetry.timestamp
         self.total_node_count = chaos_run_telemetry.total_node_count

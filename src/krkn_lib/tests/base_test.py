@@ -592,6 +592,7 @@ class BaseTest(unittest.TestCase):
                     "start_timestamp": "2025-03-12T14:57:54.706000",
                     "end_timestamp": "2025-03-12T15:02:13.819742",
                     "duration": 259.113742,
+                    "phase": "during",
                 }
             ],
             "virt_checks": [
@@ -608,6 +609,7 @@ class BaseTest(unittest.TestCase):
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.348474,
                     "new_ip_address": "",
+                    "phase": "during",
                 },
                 {
                     "node_name": "h27-r660",
@@ -622,6 +624,7 @@ class BaseTest(unittest.TestCase):
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 20.145247,
                     "new_ip_address": "",
+                    "phase": "during",
                 },
                 {
                     "node_name": "h10-r660",
@@ -636,9 +639,8 @@ class BaseTest(unittest.TestCase):
                     "end_timestamp": "2025-03-12T14:57:54.904352",
                     "duration": 19.595395,
                     "new_ip_address": "0.0.0.3",
+                    "phase": "during",
                 },
-            ],
-            "post_virt_checks": [
                 {
                     "node_name": "h10-r660",
                     "namespace": "benchmark-runner",
@@ -652,6 +654,41 @@ class BaseTest(unittest.TestCase):
                     "end_timestamp": "2025-03-12T14:57:55.904352",
                     "duration": 0.00,
                     "new_ip_address": "",
+                    "phase": "post",
+                },
+            ],
+            "object_state_checks": [
+                {
+                    "check_name": "etcd-pods-ready",
+                    "kind": "Pod",
+                    "namespace": "kube-system",
+                    "object_name": "etcd-.*",
+                    "condition_type": "Ready",
+                    "condition_status": "True",
+                    "passed": True,
+                    "objects_checked": 3,
+                    "objects_failed": 0,
+                    "start_timestamp": "2026-09-03T10:00:00.000000",
+                    "end_timestamp": "2026-09-03T10:05:00.000000",
+                    "duration": 300.0,
+                    "message": "Pod kube-system/etcd-0 condition Ready=True; Pod kube-system/etcd-1 condition Ready=True; Pod kube-system/etcd-2 condition Ready=True",
+                    "phase": "pre",
+                },
+                {
+                    "check_name": "api-deployment-available",
+                    "kind": "Deployment",
+                    "namespace": "default",
+                    "object_name": "api-server",
+                    "condition_type": "Available",
+                    "condition_status": "True",
+                    "passed": False,
+                    "objects_checked": 1,
+                    "objects_failed": 1,
+                    "start_timestamp": "2026-09-03T10:00:00.000000",
+                    "end_timestamp": "2026-09-03T10:01:30.000000",
+                    "duration": 90.0,
+                    "message": "Deployment default/api-server condition Available=False (expected True). Reason: MinimumReplicasUnavailable",
+                    "phase": "during",
                 }
             ],
             "total_node_count": 3,

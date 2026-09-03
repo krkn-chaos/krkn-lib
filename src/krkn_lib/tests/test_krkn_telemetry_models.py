@@ -13,7 +13,7 @@ from krkn_lib.models.telemetry import (
     ClusterEvent,
     ScenarioTelemetry,
 )
-from krkn_lib.models.telemetry.models import FailedAlert, VirtCheck
+from krkn_lib.models.telemetry.models import FailedAlert, VirtCheck, ObjectStateCheck
 
 
 class KrknTelemetryModelsTests(unittest.TestCase):
@@ -787,6 +787,88 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertIsNotNone(telemetry.failed_alerts)
         self.assertEqual(telemetry.failed_alerts, [])
 
+    def test_chaos_run_telemetry_backward_compat_post_virt_checks(self):
+        """Test backward compatibility with old post_virt_checks field"""
+        base_scenarios = '[{"scenario": "test", "scenario_type": "pod_disruption_scenarios", "exit_status": 0, "start_timestamp": 1686141432, "end_timestamp": 1686141435}]'
+
+        # Old telemetry format with both virt_checks and post_virt_checks
+        old_telemetry = json.loads(
+            f'{{"scenarios": {base_scenarios}, '
+            f'"node_summary_infos": [], '
+            f'"node_taints": [], '
+            f'"virt_checks": [{{'
+            f'  "vm_name": "during-vm", '
+            f'  "namespace": "test", '
+            f'  "node_name": "node1", '
+            f'  "ip_address": "10.0.0.1", '
+            f'  "status": true, '
+            f'  "duration": 1.0, '
+            f'  "start_timestamp": "2024-01-01T00:00:00Z", '
+            f'  "end_timestamp": "2024-01-01T00:01:00Z", '
+            f'  "phase": "during"'
+            f'}}], '
+            f'"post_virt_checks": [{{'
+            f'  "vm_name": "post-vm", '
+            f'  "namespace": "test", '
+            f'  "node_name": "node1", '
+            f'  "ip_address": "10.0.0.2", '
+            f'  "new_ip_address": "10.0.0.3", '
+            f'  "status": true, '
+            f'  "duration": 2.0, '
+            f'  "start_timestamp": "2024-01-01T00:02:00Z", '
+            f'  "end_timestamp": "2024-01-01T00:03:00Z"'
+            f'}}]'
+            f'}}'
+        )
+
+        telemetry = ChaosRunTelemetry(old_telemetry)
+
+        # Verify both during and post checks are merged into virt_checks
+        self.assertIsNotNone(telemetry.virt_checks)
+        self.assertEqual(len(telemetry.virt_checks), 2)
+
+        # Verify during check
+        during_checks = [c for c in telemetry.virt_checks if c.phase == "during"]
+        self.assertEqual(len(during_checks), 1)
+        self.assertEqual(during_checks[0].vm_name, "during-vm")
+
+        # Verify post check was migrated with phase="post"
+        post_checks = [c for c in telemetry.virt_checks if c.phase == "post"]
+        self.assertEqual(len(post_checks), 1)
+        self.assertEqual(post_checks[0].vm_name, "post-vm")
+        self.assertEqual(post_checks[0].ip_address, "10.0.0.2")
+        self.assertEqual(post_checks[0].new_ip_address, "10.0.0.3")
+
+    def test_chaos_run_telemetry_backward_compat_only_post_virt_checks(self):
+        """Test backward compatibility with only post_virt_checks (no virt_checks)"""
+        base_scenarios = '[{"scenario": "test", "scenario_type": "pod_disruption_scenarios", "exit_status": 0, "start_timestamp": 1686141432, "end_timestamp": 1686141435}]'
+
+        # Old telemetry with only post_virt_checks
+        old_telemetry = json.loads(
+            f'{{"scenarios": {base_scenarios}, '
+            f'"node_summary_infos": [], '
+            f'"node_taints": [], '
+            f'"post_virt_checks": [{{'
+            f'  "vm_name": "post-only-vm", '
+            f'  "namespace": "test", '
+            f'  "node_name": "node1", '
+            f'  "ip_address": "10.0.0.5", '
+            f'  "status": true, '
+            f'  "duration": 1.5, '
+            f'  "start_timestamp": "2024-01-01T00:00:00Z", '
+            f'  "end_timestamp": "2024-01-01T00:01:30Z"'
+            f'}}]'
+            f'}}'
+        )
+
+        telemetry = ChaosRunTelemetry(old_telemetry)
+
+        # Verify post_virt_checks were migrated
+        self.assertIsNotNone(telemetry.virt_checks)
+        self.assertEqual(len(telemetry.virt_checks), 1)
+        self.assertEqual(telemetry.virt_checks[0].vm_name, "post-only-vm")
+        self.assertEqual(telemetry.virt_checks[0].phase, "post")
+
 
 class VirtCheckModelTests(unittest.TestCase):
     def _base_dict(self, **overrides) -> dict:
@@ -861,6 +943,138 @@ class VirtCheckModelTests(unittest.TestCase):
         )
         self.assertEqual(vc.new_ip_address, "10.0.0.5")
         self.assertEqual(vc.check_type, "ssh_access")
+
+
+class ObjectStateCheckModelTests(unittest.TestCase):
+    def _base_dict(self, **overrides) -> dict:
+        base = {
+            "check_name": "etcd-pods-ready",
+            "kind": "Pod",
+            "namespace": "kube-system",
+            "object_name": "etcd-.*",
+            "condition_type": "Ready",
+            "condition_status": "True",
+            "passed": True,
+            "objects_checked": 3,
+            "objects_failed": 0,
+            "start_timestamp": "2026-09-03T10:00:00.000000",
+            "end_timestamp": "2026-09-03T10:05:00.000000",
+            "duration": 300.0,
+            "message": "Pod kube-system/etcd-0 condition Ready=True; Pod kube-system/etcd-1 condition Ready=True; Pod kube-system/etcd-2 condition Ready=True",
+            "phase": "during"
+        }
+        base.update(overrides)
+        return base
+
+    def test_all_objects_healthy(self):
+        """Test object state check when all objects pass"""
+        check = ObjectStateCheck(self._base_dict())
+        self.assertEqual(check.check_name, "etcd-pods-ready")
+        self.assertEqual(check.kind, "Pod")
+        self.assertEqual(check.namespace, "kube-system")
+        self.assertEqual(check.condition_type, "Ready")
+        self.assertEqual(check.condition_status, "True")
+        self.assertTrue(check.passed)
+        self.assertEqual(check.objects_checked, 3)
+        self.assertEqual(check.duration, 300.0)
+
+    def test_some_objects_unhealthy(self):
+        """Test object state check when some objects fail"""
+        check = ObjectStateCheck(
+            self._base_dict(
+                passed=False,
+                objects_failed=1,
+                message="Pod kube-system/etcd-0 condition Ready=True; Pod kube-system/etcd-1 condition Ready=False (expected True)"
+            )
+        )
+        self.assertFalse(check.passed)
+        self.assertEqual(check.objects_failed, 1)
+        self.assertIn("Ready=False", check.message)
+
+    def test_deployment_check(self):
+        """Test object state check for Deployment"""
+        check = ObjectStateCheck(
+            self._base_dict(
+                check_name="myapp-deployment-available",
+                kind="Deployment",
+                namespace="production",
+                object_name="myapp",
+                condition_type="Available",
+                objects_checked=1,
+                message="Deployment production/myapp condition Available=True"
+            )
+        )
+        self.assertEqual(check.kind, "Deployment")
+        self.assertEqual(check.condition_type, "Available")
+        self.assertTrue(check.passed)
+
+    def test_json_serialization(self):
+        """Test that ObjectStateCheck can be serialized to JSON"""
+        check = ObjectStateCheck(self._base_dict())
+        json_str = check.to_json()
+        self.assertIn("etcd-pods-ready", json_str)
+        self.assertIn("Ready", json_str)
+        self.assertIn("kube-system", json_str)
+
+    def test_empty_initialization(self):
+        """Test ObjectStateCheck with no data"""
+        check = ObjectStateCheck(None)
+        self.assertEqual(check.check_name, "")
+        self.assertEqual(check.kind, "")
+        self.assertFalse(check.passed)
+        self.assertEqual(check.objects_checked, 0)
+        self.assertEqual(check.phase, "during")
+
+    def test_phase_field_pre(self):
+        """Test ObjectStateCheck with pre-chaos phase"""
+        check = ObjectStateCheck(self._base_dict(phase="pre"))
+        self.assertEqual(check.phase, "pre")
+
+    def test_phase_field_post(self):
+        """Test ObjectStateCheck with post-chaos phase"""
+        check = ObjectStateCheck(self._base_dict(phase="post"))
+        self.assertEqual(check.phase, "post")
+
+    def test_phase_field_during(self):
+        """Test ObjectStateCheck with during-chaos phase"""
+        check = ObjectStateCheck(self._base_dict(phase="during"))
+        self.assertEqual(check.phase, "during")
+
+    def test_phase_field_default(self):
+        """Test ObjectStateCheck defaults to 'during' when phase not provided"""
+        data = self._base_dict()
+        del data["phase"]  # Remove phase field
+        check = ObjectStateCheck(data)
+        self.assertEqual(check.phase, "during")
+
+    def test_phase_in_json_serialization(self):
+        """Test that phase field is included in JSON serialization"""
+        check = ObjectStateCheck(self._base_dict(phase="pre"))
+        json_str = check.to_json()
+        self.assertIn('"phase"', json_str)
+        self.assertIn('"pre"', json_str)
+
+    def test_backward_compatibility_no_phase(self):
+        """Test backward compatibility with telemetry missing phase field"""
+        # Simulate old telemetry data without phase field
+        old_data = {
+            "check_name": "old-check",
+            "kind": "Pod",
+            "namespace": "default",
+            "object_name": "test-pod",
+            "condition_type": "Ready",
+            "condition_status": "True",
+            "passed": True,
+            "objects_checked": 1,
+            "objects_failed": 0,
+            "start_timestamp": "2026-09-03T10:00:00.000000",
+            "end_timestamp": "2026-09-03T10:00:00.000000",
+            "duration": 0.0,
+            "message": "All healthy"
+            # Note: no "phase" field
+        }
+        check = ObjectStateCheck(old_data)
+        self.assertEqual(check.phase, "during")  # Should default to "during"
 
 
 if __name__ == "__main__":

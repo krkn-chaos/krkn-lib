@@ -270,8 +270,8 @@ class TestKrknElasticModels(BaseTest):
             elastic_telemetry.health_checks[0].duration, 259.113742
         )
 
-        # virt_checks
-        self.assertEqual(len(elastic_telemetry.virt_checks), 3)
+        # virt_checks (includes during and post phases)
+        self.assertEqual(len(elastic_telemetry.virt_checks), 4)
         self.assertEqual(
             elastic_telemetry.virt_checks[0].vm_name, "windows-vm-50"
         )
@@ -316,29 +316,17 @@ class TestKrknElasticModels(BaseTest):
         self.assertEqual(elastic_telemetry.virt_checks[2].status, False)
         self.assertEqual(elastic_telemetry.virt_checks[2].check_type, "ssh_access")
 
-        # post_virt_checks
-        self.assertEqual(len(elastic_telemetry.post_virt_checks), 1)
-        self.assertEqual(
-            elastic_telemetry.post_virt_checks[0].vm_name, "windows-vm-52"
-        )
-        self.assertEqual(
-            elastic_telemetry.post_virt_checks[0].ip_address, "0.0.0.0"
-        )
-        self.assertEqual(
-            elastic_telemetry.post_virt_checks[0].new_ip_address, ""
-        )
-        self.assertEqual(
-            elastic_telemetry.post_virt_checks[0].namespace, "benchmark-runner"
-        )
-        self.assertEqual(
-            elastic_telemetry.post_virt_checks[0].node_name, "h10-r660"
-        )
-
-        # post_virt_checks[0]: both down → both
-        self.assertEqual(elastic_telemetry.post_virt_checks[0].ssh_status, False)
-        self.assertEqual(elastic_telemetry.post_virt_checks[0].vmi_ready, False)
-        self.assertEqual(elastic_telemetry.post_virt_checks[0].status, False)
-        self.assertEqual(elastic_telemetry.post_virt_checks[0].check_type, "both")
+        # virt_checks[3]: post-chaos check - both down → both
+        self.assertEqual(elastic_telemetry.virt_checks[3].vm_name, "windows-vm-52")
+        self.assertEqual(elastic_telemetry.virt_checks[3].ip_address, "0.0.0.0")
+        self.assertEqual(elastic_telemetry.virt_checks[3].new_ip_address, "")
+        self.assertEqual(elastic_telemetry.virt_checks[3].namespace, "benchmark-runner")
+        self.assertEqual(elastic_telemetry.virt_checks[3].node_name, "h10-r660")
+        self.assertEqual(elastic_telemetry.virt_checks[3].ssh_status, False)
+        self.assertEqual(elastic_telemetry.virt_checks[3].vmi_ready, False)
+        self.assertEqual(elastic_telemetry.virt_checks[3].status, False)
+        self.assertEqual(elastic_telemetry.virt_checks[3].check_type, "both")
+        self.assertEqual(elastic_telemetry.virt_checks[3].phase, "post")
 
         self.assertEqual(elastic_telemetry.total_node_count, 3)
         self.assertEqual(elastic_telemetry.cloud_infrastructure, "AWS")
@@ -381,6 +369,56 @@ class TestKrknElasticModels(BaseTest):
             overall_report.scenarios.to_dict().get("example_scenario.yaml"),
             95,
         )
+
+        # object_state_checks validation
+        self.assertEqual(len(elastic_telemetry.object_state_checks), 2)
+
+        # First check - all healthy
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].check_name, "etcd-pods-ready"
+        )
+        self.assertEqual(elastic_telemetry.object_state_checks[0].kind, "Pod")
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].namespace, "kube-system"
+        )
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].object_name, "etcd-.*"
+        )
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].condition_type, "Ready"
+        )
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].condition_status, "True"
+        )
+        self.assertTrue(elastic_telemetry.object_state_checks[0].passed)
+        self.assertEqual(elastic_telemetry.object_state_checks[0].objects_checked, 3)
+        self.assertEqual(elastic_telemetry.object_state_checks[0].objects_failed, 0)
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].start_timestamp,
+            datetime.datetime.fromisoformat("2026-09-03T10:00:00.000000"),
+        )
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[0].end_timestamp,
+            datetime.datetime.fromisoformat("2026-09-03T10:05:00.000000"),
+        )
+        self.assertEqual(elastic_telemetry.object_state_checks[0].duration, 300.0)
+        self.assertIn("etcd-0", elastic_telemetry.object_state_checks[0].message)
+        self.assertEqual(elastic_telemetry.object_state_checks[0].phase, "pre")
+
+        # Second check - has failures
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[1].check_name,
+            "api-deployment-available"
+        )
+        self.assertEqual(elastic_telemetry.object_state_checks[1].kind, "Deployment")
+        self.assertEqual(
+            elastic_telemetry.object_state_checks[1].namespace, "default"
+        )
+        self.assertFalse(elastic_telemetry.object_state_checks[1].passed)
+        self.assertEqual(elastic_telemetry.object_state_checks[1].objects_checked, 1)
+        self.assertEqual(elastic_telemetry.object_state_checks[1].objects_failed, 1)
+        self.assertEqual(elastic_telemetry.object_state_checks[1].duration, 90.0)
+        self.assertEqual(elastic_telemetry.object_state_checks[1].phase, "during")
 
     def test_ElasticChaosRunTelemetry(self):
         run_uuid = str(uuid.uuid4())
@@ -425,3 +463,28 @@ class TestKrknElasticModels(BaseTest):
             chaos_run_telemetry=telemetry
         )
         self.assertIsNone(elastic_telemetry.error_logs)
+
+    def test_elastic_object_state_checks_conversion_from_none(self):
+        """Test that conversion handles None object_state_checks gracefully"""
+        run_uuid = str(uuid.uuid4())
+        example_data = self.get_ChaosRunTelemetry_json(run_uuid)
+        example_data["object_state_checks"] = None
+
+        telemetry = ChaosRunTelemetry(json_dict=example_data)
+        elastic_telemetry = ElasticChaosRunTelemetry(
+            chaos_run_telemetry=telemetry
+        )
+
+        self.assertIsNone(elastic_telemetry.object_state_checks)
+
+    def test_elastic_object_state_checks_conversion_from_empty_list(self):
+        """Test empty list handling in conversion"""
+        run_uuid = str(uuid.uuid4())
+        example_data = self.get_ChaosRunTelemetry_json(run_uuid)
+        example_data["object_state_checks"] = []
+
+        telemetry = ChaosRunTelemetry(json_dict=example_data)
+        elastic_telemetry = ElasticChaosRunTelemetry(
+            chaos_run_telemetry=telemetry
+        )
+        self.assertIsNone(elastic_telemetry.object_state_checks)
