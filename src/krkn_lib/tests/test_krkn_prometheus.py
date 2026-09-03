@@ -53,6 +53,19 @@ class TestKrknPrometheus(BaseTest):
                 f"Bearer {bearer_token}",
             )
 
+    def test_constructor_with_timeout(self):
+        """Test initialization passes timeout to PrometheusConnect."""
+        with patch(
+            "krkn_lib.prometheus.krkn_prometheus.PrometheusConnect"
+        ) as mock_prom:
+            mock_instance = Mock()
+            mock_prom.return_value = mock_instance
+
+            KrknPrometheus(self.url, timeout=30)
+
+            call_args = mock_prom.call_args
+            self.assertEqual(call_args.kwargs["timeout"], 30)
+
     def test_constructor_exception_handling(self):
         """Test that constructor exits on initialization failure."""
         with patch(

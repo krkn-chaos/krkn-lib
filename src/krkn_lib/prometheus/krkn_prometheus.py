@@ -15,7 +15,10 @@ class KrknPrometheus:
     prom_cli: PrometheusConnect
 
     def __init__(
-        self, prometheus_url: str, prometheus_bearer_token: str = None
+        self,
+        prometheus_url: str,
+        prometheus_bearer_token: str = None,
+        timeout: Optional[int] = None,
     ):
         """
         Instantiates a KrknPrometheus class with the Prometheus API
@@ -25,6 +28,10 @@ class KrknPrometheus:
         :param prometheus_url: the prometheus API endpoint
         :param prometheus_bearer_token: the bearer token to authenticate
             the query (optional).
+        :param timeout: optional request timeout in seconds applied to
+            all Prometheus API requests (passed through to
+            PrometheusConnect). Default None keeps current behavior
+            (no timeout).
         """
 
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -38,7 +45,7 @@ class KrknPrometheus:
             headers = {"Authorization": bearer}
         try:
             self.prom_cli = PrometheusConnect(
-                url=prometheus_url, headers=headers, disable_ssl=True
+                url=prometheus_url, headers=headers, disable_ssl=True, timeout=timeout,
             )
         except Exception as e:
             logging.error("Not able to initialize the client %s" % e)
