@@ -377,6 +377,108 @@ class KrknKubernetesTestsGet(BaseTest):
             self.assertEqual(len(result), 1)
             self.assertIn(result[0], ["node-a", "node-b", "node-c"])
 
+    def test_get_object_by_name_pod(self):
+        """Test getting a Pod object by name"""
+        namespace = "test-gobj-pod-" + self.get_random_string(10)
+        random_label = self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fake_kraken(random_label=random_label, namespace=namespace)
+        self.wait_pod("kraken-deployment", namespace)
+
+        # Get the pod as a dictionary
+        result = self.lib_k8s.get_object_by_name("Pod", "kraken-deployment", namespace)
+
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["metadata"]["name"], "kraken-deployment")
+        self.assertEqual(result["metadata"]["namespace"], namespace)
+        self.assertIn("status", result)
+        self.assertIn("spec", result)
+
+        self.pod_delete_queue.put(["kraken-deployment", namespace])
+
+    def test_get_object_by_name_deployment(self):
+        """Test getting a Pod object by name using get_object_by_name"""
+        namespace = "test-gobj-pod-" + self.get_random_string(10)
+        pod_name = "test-pod-" + self.get_random_string(5)
+        random_label = self.get_random_string(10)
+        self.deploy_namespace(namespace, [])
+        self.deploy_fedtools(name=pod_name, namespace=namespace, random_label=random_label)
+
+        try:
+            # Get the pod as a dictionary
+            result = self.lib_k8s.get_object_by_name("Pod", pod_name, namespace)
+
+            self.assertIsNotNone(result)
+            self.assertIsInstance(result, dict)
+            self.assertEqual(result["metadata"]["name"], pod_name)
+            self.assertEqual(result["metadata"]["namespace"], namespace)
+            self.assertIn("status", result)
+            self.assertIn("spec", result)
+        finally:
+            self.background_delete_ns(namespace)
+
+    def test_get_object_by_name_service(self):
+        """Test getting a Service object by name"""
+        # Use the kubernetes service in default namespace
+        result = self.lib_k8s.get_object_by_name("Service", "kubernetes", "default")
+
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["metadata"]["name"], "kubernetes")
+        self.assertEqual(result["metadata"]["namespace"], "default")
+        self.assertIn("spec", result)
+
+    def test_get_object_by_name_node(self):
+        """Test getting a Node object by name (cluster-scoped)"""
+        # Get the first available node
+        nodes = self.lib_k8s.list_nodes()
+        self.assertGreater(len(nodes), 0, "No nodes available in cluster")
+
+        node_name = nodes[0]
+        result = self.lib_k8s.get_object_by_name("Node", node_name)
+
+        self.assertIsNotNone(result)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["metadata"]["name"], node_name)
+        self.assertIn("status", result)
+        self.assertIn("spec", result)
+        # Node is cluster-scoped, should not have namespace
+        self.assertNotIn("namespace", result["metadata"])
+
+    def test_get_object_by_name_missing_namespace(self):
+        """Test that namespaced resources require namespace parameter"""
+        with self.assertRaises(ValueError) as context:
+            self.lib_k8s.get_object_by_name("Pod", "test-pod")
+
+        self.assertIn("Namespace is required", str(context.exception))
+
+    def test_get_object_by_name_not_found(self):
+        """Test getting a non-existent object raises ApiException"""
+        with self.assertRaises(ApiException) as context:
+            self.lib_k8s.get_object_by_name("Pod", "nonexistent-pod-xyz", "default")
+
+        # ApiException should have 404 status code
+        self.assertEqual(context.exception.status, 404)
+
+    def test_get_object_by_name_unsupported_kind(self):
+        """Test getting an unsupported resource kind returns None"""
+        result = self.lib_k8s.get_object_by_name("UnsupportedKind", "test", "default")
+        self.assertIsNone(result)
+
+    def test_get_object_by_name_case_insensitive(self):
+        """Test that kind parameter is case-insensitive"""
+        # Use the kubernetes service in default namespace
+        result1 = self.lib_k8s.get_object_by_name("Service", "kubernetes", "default")
+        result2 = self.lib_k8s.get_object_by_name("service", "kubernetes", "default")
+        result3 = self.lib_k8s.get_object_by_name("SERVICE", "kubernetes", "default")
+
+        self.assertIsNotNone(result1)
+        self.assertIsNotNone(result2)
+        self.assertIsNotNone(result3)
+        self.assertEqual(result1["metadata"]["name"], result2["metadata"]["name"])
+        self.assertEqual(result2["metadata"]["name"], result3["metadata"]["name"])
+
 
 if __name__ == "__main__":
     unittest.main()
