@@ -70,6 +70,18 @@ class KrknKubernetesTestsExec(BaseTest):
 
         try:
             self.lib_k8s.exec_cmd_in_pod(["ls", "-al"], alpine_name, namespace)
+            
+            # Synthetic regression test for argument truncation bug
+            # Currently ["echo", "hello"] executes as `bash/sh -c echo` and drops "hello".
+            # It must preserve and print "hello".
+            result_echo = self.lib_k8s.exec_cmd_in_pod(["echo", "hello"], alpine_name, namespace)
+            self.assertIn("hello", result_echo)
+
+            # Real-world regression test for argument truncation bug
+            # Currently ["ip", "route"] executes as `bash/sh -c ip` and drops "route",
+            # returning the ip usage/help text.
+            result_ip = self.lib_k8s.exec_cmd_in_pod(["ip", "route"], alpine_name, namespace)
+            self.assertNotIn("Usage: ip", result_ip)
         except Exception:
             self.fail()
 
