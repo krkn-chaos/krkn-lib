@@ -38,6 +38,7 @@ from krkn_lib.models.k8s import (
 )
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
+from krkn_lib.k8s.kubernetes_object_helpers import KubernetesObjectHelpers
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -1409,6 +1410,40 @@ class KrknKubernetes:
         :return: V1Pod definition of the pod
         """
         return self.cli.read_namespaced_pod(name=name, namespace=namespace)
+
+    def get_object_by_name(
+        self,
+        kind: str,
+        name: str,
+        namespace: str = None
+    ) -> Optional[dict]:
+        """
+        Get a Kubernetes object by kind and name, returning it as a dictionary.
+
+        This is a universal helper that works with any supported Kubernetes resource type,
+        handling both namespaced and cluster-scoped resources automatically.
+
+        Supported resource kinds:
+        - Namespaced: Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Service,
+                      PersistentVolumeClaim, Job, CronJob
+        - Cluster-scoped: Node, PersistentVolume
+
+        :param kind: Kubernetes resource kind (e.g., "Pod", "Deployment", "Node")
+        :param name: Name of the object
+        :param namespace: Namespace (required for namespaced resources, ignored for cluster-scoped)
+        :return: Object as a dictionary, or None if not found or unsupported kind
+        :raises ApiException: If the API call fails (e.g., object not found)
+
+        Example:
+            >>> krkn_lib.get_object_by_name("Pod", "my-pod", "default")
+            {'metadata': {'name': 'my-pod', ...}, 'status': {...}, ...}
+
+            >>> krkn_lib.get_object_by_name("Node", "worker-1")
+            {'metadata': {'name': 'worker-1', ...}, 'status': {...}, ...}
+        """
+        
+        helpers = KubernetesObjectHelpers(self)
+        return helpers.get_object_by_name(kind, name, namespace)
 
     def get_pod_log(
         self, name: str, namespace: str = "default"
