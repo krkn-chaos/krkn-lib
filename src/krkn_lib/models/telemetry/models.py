@@ -426,6 +426,10 @@ class HealthCheck:
     """
     Denotes the time between start time and end time
     """
+    phase: str
+    """
+    Chaos phase when this check was performed: 'pre', 'during', or 'post'
+    """
 
     def __init__(self, json_dict: dict = None):
         if json_dict is not None:
@@ -435,6 +439,7 @@ class HealthCheck:
             self.start_timestamp = json_dict["start_timestamp"]
             self.end_timestamp = json_dict["end_timestamp"]
             self.duration = json_dict["duration"]
+            self.phase = json_dict.get("phase", "during")
 
 
 @dataclass(order=False)
@@ -491,6 +496,10 @@ class VirtCheck:
     """
     Denotes the time between start time and end time
     """
+    phase: str
+    """
+    Chaos phase when this check was performed: 'pre', 'during', or 'post'
+    """
 
     def __init__(self, json_dict: dict = None):
         if json_dict is not None:
@@ -512,6 +521,107 @@ class VirtCheck:
             self.end_timestamp = json_dict.get("end_timestamp", "")
             self.duration = json_dict.get("duration", "")
             self.new_ip_address = json_dict.get("new_ip_address", "")
+            self.phase = json_dict.get("phase", "during")
+
+
+@dataclass(order=False)
+class ObjectStateCheck:
+    """
+    Object state health checks for Kubernetes resources
+    """
+
+    check_name: str
+    """
+    Descriptive name of the check (e.g., "etcd-pods-ready")
+    """
+    kind: str
+    """
+    Kubernetes resource kind (Pod, Deployment, StatefulSet, etc.)
+    """
+    namespace: str
+    """
+    Namespace of the checked object(s)
+    """
+    object_name: str
+    """
+    Name or regex pattern of object(s) checked
+    """
+    condition_type: str
+    """
+    Condition type checked (Ready, Available, Progressing, etc.)
+    """
+    condition_status: str
+    """
+    Expected condition status (True, False, Unknown)
+    """
+    passed: bool
+    """
+    Whether all checked objects passed the condition check
+    """
+    objects_checked: int
+    """
+    Number of objects that matched the criteria and were checked
+    """
+    objects_failed: int
+    """
+    Number of objects that failed the condition check
+    """
+    start_timestamp: str
+    """
+    Start timestamp of the check period
+    """
+    end_timestamp: str
+    """
+    End timestamp of the check period
+    """
+    duration: float
+    """
+    Duration of the check period in seconds
+    """
+    message: str
+    """
+    Detailed message about the check results
+    """
+
+    phase: str
+    """
+    Chaos phase when this check was performed: 'pre', 'during', or 'post'
+    """
+
+    def __init__(self, json_dict: dict = None):
+        if json_dict is not None:
+            self.check_name = json_dict.get("check_name", "")
+            self.kind = json_dict.get("kind", "")
+            self.namespace = json_dict.get("namespace", "")
+            self.object_name = json_dict.get("object_name", "")
+            self.condition_type = json_dict.get("condition_type", "")
+            self.condition_status = json_dict.get("condition_status", "")
+            self.passed = json_dict.get("passed", False)
+            self.objects_checked = json_dict.get("objects_checked", 0)
+            self.objects_failed = json_dict.get("objects_failed", 0)
+            self.start_timestamp = json_dict.get("start_timestamp", "")
+            self.end_timestamp = json_dict.get("end_timestamp", "")
+            self.duration = json_dict.get("duration", 0.0)
+            self.message = json_dict.get("message", "")
+            self.phase = json_dict.get("phase", "during")
+        else:
+            self.check_name = ""
+            self.kind = ""
+            self.namespace = ""
+            self.object_name = ""
+            self.condition_type = ""
+            self.condition_status = ""
+            self.passed = False
+            self.objects_checked = 0
+            self.objects_failed = 0
+            self.start_timestamp = ""
+            self.end_timestamp = ""
+            self.duration = 0.0
+            self.message = ""
+            self.phase = "during"
+
+    def to_json(self) -> str:
+        return json.dumps(self, default=lambda o: o.__dict__, indent=4)
 
 
 @dataclass(order=False)
@@ -605,11 +715,11 @@ class ChaosRunTelemetry:
     """
     virt_checks: list[VirtCheck] = None
     """
-    Virt checks of VMIs
+    Virt checks of VMIs (includes pre, during, and post phases differentiated by phase field)
     """
-    post_virt_checks: list[VirtCheck] = None
+    object_state_checks: list[ObjectStateCheck] = None
     """
-    Post Scenario Virt checks of VMIs
+    Object state health checks for Kubernetes resources
     """
     job_status: bool = True
     """
@@ -660,6 +770,7 @@ class ChaosRunTelemetry:
         )
         self.health_checks = list[HealthCheck]()
         self.virt_checks = list[VirtCheck]()
+        self.object_state_checks = list[ObjectStateCheck]()
         self.error_logs = []
         self.overall_resiliency_report = ResiliencyReport()
         self.failed_alerts = []
@@ -690,14 +801,23 @@ class ChaosRunTelemetry:
                 if json_dict.get("health_checks")
                 else None
             )
-            self.virt_checks = (
-                [VirtCheck(k) for k in json_dict.get("virt_checks")]
-                if json_dict.get("virt_checks")
-                else None
-            )
-            self.post_virt_checks = (
-                [VirtCheck(k) for k in json_dict.get("post_virt_checks")]
-                if json_dict.get("post_virt_checks")
+            # Read virt_checks from new unified field
+            virt_checks = []
+            if json_dict.get("virt_checks"):
+                virt_checks = [VirtCheck(k) for k in json_dict.get("virt_checks")]
+
+            # Backward compatibility: merge old post_virt_checks into virt_checks
+            if json_dict.get("post_virt_checks"):
+                for check_dict in json_dict.get("post_virt_checks"):
+                    # Ensure phase is set to "post" for backward compatibility
+                    if isinstance(check_dict, dict) and "phase" not in check_dict:
+                        check_dict["phase"] = "post"
+                    virt_checks.append(VirtCheck(check_dict))
+
+            self.virt_checks = virt_checks if virt_checks else None
+            self.object_state_checks = (
+                [ObjectStateCheck(k) for k in json_dict.get("object_state_checks")]
+                if json_dict.get("object_state_checks")
                 else None
             )
             self.job_status = json_dict.get("job_status")
