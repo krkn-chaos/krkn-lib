@@ -224,6 +224,7 @@ class ElasticChaosRunTelemetry(Document):
     object_state_checks = Nested(ElasticObjectStateCheck, multi=True)
     error_logs = Nested(ElasticErrorLog, multi=True)
     overall_resiliency_report = Nested(ElasticResiliencyReport)
+    time_to_recovery = Float()
 
     class Index:
         name = "chaos_run_telemetry"
@@ -407,6 +408,7 @@ class ElasticChaosRunTelemetry(Document):
             chaos_run_telemetry.etcd_encryption_enabled
         )
         self.ipsec_enabled = chaos_run_telemetry.ipsec_enabled
+        self.time_to_recovery = chaos_run_telemetry.time_to_recovery
 
         if chaos_run_telemetry.error_logs:
             self.error_logs = [
