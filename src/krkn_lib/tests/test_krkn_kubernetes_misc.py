@@ -144,7 +144,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         service_infos = self.lib_k8s.deploy_service_hijacking(
             namespace,
             plan,
-            "quay.io/redhat-chaos/krkn-service-hijacking:v0.1.0",
+            "quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-service-hijacking",
         )
 
         self.assertIsNotNone(service_infos)
@@ -200,7 +200,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         self.lib_k8s.deploy_syn_flood(
             pod_name=syn_flood_pod_name,
             namespace=namespace,
-            image="quay.io/krkn-chaos/krkn-syn-flood",
+            image="quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-syn-flood",
             target=service_name,
             target_port=80,
             packet_size=120,
@@ -270,7 +270,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         self.lib_k8s.deploy_http_load(
             name=http_load_pod_name,
             namespace=namespace,
-            image="quay.io/krkn-chaos/krkn-http-load",
+            image="quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-http-load",
             targets_json_base64=targets_json_base64,
             duration=f"{test_duration}s",
             rate="10/1s",
@@ -322,7 +322,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.workers = node_cpus
         config.node_selector = f"kubernetes.io/hostname={nodes[0]}"
         config.namespace = namespace
-        config.image = "quay.io/krkn-chaos/krkn-hog"
+        config.image = "quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog"
         self.lib_k8s.deploy_hog(pod_name, config)
 
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
@@ -342,7 +342,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
         config.namespace = namespace
-        config.image = "quay.io/krkn-chaos/krkn-hog"
+        config.image = "quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog"
         self.lib_k8s.deploy_hog(pod_name, config)
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue
@@ -363,7 +363,7 @@ class KrknKubernetesTestsMisc(BaseTest):
         config.workers = 4
         pod_name = f"test-hog-pod-{self.get_random_string(5)}"
         config.namespace = namespace
-        config.image = "quay.io/krkn-chaos/krkn-hog"
+        config.image = "quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog"
         self.lib_k8s.deploy_hog(pod_name, config)
         while not self.lib_k8s.is_pod_running(pod_name, namespace):
             continue

@@ -31,6 +31,7 @@ coverage="^7.6.12"
 importlib-metadata = "^8.7.0"
 urllib3 = ">=2.7.0"  # Fix CVE GHSA-mf9v-mfxr-j63j, GHSA-qccp-gfcp-xxvc
 cryptography = ">=46.0.7"
+oras = "^0.2.43"
 pyasn1 = ">=0.6.3"
 pygments = ">=2.20.0"
 pillow = ">=12.2.0"
