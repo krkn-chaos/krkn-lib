@@ -35,6 +35,27 @@ from krkn_lib.utils import SafeLogger
 class TestKrknOpenshiftInit(unittest.TestCase):
     """Test KrknOpenshift initialization."""
 
+    @patch(
+        "krkn_lib.ocp.krkn_openshift.KrknKubernetes.__init__",
+        return_value=None,
+    )
+    def test_passes_image_signature_settings_to_parent(self, parent_init):
+        """Image signature settings are propagated to KrknKubernetes."""
+        public_key = "/tmp/cosign.pub"
+
+        KrknOpenshift(
+            kubeconfig_path="/tmp/kubeconfig",
+            image_signature_verification_enabled=True,
+            image_signature_public_key=public_key,
+        )
+
+        parent_init.assert_called_once_with(
+            kubeconfig_path="/tmp/kubeconfig",
+            kubeconfig_string=None,
+            image_signature_verification_enabled=True,
+            image_signature_public_key=public_key,
+        )
+
     @patch("krkn_lib.k8s.krkn_kubernetes.config")
     def test_init_with_kubeconfig(self, mock_config):
         """Test initialization with kubeconfig path."""
