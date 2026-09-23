@@ -13,7 +13,7 @@ from krkn_lib.models.telemetry import (
     ClusterEvent,
     ScenarioTelemetry,
 )
-from krkn_lib.models.telemetry.models import FailedAlert, VirtCheck, ObjectStateCheck
+from krkn_lib.models.telemetry.models import Alerts, VirtCheck, ObjectStateCheck
 
 
 class KrknTelemetryModelsTests(unittest.TestCase):
@@ -666,7 +666,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         # json_dict missing count (e.g. old telemetry data)
         self.assertEqual(NodeInfo({"architecture": "amd64"}).count, 1)
     def test_failed_alert_model(self):
-        """Test FailedAlert dataclass construction and field values"""
+        """Test Alerts dataclass construction and field values"""
         alert_dict = {
             "name": "KubePodCrashLooping",
             "severity": "critical",
@@ -674,11 +674,12 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             "namespace": "test-ns",
             "starts_at": "2024-09-02T14:00:53Z",
         }
-        alert = FailedAlert(alert_dict)
+        alert = Alerts(alert_dict)
         self.assertEqual(alert.name, "KubePodCrashLooping")
         self.assertEqual(alert.severity, "critical")
         self.assertEqual(alert.message, "Pod test-ns/test-pod is crash looping")
         self.assertEqual(alert.starts_at, "2024-09-02T14:00:53Z")
+        self.assertEqual(alert.phase, "during")
 
         json_str = alert.to_json()
         self.assertIsNotNone(json_str)
@@ -687,15 +688,26 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         self.assertEqual(parsed["severity"], "critical")
 
     def test_failed_alert_model_defaults(self):
-        """Test FailedAlert defaults to empty strings for missing fields"""
-        alert = FailedAlert({})
+        """Test Alerts defaults to empty strings for missing fields"""
+        alert = Alerts({})
         self.assertEqual(alert.name, "")
         self.assertEqual(alert.severity, "")
         self.assertEqual(alert.message, "")
         self.assertEqual(alert.starts_at, "")
+        self.assertEqual(alert.phase, "during")
 
-    def test_chaos_run_telemetry_with_failed_alerts(self):
-        """Test failed_alerts field is properly parsed from JSON and serialized"""
+    def test_alert_model_preserves_non_during_phase(self):
+        """Alert telemetry preserves pre and post evaluation phases."""
+        pre_alert = Alerts({"name": "pre-check", "phase": "pre", "status": True})
+        post_alert = Alerts({"name": "post-check", "phase": "post", "status": False})
+
+        self.assertEqual(pre_alert.phase, "pre")
+        self.assertTrue(pre_alert.status)
+        self.assertEqual(post_alert.phase, "post")
+        self.assertFalse(post_alert.status)
+
+    def test_chaos_run_telemetry_with_alerts(self):
+        """Test alerts field is properly parsed from JSON and serialized"""
         test_json = """
         {
             "scenarios": [{
@@ -708,7 +720,7 @@ class KrknTelemetryModelsTests(unittest.TestCase):
             }],
             "node_summary_infos": [],
             "node_taints": [],
-            "failed_alerts": [
+            "alerts": [
                 {
                     "name": "KubePodCrashLooping",
                     "severity": "critical",
@@ -726,30 +738,30 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         """  # NOQA
         telemetry = ChaosRunTelemetry(json.loads(test_json))
 
-        self.assertIsNotNone(telemetry.failed_alerts)
-        self.assertEqual(len(telemetry.failed_alerts), 2)
+        self.assertIsNotNone(telemetry.alerts)
+        self.assertEqual(len(telemetry.alerts), 2)
 
-        self.assertIsInstance(telemetry.failed_alerts[0], FailedAlert)
-        self.assertEqual(telemetry.failed_alerts[0].name, "KubePodCrashLooping")
-        self.assertEqual(telemetry.failed_alerts[0].severity, "critical")
+        self.assertIsInstance(telemetry.alerts[0], Alerts)
+        self.assertEqual(telemetry.alerts[0].name, "KubePodCrashLooping")
+        self.assertEqual(telemetry.alerts[0].severity, "critical")
         self.assertEqual(
-            telemetry.failed_alerts[0].message,
+            telemetry.alerts[0].message,
             "Pod default/my-pod is crash looping",
         )
         self.assertEqual(
-            telemetry.failed_alerts[0].starts_at, "2024-09-02T14:00:00Z"
+            telemetry.alerts[0].starts_at, "2024-09-02T14:00:00Z"
         )
 
-        self.assertEqual(telemetry.failed_alerts[1].name, "NodeNotReady")
-        self.assertEqual(telemetry.failed_alerts[1].severity, "warning")
+        self.assertEqual(telemetry.alerts[1].name, "NodeNotReady")
+        self.assertEqual(telemetry.alerts[1].severity, "warning")
 
         json_str = telemetry.to_json()
-        self.assertIn("failed_alerts", json_str)
+        self.assertIn("alerts", json_str)
         self.assertIn("KubePodCrashLooping", json_str)
         self.assertIn("NodeNotReady", json_str)
 
-    def test_chaos_run_telemetry_failed_alerts_edge_cases(self):
-        """Test failed_alerts field handles empty, missing, and null cases"""
+    def test_chaos_run_telemetry_alerts_edge_cases(self):
+        """Test alerts field handles empty, missing, and null cases"""
         base_scenarios = """[{
             "start_timestamp": 1686141432,
             "end_timestamp": 1686141435,
@@ -762,30 +774,30 @@ class KrknTelemetryModelsTests(unittest.TestCase):
         # Empty list
         t = ChaosRunTelemetry(json.loads(
             f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
-            f'"node_taints": [], "failed_alerts": []}}'
+            f'"node_taints": [], "alerts": []}}'
         ))
-        self.assertEqual(t.failed_alerts, [])
+        self.assertEqual(t.alerts, [])
 
         # Missing field
         t = ChaosRunTelemetry(json.loads(
             f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
             f'"node_taints": []}}'
         ))
-        self.assertEqual(t.failed_alerts, [])
+        self.assertEqual(t.alerts, [])
 
         # Null field
         t = ChaosRunTelemetry(json.loads(
             f'{{"scenarios": {base_scenarios}, "node_summary_infos": [], '
-            f'"node_taints": [], "failed_alerts": null}}'
+            f'"node_taints": [], "alerts": null}}'
         ))
-        self.assertEqual(t.failed_alerts, [])
+        self.assertEqual(t.alerts, [])
 
-    def test_chaos_run_telemetry_empty_constructor_has_failed_alerts(self):
-        """Test failed_alerts is initialized when using empty constructor"""
+    def test_chaos_run_telemetry_empty_constructor_has_alerts(self):
+        """Test alerts is initialized when using empty constructor"""
         telemetry = ChaosRunTelemetry()
-        self.assertTrue(hasattr(telemetry, "failed_alerts"))
-        self.assertIsNotNone(telemetry.failed_alerts)
-        self.assertEqual(telemetry.failed_alerts, [])
+        self.assertTrue(hasattr(telemetry, "alerts"))
+        self.assertIsNotNone(telemetry.alerts)
+        self.assertEqual(telemetry.alerts, [])
 
     def test_chaos_run_telemetry_backward_compat_post_virt_checks(self):
         """Test backward compatibility with old post_virt_checks field"""
