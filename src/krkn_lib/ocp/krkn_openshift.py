@@ -23,10 +23,17 @@ class KrknOpenshift(KrknKubernetes):
         self,
         kubeconfig_path: str = None,
         kubeconfig_string: str = None,
+        *,
+        image_signature_verification_enabled: bool = False,
+        image_signature_public_key: str | bytes = None,
     ):
         super().__init__(
             kubeconfig_path=kubeconfig_path,
             kubeconfig_string=kubeconfig_string,
+            image_signature_verification_enabled=(
+                image_signature_verification_enabled
+            ),
+            image_signature_public_key=image_signature_public_key,
         )
 
     def get_clusterversion_string(self) -> str:

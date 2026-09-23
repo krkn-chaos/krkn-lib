@@ -39,6 +39,10 @@ from krkn_lib.models.k8s import (
 from krkn_lib.models.krkn import HogConfig, HogType
 from krkn_lib.models.telemetry import ClusterEvent, NodeInfo, Taint
 from krkn_lib.k8s.kubernetes_object_helpers import KubernetesObjectHelpers
+from krkn_lib.k8s.image_verification import (
+    CosignImageVerifier,
+    ImageSignatureVerificationError,
+)
 from krkn_lib.utils import filter_dictionary, get_random_string
 from krkn_lib.utils.safe_logger import SafeLogger
 
@@ -96,6 +100,9 @@ class KrknKubernetes:
         kubeconfig_path: str,
         kubeconfig_string: str = None,
         request_chunk_size: int = 250,
+        *,
+        image_signature_verification_enabled: bool = False,
+        image_signature_public_key: str | bytes = None,
     ):
         """
         KrknKubernetes Constructor. Can be invoked with kubeconfig_path
@@ -119,6 +126,21 @@ class KrknKubernetes:
         self._dyn_client = None
         self._dyn_client_lock = threading.Lock()
         self.request_chunk_size = request_chunk_size
+        self._image_signature_verification_enabled = (
+            image_signature_verification_enabled
+        )
+        self._image_signature_verifier = None
+        self._image_signature_bypass_warning_logged = False
+
+        if image_signature_verification_enabled:
+            if image_signature_public_key is None:
+                raise ValueError(
+                    "image_signature_public_key is required when "
+                    "image signature verification is enabled"
+                )
+            self._image_signature_verifier = CosignImageVerifier(
+                image_signature_public_key
+            )
 
         if kubeconfig_string is not None:
             with tempfile.NamedTemporaryFile(mode="w+", delete=False) as f:
@@ -129,6 +151,78 @@ class KrknKubernetes:
         if kubeconfig_path is not None:
             self.__initialize_config(kubeconfig_path)
             self.__kubeconfig_path = kubeconfig_path
+
+    @staticmethod
+    def verify_image_signature(public_key: str | bytes, image: str) -> bool:
+        """Verify an OCI image with a PEM-encoded Cosign public key.
+
+        The check resolves tags through the registry and verifies the signature
+        against the resulting digest. It returns ``False`` for malformed input,
+        unavailable registries, unsigned images, and invalid signatures.
+        """
+        try:
+            return CosignImageVerifier(public_key).verify(image)
+        except Exception:
+            return False
+
+    @staticmethod
+    def _extract_manifest_images(manifest: object) -> list[str]:
+        """Extract unique container images from a Kubernetes manifest."""
+        images = []
+
+        def visit(value: object):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    if key == "image" and isinstance(child, str):
+                        if child not in images:
+                            images.append(child)
+                    else:
+                        visit(child)
+            elif isinstance(value, list):
+                for child in value:
+                    visit(child)
+
+        visit(manifest)
+        return images
+
+    def _verify_manifest_images(
+        self, manifest: object, operation: str
+    ) -> None:
+        """Verify all container images before creating a Kubernetes object."""
+        images = self._extract_manifest_images(manifest)
+        if not images:
+            return
+
+        if not self._image_signature_verification_enabled:
+            if not self._image_signature_bypass_warning_logged:
+                logging.warning(
+                    "Image signature verification is disabled; "
+                    "workload image verification is being bypassed"
+                )
+                self._image_signature_bypass_warning_logged = True
+            return
+
+        for image in images:
+            logging.info(
+                "Verifying signature for image '%s' before %s",
+                image,
+                operation,
+            )
+            if not self._image_signature_verifier.verify(image):
+                logging.error(
+                    "Image signature verification failed for '%s'; "
+                    "aborting %s",
+                    image,
+                    operation,
+                )
+                raise ImageSignatureVerificationError(
+                    f"Image signature verification failed for {image}"
+                )
+            logging.info(
+                "Image signature verified for '%s' before %s",
+                image,
+                operation,
+            )
 
     def __del__(self):
         self.api_client.rest_client.pool_manager.clear()
@@ -697,6 +791,7 @@ class KrknKubernetes:
         return pods
 
     def create_obj(self, obj_body: json, namespace: str, api_func):
+        self._verify_manifest_images(obj_body, "creating Kubernetes object")
         try:
             api_func(body=obj_body, namespace=namespace)
         except ApiException as e:
@@ -1362,7 +1457,12 @@ class KrknKubernetes:
                 logging.error("Failed to delete pod %s", str(e))
                 raise e
 
-    def create_pod(self, body: any, namespace: str, timeout: int = 120):
+    def create_pod(
+        self,
+        body: any,
+        namespace: str,
+        timeout: int = 120,
+    ):
         """
         Create a pod in a namespace
 
@@ -1370,6 +1470,7 @@ class KrknKubernetes:
         :param namespace: namespace where the pod is created
         :param timeout: request timeout
         """
+        self._verify_manifest_images(body, "creating pod")
         pod_stat = None
         pod_name = body["metadata"]["name"]
         try:
@@ -1526,6 +1627,7 @@ class KrknKubernetes:
             override
         :return: V1Job API object
         """
+        self._verify_manifest_images(body, "creating job")
         try:
             api_response = self.batch_cli.create_namespaced_job(
                 body=body, namespace=namespace
@@ -1559,6 +1661,7 @@ class KrknKubernetes:
         :return: a custom object representing the newly created manifestwork
         """
 
+        self._verify_manifest_images(body, "creating manifestwork")
         try:
             api_response = (
                 self.custom_object_client.create_namespaced_custom_object(
@@ -2171,9 +2274,17 @@ class KrknKubernetes:
         :return: the list of names of created objects
         """
         try:
+            with open(path, encoding="utf-8") as yaml_file:
+                for manifest in yaml.safe_load_all(yaml_file):
+                    if manifest is not None:
+                        self._verify_manifest_images(
+                            manifest, f"applying YAML '{path}'"
+                        )
             return utils.create_from_yaml(
                 self.api_client, yaml_file=path, namespace=namespace
             )
+        except ImageSignatureVerificationError:
+            raise
         except Exception as e:
             logging.error("Error trying to apply_yaml" + str(e))
 
@@ -3509,9 +3620,6 @@ class KrknKubernetes:
                 name=config_map_name, namespace=namespace, plan=plan_dump
             )
         )
-        self.cli.create_namespaced_config_map(
-            namespace=namespace, body=cm_body
-        )
 
         pod_template = env.get_template("service_hijacking_pod.j2")
         pod_body = yaml.safe_load(
@@ -3529,6 +3637,13 @@ class KrknKubernetes:
             )
         )
 
+        # Verify before creating the ConfigMap so a failed image check leaves
+        # no partial service-hijacking deployment behind. create_pod repeats
+        # the check at the final API boundary.
+        self._verify_manifest_images(pod_body, "deploying service hijacking")
+        self.cli.create_namespaced_config_map(
+            namespace=namespace, body=cm_body
+        )
         self.create_pod(namespace=namespace, body=pod_body)
 
         return ServiceHijacking(

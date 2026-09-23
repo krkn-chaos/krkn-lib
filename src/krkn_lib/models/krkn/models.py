@@ -130,7 +130,7 @@ class HogConfig:
 
     def __init__(self):
         self.type = HogType.cpu
-        self.image = "quay.io/krkn-chaos/krkn-hog"
+        self.image = "quay.io/krkn-chaos/krkn-hub-multiarch:workload-krkn-hog"
         self.cpu_load_percentage = 80
         self.cpu_method = "all"
         self.io_block_size = "1m"
