@@ -21,12 +21,14 @@ class TestKrknElastic(BaseTest):
             severity="WARNING",
             created_at=datetime.datetime.now(),
             run_uuid=run_uuid,
+            phase="pre",
         )
         alert_2 = ElasticAlert(
             alert="alert_2",
             severity="ERROR",
             created_at=datetime.datetime.now(),
             run_uuid=run_uuid,
+            phase="post",
         )
         result = self.lib_elastic.push_alert(alert_1, index)
         self.assertNotEqual(result, -1)
@@ -39,10 +41,12 @@ class TestKrknElastic(BaseTest):
         alert = next(alert for alert in alerts if alert.alert == "alert_1")
         self.assertIsNotNone(alert)
         self.assertEqual(alert.severity, "WARNING")
+        self.assertEqual(alert.phase, "pre")
 
         alert = next(alert for alert in alerts if alert.alert == "alert_2")
         self.assertIsNotNone(alert)
         self.assertEqual(alert.severity, "ERROR")
+        self.assertEqual(alert.phase, "post")
 
     def test_push_search_metric(self):
         run_uuid = str(uuid.uuid4())

@@ -20,6 +20,7 @@ class ElasticAlert(Document):
     severity = Text()
     alert = Text()
     created_at = Date()
+    phase = Keyword()
 
     def __init__(
         self,
@@ -27,6 +28,7 @@ class ElasticAlert(Document):
         severity: str = None,
         alert: str = None,
         created_at: datetime = None,
+        phase: str = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -34,6 +36,7 @@ class ElasticAlert(Document):
         self.severity = severity
         self.alert = alert
         self.created_at = created_at
+        self.phase = phase
 
     def to_dict(self, **kwargs):
         """Override to_dict to ensure ISO 8601 datetime format"""

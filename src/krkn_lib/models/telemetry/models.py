@@ -625,9 +625,9 @@ class ObjectStateCheck:
 
 
 @dataclass(order=False)
-class FailedAlert:
+class Alerts:
     """
-    A Prometheus alert that fired during the chaos run
+    A Prometheus alert evaluation performed during the chaos run
     """
 
     name: str = ""
@@ -638,13 +638,19 @@ class FailedAlert:
     """ Alert message or description """
     starts_at: str = ""
     """ Timestamp when the alert started firing """
+    status: bool = False
+    """Whether the alert expression passed"""
+    phase: str = "during"
+    """Chaos lifecycle phase when the alert was detected"""
 
-    def __init__(self, json_dict: dict = None):
-        if json_dict is not None:
-            self.name = json_dict.get("name", "")
-            self.severity = json_dict.get("severity", "")
-            self.message = json_dict.get("message", "")
-            self.starts_at = json_dict.get("starts_at", "")
+    def __init__(self, json_dict: dict = None, **kwargs):
+        values = {**(json_dict or {}), **kwargs}
+        self.name = values.get("name", "")
+        self.severity = values.get("severity", "")
+        self.message = values.get("message", "")
+        self.starts_at = values.get("starts_at", "")
+        self.status = values.get("status", False)
+        self.phase = values.get("phase", "during")
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
@@ -754,7 +760,7 @@ class ChaosRunTelemetry:
     """
     Overall resiliency report for the chaos run
     """
-    failed_alerts: list[FailedAlert] = None
+    alerts: list[Alerts] = None
     """
     Prometheus alerts that fired during the chaos run
     """
@@ -773,7 +779,7 @@ class ChaosRunTelemetry:
         self.object_state_checks = list[ObjectStateCheck]()
         self.error_logs = []
         self.overall_resiliency_report = ResiliencyReport()
-        self.failed_alerts = []
+        self.alerts = []
         if json_dict is not None:
             scenarios = json_dict.get("scenarios")
             if scenarios is None or isinstance(scenarios, list) is False:
@@ -838,11 +844,8 @@ class ChaosRunTelemetry:
                     passed_slos=report_data.get("passed_slos", 0),
                     total_slos=report_data.get("total_slos", 0),
                 )
-            self.failed_alerts = (
-                [FailedAlert(a) for a in json_dict.get("failed_alerts")]
-                if json_dict.get("failed_alerts")
-                else []
-            )
+            raw_alerts = json_dict.get("alerts", json_dict.get("failed_alerts"))
+            self.alerts = [Alerts(a) for a in raw_alerts] if raw_alerts else []
 
     def to_json(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=4)
