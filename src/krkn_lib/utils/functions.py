@@ -7,14 +7,19 @@ import socket
 import string
 import sys
 import xml.etree.cElementTree as ET
+from collections.abc import Mapping
 from queue import Queue
 from typing import Optional
+from urllib.parse import urlparse
 
 import pytz
+import requests
 from base64io import Base64IO
 from dateutil import parser
 from dateutil.parser import ParserError
 from dateutil.tz import tzutc  # NOQA
+
+PROW_METADATA_TIMEOUT = 1
 
 
 def decode_base64_file(source_filename: str, destination_filename: str):
@@ -480,39 +485,78 @@ def get_junit_test_case(
 
 
 def get_ci_job_url():
-    build_url = "manual"
-    if os.getenv("GITHUB_RUN_ID", ""):
+    github_run_id = os.getenv("GITHUB_RUN_ID", "").strip()
+    github_repo = os.getenv("GITHUB_REPOSITORY", "").strip()
+    if github_run_id and github_repo:
         # github actions build url
-        github_run_id = os.getenv("GITHUB_RUN_ID")
-        github_repo = os.getenv("GITHUB_REPOSITORY")
-        build_url = (
+        return (
             f"https://github.com/{github_repo}/actions/runs/{github_run_id}"
         )
-    elif os.getenv("PROW_JOB_ID", ""):
+
+    prow_job_id = os.getenv("PROW_JOB_ID", "").strip()
+    task_id = os.getenv("BUILD_ID", "").strip()
+    job_id = os.getenv("JOB_NAME", "").strip()
+    pull_number = os.getenv("PULL_NUMBER", "").strip()
+    job_type = os.getenv("JOB_TYPE", "").strip()
+    if prow_job_id and task_id and job_id:
         prow_base_url = (
             "https://prow.ci.openshift.org/view/gs/origin-ci-test/logs"
         )
 
         prow_pr_base_url = "https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release"  # NOQA
-        task_id = os.getenv("BUILD_ID")
-        job_id = os.getenv("JOB_NAME")
-        pull_number = os.getenv("PULL_NUMBER")
-        job_type = os.getenv("JOB_TYPE")
-        if job_type == "presubmit" and "pull" in task_id:
-            # Indicates a ci test triggered in PR against source code
-            job_type = "pull"
-        if job_type == "presubmit" and "rehearse" in task_id:
-            # Indicates a rehearsel in PR against openshift/release repo
+        if job_type == "presubmit":
+            # Presubmit jobs use the pull request log path.
             job_type = "pull"
         # Handle cases where a periodic job iw triggered via pull request
-        if job_type == "periodic" and pull_number:
+        if job_type == "periodic" and pull_number not in ("", "0"):
             job_type = "pull"
+        if job_type == "periodic" and not pull_number:
+            prowjob_url = (
+                "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/"
+                f"test-platform-results/logs/{job_id}/{task_id}/prowjob.json"
+            )
+            try:
+                response = requests.get(
+                    prowjob_url, timeout=PROW_METADATA_TIMEOUT
+                )
+                response.raise_for_status()
+                payload = response.json()
+                metadata = (
+                    payload.get("metadata")
+                    if isinstance(payload, Mapping)
+                    else None
+                )
+                labels = (
+                    metadata.get("labels")
+                    if isinstance(metadata, Mapping)
+                    else None
+                )
+                raw_pull_number = (
+                    labels.get("prow.k8s.io/refs.pull")
+                    if isinstance(labels, Mapping)
+                    else None
+                )
+                pull_number = (
+                    str(raw_pull_number).strip()
+                    if raw_pull_number is not None
+                    else "0"
+                )
+                if not pull_number.isdigit() or pull_number == "0":
+                    pull_number = "0"
+            except (requests.RequestException, ValueError, TypeError):
+                pull_number = "0"
+            if pull_number != "0":
+                job_type = "pull"
         if job_type == "pull":
-            build_url = f"{prow_pr_base_url}/{pull_number}/{task_id}/{job_id}"
+            if pull_number:
+                return f"{prow_pr_base_url}/{pull_number}/{job_id}/{task_id}"
         else:
-            build_url = f"{prow_base_url}/{job_id}/{task_id}"
+            return f"{prow_base_url}/{job_id}/{task_id}"
 
-    elif os.getenv("BUILD_URL", ""):
+    build_url = os.getenv("BUILD_URL", "").strip()
+    parsed_url = urlparse(build_url)
+    if parsed_url.scheme in ("http", "https") and parsed_url.netloc:
         # Jenkins build url
-        build_url = os.getenv("BUILD_URL")
-    return build_url
+        return build_url
+
+    return "manual"
