@@ -137,7 +137,7 @@ class KrknTelemetryOpenshift(KrknTelemetryKubernetes):
         cluster_version = get_result("get_clusterversion_string")
         if cluster_version:
             chaos_telemetry.cluster_version = cluster_version
-            chaos_telemetry.major_version = cluster_version[:4]
+            chaos_telemetry.major_version = cluster_version[:4].rstrip(".")
         chaos_telemetry.network_plugins = (
             get_result("get_cluster_network_plugins") or []
         )
