@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 import xml.etree.ElementTree as ET
+from unittest.mock import patch
 
 import yaml
 from dateutil.tz import tzutc
@@ -441,6 +442,7 @@ class UtilFunctionTests(BaseTest):
         github_run_id = os.getenv("GITHUB_RUN_ID", "")
         os.environ["GITHUB_RUN_ID"] = ""
         os.environ["PROW_JOB_ID"] = "1953335493844275200"
+        os.environ["PULL_NUMBER"] = "0"
         os.environ["BUILD_ID"] = (
             "periodic-ci-redhat-chaos-prow-scripts-main-cr-4.19-nightly-krkn-hub-aws"  # NOQA
         )
@@ -474,3 +476,156 @@ class UtilFunctionTests(BaseTest):
         print("ci job url" + str(ci_job_url))
         self.assertEqual(ci_job_url, os.environ["BUILD_URL"])
         os.environ["GITHUB_RUN_ID"] = github_run_id
+
+    def test_get_ci_job_url_does_not_build_incomplete_urls(self):
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_REPOSITORY": "",
+                "PROW_JOB_ID": "prow-123",
+                "BUILD_ID": "",
+                "JOB_NAME": "periodic-job",
+                "BUILD_URL": "",
+            },
+            clear=True,
+        ):
+            self.assertEqual(utils.get_ci_job_url(), "manual")
+
+    def test_get_ci_job_url_returns_valid_ci_urls(self):
+        with patch.dict(
+            os.environ,
+            {
+                "PROW_JOB_ID": "prow-123",
+                "BUILD_ID": "periodic-job",
+                "JOB_NAME": "2105900889041539072",
+                "JOB_TYPE": "periodic",
+                "PULL_NUMBER": "0",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                utils.get_ci_job_url(),
+                "https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/"
+                "2105900889041539072/periodic-job",
+            )
+
+        with patch.dict(
+            os.environ,
+            {
+                "PROW_JOB_ID": "prow-456",
+                "BUILD_ID": "presubmit-build",
+                "JOB_NAME": "presubmit-job",
+                "JOB_TYPE": "presubmit",
+                "PULL_NUMBER": "42",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                utils.get_ci_job_url(),
+                "https://prow.ci.openshift.org/view/gs/"
+                "test-platform-results/pr-logs/pull/openshift_release/42/"
+                "presubmit-job/presubmit-build",
+            )
+
+        with patch(
+            "krkn_lib.utils.functions.requests.get"
+        ) as mock_get:
+            mock_get.return_value.json.return_value = {
+                "metadata": {
+                    "labels": {"prow.k8s.io/refs.pull": "84"}
+                }
+            }
+            with patch.dict(
+                os.environ,
+                {
+                    "PROW_JOB_ID": "prow-789",
+                    "BUILD_ID": "periodic-build",
+                    "JOB_NAME": "periodic-job",
+                    "JOB_TYPE": "periodic",
+                },
+                clear=True,
+            ):
+                self.assertEqual(
+                    utils.get_ci_job_url(),
+                    "https://prow.ci.openshift.org/view/gs/"
+                    "test-platform-results/pr-logs/pull/openshift_release/84/"
+                    "periodic-job/periodic-build",
+                )
+            mock_get.assert_called_once_with(
+                "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/"
+                "test-platform-results/logs/periodic-job/periodic-build/"
+                "prowjob.json",
+                timeout=1,
+            )
+
+        with patch("krkn_lib.utils.functions.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {
+                "metadata": {"labels": {"prow.k8s.io/refs.pull": None}}
+            }
+            with patch.dict(
+                os.environ,
+                {
+                    "PROW_JOB_ID": "prow-null",
+                    "BUILD_ID": "periodic-build",
+                    "JOB_NAME": "periodic-job",
+                    "JOB_TYPE": "periodic",
+                },
+                clear=True,
+            ):
+                self.assertEqual(
+                    utils.get_ci_job_url(),
+                    "https://prow.ci.openshift.org/view/gs/"
+                    "origin-ci-test/logs/periodic-job/periodic-build",
+                )
+
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_REPOSITORY": "redhat-chaos/krkn-lib",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                utils.get_ci_job_url(),
+                "https://github.com/redhat-chaos/krkn-lib/actions/runs/123",
+            )
+
+        with patch.dict(
+            os.environ,
+            {
+                "BUILD_URL": "https://jenkins.example.com/job/krkn/123",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                utils.get_ci_job_url(),
+                "https://jenkins.example.com/job/krkn/123",
+            )
+
+    def test_get_ci_job_url_handles_malformed_prow_metadata(self):
+        malformed_payloads = [
+            [],
+            {"metadata": None},
+            {"metadata": {"labels": None}},
+            {"metadata": {"labels": []}},
+        ]
+        with patch("krkn_lib.utils.functions.requests.get") as mock_get:
+            with patch.dict(
+                os.environ,
+                {
+                    "PROW_JOB_ID": "prow-malformed",
+                    "BUILD_ID": "periodic-build",
+                    "JOB_NAME": "periodic-job",
+                    "JOB_TYPE": "periodic",
+                },
+                clear=True,
+            ):
+                for payload in malformed_payloads:
+                    mock_get.return_value.json.return_value = payload
+                    self.assertEqual(
+                        utils.get_ci_job_url(),
+                        "https://prow.ci.openshift.org/view/gs/"
+                        "origin-ci-test/logs/periodic-job/periodic-build",
+                    )
