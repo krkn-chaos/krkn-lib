@@ -440,7 +440,7 @@ class TestCollectClusterMetadata(unittest.TestCase):
         telemetry, mock_ocpcli = _make_telemetry()
         mock_ocpcli.get_cloud_infrastructure.return_value = "AWS"
         mock_ocpcli.get_cluster_type.return_value = "Managed"
-        mock_ocpcli.get_clusterversion_string.return_value = "4.15.2"
+        mock_ocpcli.get_clusterversion_string.return_value = "5.1."
         mock_ocpcli.get_cluster_network_plugins.return_value = ["OVN"]
         mock_get_vm.return_value = 10
         mock_get_build.return_value = 20
@@ -453,10 +453,8 @@ class TestCollectClusterMetadata(unittest.TestCase):
             mock_super_collect.assert_called_once_with(chaos_telemetry)
         self.assertEqual(chaos_telemetry.cloud_infrastructure, "AWS")
         self.assertEqual(chaos_telemetry.cloud_type, "Managed")
-        # Assert both the raw version string and the derived major_version slice
-        # to make clear we are validating current [:4] behavior, not invented semantics.
-        self.assertEqual(chaos_telemetry.cluster_version, "4.15.2")
-        self.assertEqual(chaos_telemetry.major_version, "4.15")
+        self.assertEqual(chaos_telemetry.cluster_version, "5.1.")
+        self.assertEqual(chaos_telemetry.major_version, "5.1")
         self.assertEqual(chaos_telemetry.network_plugins, ["OVN"])
         self.assertEqual(
             chaos_telemetry.kubernetes_objects_count["VirtualMachineInstance"],
@@ -470,6 +468,34 @@ class TestCollectClusterMetadata(unittest.TestCase):
             chaos_telemetry.kubernetes_objects_count["Route"],
             30,
         )
+
+    @patch.object(KrknTelemetryOpenshift, "get_route_count")
+    @patch.object(KrknTelemetryOpenshift, "get_build_count")
+    @patch.object(KrknTelemetryOpenshift, "get_vm_number")
+    def test_major_version_preserves_two_digit_minor_versions(
+        self,
+        mock_get_vm,
+        mock_get_build,
+        mock_get_route,
+    ):
+        """Keeps OpenShift 4.22 versions as 4.22."""
+        telemetry, mock_ocpcli = _make_telemetry()
+        mock_ocpcli.get_cloud_infrastructure.return_value = "AWS"
+        mock_ocpcli.get_cluster_type.return_value = "Managed"
+        mock_ocpcli.get_clusterversion_string.return_value = "4.22.0"
+        mock_ocpcli.get_cluster_network_plugins.return_value = []
+        mock_get_vm.return_value = 0
+        mock_get_build.return_value = 0
+        mock_get_route.return_value = 0
+
+        chaos_telemetry = ChaosRunTelemetry()
+        with patch(
+            "krkn_lib.telemetry.k8s.KrknTelemetryKubernetes.collect_cluster_metadata"
+        ):
+            telemetry.collect_cluster_metadata(chaos_telemetry)
+
+        self.assertEqual(chaos_telemetry.cluster_version, "4.22.0")
+        self.assertEqual(chaos_telemetry.major_version, "4.22")
 
     @patch.object(KrknTelemetryOpenshift, "get_route_count")
     @patch.object(KrknTelemetryOpenshift, "get_build_count")
