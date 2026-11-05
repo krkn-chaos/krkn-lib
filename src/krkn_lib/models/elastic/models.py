@@ -97,6 +97,7 @@ class ElasticAffectedVMI(InnerDoc):
     total_recovery_time = Float()
     vmi_readiness_time = Float()
     vmi_rescheduling_time = Float()
+    guest_reachable_time = Float()
 
 
 class ElasticVmisStatus(InnerDoc):
@@ -274,6 +275,8 @@ class ElasticChaosRunTelemetry(Document):
                             total_recovery_time=vmi.total_recovery_time,
                             vmi_readiness_time=vmi.vmi_readiness_time,
                             vmi_rescheduling_time=vmi.vmi_rescheduling_time,
+                            # Requires AffectedVMI.guest_reachable_time (krkn-lib 7.0.4+)
+                            guest_reachable_time=vmi.guest_reachable_time,
                         )
                         for vmi in sc.affected_vmis.recovered
                     ],
