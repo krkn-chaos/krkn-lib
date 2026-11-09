@@ -543,6 +543,7 @@ class BaseTest(unittest.TestCase):
                                 "total_recovery_time": 15.0,
                                 "vmi_readiness_time": 8.0,
                                 "vmi_rescheduling_time": 3.0,
+                                "guest_reachable_time": 4.0,
                             }
                         ],
                         "unrecovered": [
