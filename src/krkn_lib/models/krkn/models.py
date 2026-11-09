@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 
@@ -126,6 +126,7 @@ class HogConfig:
     duration: int
     namespace: str
     node_selector: str
+    node_name: Optional[Union[str, list[str]]]
     tolerations: list[str]
 
     def __init__(self):
@@ -146,6 +147,7 @@ class HogConfig:
         self.duration = 30
         self.namespace = "default"
         self.node_selector = ""
+        self.node_name = None
         self.tolerations = []
 
     @staticmethod
@@ -177,6 +179,8 @@ class HogConfig:
             config.number_of_nodes = yaml_dict["number-of-nodes"]
         if "image" in yaml_dict.keys() and yaml_dict["image"]:
             config.image = yaml_dict["image"]
+        if "node-name" in yaml_dict.keys() and yaml_dict["node-name"]:
+            config.node_name = yaml_dict["node-name"]
 
         if "taints" in yaml_dict.keys() and yaml_dict["taints"]:
             for taint in yaml_dict["taints"]:
