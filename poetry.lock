@@ -1393,6 +1393,19 @@ files = [
 ]
 
 [[package]]
+name = "nvidia-ml-py"
+version = "13.615.71"
+description = "Python Bindings for the NVIDIA Management Library"
+optional = true
+python-versions = "*"
+groups = ["main"]
+markers = "extra == \"gpu\""
+files = [
+    {file = "nvidia_ml_py-13.615.71-py3-none-any.whl", hash = "sha256:959bf4adf6fe1308e4bd739e722236b0d1ec8392e2cefad33ff70c311380b9b6"},
+    {file = "nvidia_ml_py-13.615.71.tar.gz", hash = "sha256:bebe4e48f51b1dc75028c0815cb7bfa14a31a5bb80be70c9d980c6036953fc3d"},
+]
+
+[[package]]
 name = "oauthlib"
 version = "3.3.1"
 description = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
@@ -2675,7 +2688,10 @@ enabler = ["pytest-enabler (>=2.2)"]
 test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_itertools", "pytest (>=6,!=8.1.*)", "pytest-ignore-flaky"]
 type = ["pytest-mypy"]
 
+[extras]
+gpu = ["nvidia-ml-py"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "30f4dac5b02b8b2ec4fd1585226e4833227888bd03bb188a721dea305785a421"
+content-hash = "b471fad5d1683550aad13dae04937d9fb537259140466fbf4dc4ff55d81454b3"
