@@ -138,6 +138,12 @@ class TestKrknElasticModels(BaseTest):
             .vmi_rescheduling_time,
             3.0,
         )
+        self.assertEqual(
+            elastic_telemetry.scenarios[0]
+            .affected_vmis.recovered[0]
+            .guest_reachable_time,
+            4.0,
+        )
 
         # scenarios -> affected_vmis -> unrecovered
         self.assertEqual(

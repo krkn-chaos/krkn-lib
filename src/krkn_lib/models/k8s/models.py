@@ -239,10 +239,17 @@ class AffectedVMI:
     vmi_readiness_time: float
     """
     The time the VMI took to become ready after being scheduled
+    (KubeVirt phase == Running; guest may still be at UEFI)
+    """
+    guest_reachable_time: float
+    """
+    Optional: time from VMI Running until the guest first responds
+    to a reachability probe (ICMP ping or TCP). None when not measured.
     """
     total_recovery_time: float
     """
     Total amount of time the VMI took to become ready
+    (reschedule + readiness [+ guest_reachable when measured])
     """
 
     def __init__(
@@ -252,12 +259,14 @@ class AffectedVMI:
         total_recovery_time: float = None,
         vmi_readiness_time: float = None,
         vmi_rescheduling_time: float = None,
+        guest_reachable_time: float = None,
     ):
         self.vmi_name = vmi_name
         self.namespace = namespace
         self.total_recovery_time = total_recovery_time
         self.vmi_readiness_time = vmi_readiness_time
         self.vmi_rescheduling_time = vmi_rescheduling_time
+        self.guest_reachable_time = guest_reachable_time
 
 
 class VmisStatus:
@@ -277,6 +286,7 @@ class VmisStatus:
         self.error = None
         if json_object:
             for recovered in (json_object.get("recovered") or []):
+                guest_time = recovered.get("guest_reachable_time")
                 self.recovered.append(
                     AffectedVMI(
                         recovered["vmi_name"],
@@ -284,6 +294,7 @@ class VmisStatus:
                         float(recovered["total_recovery_time"]),
                         float(recovered["vmi_readiness_time"]),
                         float(recovered["vmi_rescheduling_time"]),
+                        float(guest_time) if guest_time is not None else None,
                     )
                 )
             for unrecovered in (json_object.get("unrecovered") or []):
