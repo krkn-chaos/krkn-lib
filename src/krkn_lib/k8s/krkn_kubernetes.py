@@ -3914,7 +3914,9 @@ class KrknKubernetes:
         :param pod_namespace: namespace of the Pod associated with the PID
         :param pod_container_id: container id of Pod associated with the PID
 
-        :return: list of pids None.
+        :return: list of PIDs whose network namespace differs from the
+            node host namespace (supervisor processes like conmon are
+            excluded), or None when no PID matches.
         """
 
         if not self.check_if_pod_exists(base_pod_name, base_pod_namespace):
@@ -3940,11 +3942,35 @@ class KrknKubernetes:
             base_pod_namespace,
             base_pod_container_name,
         )
-        if pids:
-            pids_list = pids.split("\n")
-            pids_list = list(filter(None, pids_list))
-            return pids_list
-        return None
+        if not pids:
+            return None
+        pids_list = pids.split("\n")
+        pids_list = list(filter(None, pids_list))
+
+        # The cgroup grep matches supervisor processes (e.g. conmon) that
+        # belong to the container's cgroup but run in the HOST network
+        # namespace. nsenter-ing them would apply network rules to the
+        # node itself, so only keep PIDs whose network namespace differs
+        # from init's (PID 1).
+        filter_cmd = (
+            'for p in {}; do '
+            '[ "$(readlink /proc/$p/ns/net 2>/dev/null)" '
+            '!= "$(readlink /proc/1/ns/net 2>/dev/null)" ] && echo $p; done'
+        ).format(" ".join(pids_list))
+        filtered = self.exec_cmd_in_pod(
+            [filter_cmd],
+            base_pod_name,
+            base_pod_namespace,
+            base_pod_container_name,
+        )
+        if filtered:
+            filtered_list = list(filter(None, filtered.split("\n")))
+            if filtered_list:
+                return filtered_list
+        # no PID survived the netns filter (either every matching process
+        # is host-networked, or readlink is unavailable): return the raw
+        # list so callers can decide how to fail
+        return pids_list
 
     def list_pod_network_interfaces(
         self, pod_name: str, namespace: str, container_name: str = None
