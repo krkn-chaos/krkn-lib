@@ -37,6 +37,12 @@ from krkn_lib.models.elastic.models import (
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.utils.safe_logger import SafeLogger
 
+# Number of attempts and delay between attempts used by
+# KrknElastic._detect_backend when the info endpoint of the search
+# backend replies with a non-200 status (e.g. right after deployment).
+DETECT_BACKEND_MAX_ATTEMPTS = 3
+DETECT_BACKEND_RETRY_DELAY = 2  # seconds
+
 
 class KrknElastic:
     es = None
@@ -104,6 +110,15 @@ class KrknElastic:
                     verify_certs=verify_certs,
                     ssl_show_warn=False,
                 )
+
+            # Defense in depth: _detect_backend must always return a
+            # known backend type, but if it ever doesn't, fail loudly
+            # here instead of leaving the client silently uninitialized.
+            if self.es is None:
+                raise Exception(
+                    "failed to initialize the search backend client: "
+                    f"unknown backend type: {self.backend_type}"
+                )
         except Exception as e:
             self.safe_logger.error(
                 "Failed to initialize %s: %s" % (self.backend_type, e)
@@ -121,6 +136,14 @@ class KrknElastic:
         Auto-detect whether the backend is Elasticsearch or OpenSearch
         by querying the cluster info endpoint.
 
+        A non-200 response (e.g. from a backend that is still starting
+        up) is retried a few times before giving up. Connection errors
+        and malformed 200 responses (invalid JSON or an unexpected
+        metadata shape) fall back immediately. This method never
+        returns anything other than "elasticsearch" or "opensearch":
+        on any unrecoverable failure it falls back to "elasticsearch"
+        so that the client is always initialized.
+
         :param elastic_url: The URL of the search backend
         :param elastic_port: The port of the search backend
         :param credentials: Optional tuple of (username, password)
@@ -130,58 +153,95 @@ class KrknElastic:
         # Build the info endpoint URL
         base_url = f"{elastic_url}:{elastic_port}"
         info_url = f"{base_url}/"
+        auth = credentials if credentials else None
+        last_status_code = None
 
-        try:
-            # Make a request to the info endpoint
-            auth = credentials if credentials else None
-            response = requests.get(
-                info_url,
-                auth=auth,
-                verify=verify_certs,
-                timeout=10,
-            )
-
-            if response.status_code == 200:
-                info = response.json()
-
-                # Check for OpenSearch-specific fields
-                if "version" in info:
-                    version_info = info["version"]
-
-                    # OpenSearch includes "distribution" field
-                    if "distribution" in version_info:
-                        distribution = version_info["distribution"].lower()
-                        if "opensearch" in distribution:
-                            return "opensearch"
-
-                    # Check build_type or other OpenSearch indicators
-                    if "build_type" in version_info:
-                        build_type = version_info.get("build_type", "").lower()
-                        if "opensearch" in build_type:
-                            return "opensearch"
-
-                    # Check tagline (OpenSearch has different tagline)
-                    tagline = info.get("tagline", "").lower()
-                    if "opensearch" in tagline:
-                        return "opensearch"
-
-                    # Check cluster name for opensearch indicators
-                    cluster_name = info.get("cluster_name", "").lower()
-                    if "opensearch" in cluster_name:
-                        return "opensearch"
-
-                # Default to ES if no OpenSearch indicators found
-                self.safe_logger.info(
-                    "No OpenSearch indicators found, using Elasticsearch"
+        for attempt in range(1, DETECT_BACKEND_MAX_ATTEMPTS + 1):
+            try:
+                # Make a request to the info endpoint
+                response = requests.get(
+                    info_url,
+                    auth=auth,
+                    verify=verify_certs,
+                    timeout=10,
+                )
+            except Exception as e:
+                # Connection-level errors are not retried: fall back
+                # immediately.
+                self.safe_logger.warning(
+                    f"Failed to auto-detect backend type: {e}. "
+                    f"Defaulting to Elasticsearch"
                 )
                 return "elasticsearch"
 
-        except Exception as e:
-            self.safe_logger.warning(
-                f"Failed to auto-detect backend type: {e}. "
-                f"Defaulting to Elasticsearch"
-            )
-            return "elasticsearch"
+            if response.status_code == 200:
+                try:
+                    info = response.json()
+
+                    # Check for OpenSearch-specific fields
+                    if "version" in info:
+                        version_info = info["version"]
+
+                        # OpenSearch includes "distribution" field
+                        if "distribution" in version_info:
+                            distribution = version_info["distribution"].lower()
+                            if "opensearch" in distribution:
+                                return "opensearch"
+
+                        # Check build_type or other indicators
+                        if "build_type" in version_info:
+                            build_type = version_info.get(
+                                "build_type", ""
+                            ).lower()
+                            if "opensearch" in build_type:
+                                return "opensearch"
+
+                        # Check tagline (OpenSearch different tagline)
+                        tagline = info.get("tagline", "").lower()
+                        if "opensearch" in tagline:
+                            return "opensearch"
+
+                        # Check cluster name for opensearch indicators
+                        cluster_name = info.get("cluster_name", "").lower()
+                        if "opensearch" in cluster_name:
+                            return "opensearch"
+
+                    # Default to ES if no OpenSearch indicators found
+                    self.safe_logger.info(
+                        "No OpenSearch indicators found, using Elasticsearch"
+                    )
+                    return "elasticsearch"
+                except Exception as e:
+                    # A 200 response with a malformed payload (e.g.
+                    # invalid JSON or an unexpected version field)
+                    # must not leak out of the detection: fall back
+                    # to Elasticsearch.
+                    self.safe_logger.warning(
+                        f"Failed to auto-detect backend type: "
+                        f"malformed response from the info endpoint: "
+                        f"{e}. Defaulting to Elasticsearch"
+                    )
+                    return "elasticsearch"
+
+            # The backend answered but is not serving requests yet
+            # (e.g. still booting): retry before giving up.
+            last_status_code = response.status_code
+            if attempt < DETECT_BACKEND_MAX_ATTEMPTS:
+                self.safe_logger.info(
+                    f"Search backend info endpoint returned "
+                    f"{last_status_code} (attempt {attempt}/"
+                    f"{DETECT_BACKEND_MAX_ATTEMPTS}), retrying in "
+                    f"{DETECT_BACKEND_RETRY_DELAY}s..."
+                )
+                time.sleep(DETECT_BACKEND_RETRY_DELAY)
+
+        self.safe_logger.warning(
+            f"Failed to auto-detect backend type: info endpoint "
+            f"returned {last_status_code} after "
+            f"{DETECT_BACKEND_MAX_ATTEMPTS} attempts. "
+            f"Defaulting to Elasticsearch"
+        )
+        return "elasticsearch"
 
     def _is_not_found_error(self, exception: Exception) -> bool:
         """

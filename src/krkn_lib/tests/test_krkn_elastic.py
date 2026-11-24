@@ -4,7 +4,10 @@ import time
 import uuid
 from unittest import mock
 
-from krkn_lib.elastic.krkn_elastic import KrknElastic
+from krkn_lib.elastic.krkn_elastic import (
+    DETECT_BACKEND_MAX_ATTEMPTS,
+    KrknElastic,
+)
 from krkn_lib.models.elastic.models import ElasticAlert, ElasticMetric
 from krkn_lib.models.telemetry import ChaosRunTelemetry
 from krkn_lib.tests import BaseTest
@@ -290,9 +293,7 @@ class TestKrknElastic(BaseTest):
             any("timeout" in m for m in error_messages),
             "Expected exception message in error log",
         )
-        info_messages = [
-            str(call) for call in mock_logger.info.call_args_list
-        ]
+        info_messages = [str(call) for call in mock_logger.info.call_args_list]
         self.assertFalse(
             any("timeout" in m for m in info_messages),
             "Exception message must not appear in info log",
@@ -880,6 +881,90 @@ class TestKrknElasticOpenSearch(BaseTest):
 
         # Should fall back to Elasticsearch
         self.assertEqual(client.backend_type, "elasticsearch")
+
+    @mock.patch("krkn_lib.elastic.krkn_elastic.time.sleep")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.Elasticsearch")
+    def test_auto_detect_non_200_falls_back_to_elasticsearch(
+        self, mock_elasticsearch_class, mock_requests_get, mock_sleep
+    ):
+        """Test auto-detection retries non-200 responses and falls back
+        to Elasticsearch instead of leaving the client uninitialized"""
+        # Mock the info endpoint responding with a non-200 status
+        # (e.g. a backend that is still starting up)
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 503
+        mock_requests_get.return_value = mock_response
+
+        mock_client = mock.MagicMock()
+        mock_elasticsearch_class.return_value = mock_client
+
+        client = KrknElastic(
+            SafeLogger(),
+            "https://search.example.com",
+            9200,
+        )
+
+        # Non-200 responses must be retried...
+        self.assertEqual(
+            mock_requests_get.call_count, DETECT_BACKEND_MAX_ATTEMPTS
+        )
+        # ...and must still fall back to a working Elasticsearch client
+        self.assertEqual(client.backend_type, "elasticsearch")
+        self.assertIsNotNone(client.es)
+        mock_elasticsearch_class.assert_called_once()
+
+    @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.Elasticsearch")
+    def test_auto_detect_malformed_json_falls_back_to_elasticsearch(
+        self, mock_elasticsearch_class, mock_requests_get
+    ):
+        """Test auto-detection falls back to Elasticsearch when the
+        info endpoint returns a 200 response with malformed JSON"""
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Expecting value")
+        mock_requests_get.return_value = mock_response
+
+        mock_client = mock.MagicMock()
+        mock_elasticsearch_class.return_value = mock_client
+
+        client = KrknElastic(
+            SafeLogger(),
+            "https://search.example.com",
+            9200,
+        )
+
+        self.assertEqual(client.backend_type, "elasticsearch")
+        self.assertIsNotNone(client.es)
+        mock_elasticsearch_class.assert_called_once()
+
+    @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
+    @mock.patch("krkn_lib.elastic.krkn_elastic.Elasticsearch")
+    def test_auto_detect_bad_version_metadata_falls_back_to_elasticsearch(
+        self, mock_elasticsearch_class, mock_requests_get
+    ):
+        """Test auto-detection falls back to Elasticsearch when the
+        version metadata in a 200 response has an unexpected shape"""
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "version": {"distribution": 12345},
+        }
+        mock_requests_get.return_value = mock_response
+
+        mock_client = mock.MagicMock()
+        mock_elasticsearch_class.return_value = mock_client
+
+        client = KrknElastic(
+            SafeLogger(),
+            "https://search.example.com",
+            9200,
+        )
+
+        self.assertEqual(client.backend_type, "elasticsearch")
+        self.assertIsNotNone(client.es)
+        mock_elasticsearch_class.assert_called_once()
 
     @mock.patch("krkn_lib.elastic.krkn_elastic.requests.get")
     @mock.patch("krkn_lib.elastic.krkn_elastic.OpenSearch")
