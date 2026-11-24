@@ -333,6 +333,40 @@ class KrknKubernetesTestsDelete(BaseTest):
 
         mock_cli.delete_namespaced_pod.assert_not_called()
 
+    def test_delete_job_already_deleted(self):
+        mock_batch = MagicMock()
+        mock_batch.delete_namespaced_job.side_effect = ApiException(status=404)
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            self.lib_k8s.delete_job("name", "namespace")
+
+    def test_delete_job_unexpected_api_exception_returns_none(self):
+        mock_batch = MagicMock()
+        mock_batch.delete_namespaced_job.side_effect = ApiException(status=500)
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            self.lib_k8s.delete_job("name", "namespace")
+
+    def test_delete_job_exception_raises(self):
+        mock_batch = MagicMock()
+        mock_batch.delete_namespaced_job.side_effect = Exception("mock error")
+        with patch.object(
+            KrknKubernetes,
+            "batch_cli",
+            new_callable=PropertyMock,
+            return_value=mock_batch,
+        ):
+            with self.assertRaises(Exception):
+                self.lib_k8s.delete_job("name", "namespace")
+
 
 if __name__ == "__main__":
     unittest.main()
